@@ -1,0 +1,10 @@
+ *  Copyright 2020 Steven Barcus
+ *
+ *
+ *  Developer retains all right, title, copyright, and interest, including all copyright, patent rights, trade secret in the Background
+ *  technology. May be subject to consulting fees under the Agreement between the Developer and the Customer. Developer grants a 
+ *  non-exclusive perpetual license to use the Background technology in the Software developed for and delivered to Customer under this
+ *  Agreement. However, the Customer shall make no commercial use of the Background technology without
+ *  Developer's written consent.
+ *
+ *  Software Distribution is restricted and shall be done only with Developer's written approval.
