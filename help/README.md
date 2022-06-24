@@ -27,7 +27,8 @@
     <img title="" alt="YoLink Mobile App Screenshot" width="450" height="800" src="https://raw.githubusercontent.com/srbarcus/yolink/main/help/ss6.png">
     </div>
     <div>
-    <h2>Open the Hubitat mobile app, create a new User App and copy the UAID and Secret Key values into the new Hubitat app</h2>      
+    <h2>Open the Hubitat mobile app, create a new User App and copy the UAID and Secret Key values into the new Hubitat app</h2> 
+    <h3>Take care to insure upper and lowercase letters, as well as similar looking characters such as '0' (zero) and 'O' (oh) and '1' (one) and 'l' (ell), are specified exactly as shown in the app.</h3>  
     <img title="" alt="YoLink Mobile App Screenshot" width="450" height="800" src="https://raw.githubusercontent.com/srbarcus/yolink/main/help/ss7.png">
     </div>
     </br>
