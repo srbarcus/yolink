@@ -1,0 +1,14 @@
+{
+  "author": "Steven Barcus",
+  "gitHubUrl": "https://github.com/srbarcus",
+  "payPalUrl": "https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1",
+  "packages": [
+    {
+      "id": "ecda1f74-aa9a-4b99-98c7-ec0a9a0a4811",
+      "name": "YoLink Devices",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/packageManifest.json",
+      "description": "Integrates YoLink hub and device control within Hubitat."
+    }
+  ]
+}
