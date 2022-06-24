@@ -4,13 +4,15 @@
   "payPalUrl": "https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1",
   "packages": [
     {
-      "id": "341cc03d-5825-4a8d-a9f2-830332ad1bda",
+      "id": "eea28e53-16ad-4329-b8d9-030c93dce3b6",
       "name": "YoLink Devices",
       "category": "Integrations",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/packageManifest.json",
       "description": "Integrates YoLink hub and device control within Hubitat.",
       "tags": [
-        "Misc. Devices"
+	"Cloud",
+	"Misc. Devices",
+	"Speakers"
       ]
     }
   ]
