@@ -190,6 +190,8 @@ def getDevicestate() {
             request.put("targetDevice", "${state.devId}") 
             request.put("token", "${state.token}") 
         
+        logDebug("pollAPI($request, $state.name, $state.type)") 
+        
         def object = parent.pollAPI(request, state.name, state.type)
          
         if (object) {
@@ -431,20 +433,18 @@ def DisableVoiceResults() {
     rememberState("voiceResults", false)       
     }
 
-def setVolume(volume) {
-    volume = Integer.valueOf(volume)
-    
-    if (volume < 0)  {
-        volume = 1
+def setVolume(value) {    
+    if (value < 0)  {
+        value = 1
     } else {
-        if (volume > 16) {
-            volume = 16
+        if (value > 16) {
+            value = 16
         }
     }    
         
-    rememberState("volume", volume)   
-    setOption(volume,null,null)
-    voiceResult("Speaker volume set to ${volume}")
+    rememberState("volume", value)   
+    setOption(value,null,null)
+    voiceResult("Speaker volume set to ${value}")
     }
 
 def volumeDown() {
@@ -481,12 +481,12 @@ def Announce(text, pretone="Chime-down", posttone="Chime-up", repeats=1, volume=
     state.voiceResults=false
     
     DisableBeep()
-    Unmute()
-    Volume(volume)
+    unmute()
+    setVolume(volume)
                 
     if (pretone) {
         state.repeat=repeats
-        PlayTone(pretone)
+        playTrack(pretone)
     }
     
     state.repeat=0        
@@ -494,7 +494,7 @@ def Announce(text, pretone="Chime-down", posttone="Chime-up", repeats=1, volume=
     
     if (posttone) {
         state.repeat=repeats
-        PlayTone(posttone)
+        playTrack(posttone)
     }
     
     if (confirmationBeepCur) {
@@ -505,13 +505,13 @@ def Announce(text, pretone="Chime-down", posttone="Chime-up", repeats=1, volume=
     }
     
     state.repeat=repeatCur  
-    Volume(volumeCur)                  //Reset volume
+    setVolume(volumeCur)                  //Reset volume
     
-    if (muteCur) {
-        Mute()
+    if (muteCur=="muted") {
+        mute()
     }
     else{
-        Unmute()
+        unmute()
     }
     
     state.voiceResults = voiceResultsCur    
@@ -535,10 +535,6 @@ def playAudio(tone = null, message = null, volume = null) {
    if (message != null) {params.put("message", message)
                          rememberState("lastText", message + mutestate)
                         }
-   
-   // Comment out to test mp3  
-   //if (message != null) {params.put("file", message)} 
- 
     
    if (volume != null)   {params.put("volume", volume.toInteger())}
    if (state.repeat != 0) params.put("repeat", Integer.valueOf(state.repeat))       // Integer(0~10),Optional:	Repeat times, 0 or null means not repeat. 
@@ -700,7 +696,7 @@ def reset(setup = false){
         
     state.voiceResults=false
     setOption(null,false,null) //Disable beep    
-    Volume(5)    
+    setVolume(5)    
     setOption(null,null,false) //Unmute
     state.repeat=0 
         
@@ -711,8 +707,8 @@ def reset(setup = false){
         state.voiceResults=false
     }
 
-    Unmute()
-    Volume(5)    
+    unmute()
+    setVolume(5)    
     Repeat(0)
     DisableBeep()
     
