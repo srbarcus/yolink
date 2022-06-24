@@ -44,7 +44,7 @@ preferences {
 	page(name: "about", title: "About", nextPage: "credentials")
     page(name: "credentials", title: "YoLink™ App User Access Credentials", content:"credentials", nextPage:"deviceList")
     page(name: "deviceList",title: "YoLink™ Devices", content:"deviceList",nextPage: "otherSettings")  
-	page(name: "otherSettings", title: "Other Settings", content:"otherSettings", install:true, uninstall: false)
+	page(name: "otherSettings", title: "Other Settings", content:"otherSettings", uninstall: false)
 }
 
 def about() {
@@ -126,7 +126,7 @@ def otherSettings() {
                     log.debug "Creating selected Device: ${devname}, ${devtype}, ${devtoken}, ${devId}"	
                     def Hubitat_dni = "yolink_${devtype}_${dni}"
                     Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
-                    Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)  
+                    if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}
 				} 	 
     
     def devname = "YoLink Cloud Listener"
@@ -162,12 +162,34 @@ def otherSettings() {
 	}
 }
 
+def installed() {
+    log.info "${get_APP_NAME()} app installed."
+   	pollDevices()   
+    schedulePolling()
+}
+
+def updated() {
+	log.info "${get_APP_NAME()} app updated."    
+    pollDevices()   
+    schedulePolling()
+}
+
+def uninstalled() {    
+    unschedule()
+    log.warn "Uninstalling ${get_APP_NAME()} app"
+    if (removeDevices != "False"){
+      delete_child_devices(getChildDevices()) 
+    }   
+}
+
 private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) { 	
     def newdni = Hubitat_dni
     def drivername = getYoLinkDriverName("$devtype")
     int countNewChildDevices = 0        
         
 	def dev = allChildDevices.find {it.deviceNetworkId.contains(newdni)}	
+    
+    def failed = false
 
 	if(!dev) {
         def labelName = "YoLink $devtype - ${devname}"
@@ -183,6 +205,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
            }  
             
 		} catch (IllegalArgumentException e) {
+            failed = true
     		log.error "An error occcurred while trying add child device '$labelName'"
                                 
             if (e.message.contains("Please use a different DNI")){    //Could happen if user uninstalled app without deleting previous children                 
@@ -190,7 +213,19 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
             } else {    
                   throw new IllegalArgumentException(e.message)  
             }                  
-        }
+        } catch (Exception e) {
+            failed = true
+    		                                
+            if (e.message.contains("not found")) {                
+                if (e.message.contains("MQTT Listener") == false){ 
+                  log.error "Unable to create device '$devname' because driver '$drivername' is not installed. Either the device is not currently supported by the YoLink™ Device Service, or you need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
+                }                 
+            } else {    
+                  throw new IllegalArgumentException(e.message)  
+            }                      
+        } finally {
+            if (failed) {return null}
+        }    
             
         log.trace "Calling child device setup: $newdni, $state.homeID, $devname, $devtype, $devtoken, $devId"
         dev.ServiceSetup(newdni,state.homeID,devname,devtype,devtoken,devId) 	// Initial setup of the Child Device             
@@ -208,26 +243,6 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
 	log.info "Created $countNewChildDevices of ${exposed.size()} selected devices."
     
     return newdni
-}
-
-def installed() {
-    log.info "${get_APP_NAME()} app installed with settings: ${settings}"
-   	pollDevices()   
-    schedulePolling()
-}
-
-def updated() {
-	log.info "${get_APP_NAME()} updated with settings: ${settings}"    
-    pollDevices()   
-    schedulePolling()
-}
-
-def uninstalled() {    
-    unschedule()
-    log.warn "Uninstalling ${get_APP_NAME()} app"
-    if (removeDevices != "False"){
-      delete_child_devices(getChildDevices()) 
-    }   
 }
 
 def pollDevices() {
