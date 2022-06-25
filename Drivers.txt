@@ -1,0 +1,27 @@
+CURRENTLY SUPPORTED
+-------------------
+Hub 				(YS1603-UC)
+Speaker Hub 			(YS1604-UC)
+Fob 				(YS3604-UC)
+Valve 				(YS4909-UC)
+YoLink Relay 			(YS5706-UC)
+Plug 				(YS6604-UC)
+Smoke & CO Alarm Wireless Base	(YS7A01-UC)
+Door Sensor 			(YS7707-UC)
+Motion Sensor 			(YS7804-UC)
+Outdoor Motion Sensor 		(YS7805-UC)
+Temperature Humidity Sensor 	(YS8003-UC)
+
+
+UNDER DEVELOPMENT
+-----------------
+In-wall Switch			(YS5705-UC)
+In-wall outlet 			(YS6704-UC)
+Siren Alarm   			(YS7103-UC)
+Water Leak Sensor		(YS7903-UC)
+Waterproof Temperature Sensor	(YS8004-UC)
+
+
+NOT SUPPORTED
+-------------
+Remote 				(YS3603-UC) - Only supports manually paired YoLink devices (device to device)
