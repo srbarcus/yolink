@@ -25,3 +25,8 @@ Waterproof Temperature Sensor	(YS8004-UC)
 NOT SUPPORTED
 -------------
 Remote 				(YS3603-UC) - Only supports manually paired YoLink devices (device to device)
+
+
+**********************************************************
+** ADDITIONAL DEVICES WILL BE SUPPORTED BASED ON DEMAND **
+**********************************************************
