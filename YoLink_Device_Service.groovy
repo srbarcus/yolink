@@ -77,7 +77,7 @@ def credentials() {
 	    }
         section("") {	
 			paragraph "Click here for information on obtaining your User Access Credentials from the YoLink™ mobile app" 
-				href url:"https://github.com/srbarcus/yolink/blob/main/help/README.md",
+				href url:"https://github.com/srbarcus/yolink/blob/main/Help/Obtaining_your_Personal_Access_Credentials.pdf",
 	 				title:"How to obtaining your User Access Credentials (UAC)"			
 		}
      } 
