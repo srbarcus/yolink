@@ -52,7 +52,8 @@ def about() {
  		section("") {	
 			paragraph image:"${getCustomImagePath()}yolink.png", boldTitle("${get_APP_NAME()} - Version ${get_APP_VERSION()}")
 			paragraph boldTitle("This app connects your YoLink™ devices to Hubitat via the cloud.")   
-            paragraph blueTitle("The app is neither developed, endorsed, or associated with YoLink™ or YoSmart, Inc.") 
+            paragraph blueTitle("The app is neither developed, endorsed, or associated with YoLink™ or YoSmart, Inc.) 
+	    paragraph blueTitle("Distributed on an 'AS IS' basis, without warranties or conditions of any kind, either express or implied.") 		
             paragraph boldTitle ("")
 			paragraph "Donations are appreciated and allow me to purchase new YoLink™ devices for development. Please donate via PayPal by clicking on this Paypal button:"
                 href url:"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD", title:"Paypal donation..."
