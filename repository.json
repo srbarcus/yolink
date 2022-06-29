@@ -4,7 +4,7 @@
   "payPalUrl": "https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1",
   "packages": [
     {
-      "id": "eea28e53-16ad-4329-b8d9-030c93dce3b6",
+      "id": "1826c98e-3343-4287-a666-5cb0a79ecfb2",
       "name": "YoLink Devices",
       "category": "Integrations",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/packageManifest.json",
