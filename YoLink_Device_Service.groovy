@@ -24,12 +24,9 @@ definition(
     oauth: false,    
     category: "YoLink",
     singleInstance: true,
-    iconUrl: "",
-    iconX2Url: ""
-    //iconUrl: "${getCustomImagePath()}yolink.png",
-    //iconX2Url: "${getCustomImagePath()}yolink.png"
-    //importUrl: "https://raw.githubusercontent.com/srbarcus/"
-    //importUrl:'https://raw.githubusercontent.com/imnotbob/webCoRE/hubitat-patches/smartapps/ady624/webcore-piston.src/webcore-piston.groovy'
+    iconUrl: "${getImagePath()}yolink.png",
+    iconX2Url: "${getImagePath()}yolink.png",
+    importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
 private def get_APP_VERSION() {
@@ -50,10 +47,10 @@ preferences {
 def about() {
  	dynamicPage(name: "about", title: pageTitle("About"), uninstall: true) {
  		section("") {	
-			paragraph image:"${getCustomImagePath()}yolink.png", boldTitle("${get_APP_NAME()} - Version ${get_APP_VERSION()}")
+			paragraph image:"${getImagePath()}yolink.png", boldTitle("${get_APP_NAME()} - Version ${get_APP_VERSION()}")
 			paragraph boldTitle("This app connects your YoLink™ devices to Hubitat via the cloud.")   
-            paragraph blueTitle("The app is neither developed, endorsed, or associated with YoLink™ or YoSmart, Inc.) 
-	    paragraph blueTitle("Provided 'AS IS', without warranties or conditions of any kind, either express or implied.") 		
+            paragraph blueTitle("The app is neither developed, endorsed, or associated with YoLink™ or YoSmart, Inc.") 
+	        paragraph blueTitle("Provided 'AS IS', without warranties or conditions of any kind, either express or implied.") 		
             paragraph boldTitle ("")
 			paragraph "Donations are appreciated and allow me to purchase new YoLink™ devices for development. Please donate via PayPal by clicking on this Paypal button:"
                 href url:"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD", title:"Paypal donation..."
@@ -302,7 +299,7 @@ private def tokenURL() {return "https://api.yosmart.com/open/yolink/token"}
 private def getStandardImagePath() {return "http://cdn.device-icons.smartthings.com/"}
 private int SUCCESS() {return 200}
 private int UNAUTHORIZED() {return 401}
-private def getCustomImagePath() {return "https://raw.githubusercontent.com/srbarcus/yolink/main/icons/"}   
+private def getImagePath() {return "https://raw.githubusercontent.com/srbarcus/yolink/main/icons/"}   
 
 def AuthToken() {state.access_token}  
 def refreshAuthToken() {   
