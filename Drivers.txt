@@ -11,14 +11,15 @@ Door Sensor 			(YS7707-UC)
 Motion Sensor 			(YS7804-UC)
 Outdoor Motion Sensor 		(YS7805-UC)
 Temperature Humidity Sensor 	(YS8003-UC)
+Siren Alarm   			(YS7103-UC) - 07/15/2021
+MultiOutlet                     (YS6801-UC) - 07/15/2021
+Temperature Sensor              (YS8004-UC) - 07/15/2021
 
 
 UNDER DEVELOPMENT
 -----------------
-Smart Power Strip   (YS6801-UC)
 In-wall Switch			(YS5705-UC)
 In-wall outlet 			(YS6704-UC)
-Siren Alarm   			(YS7103-UC)
 Water Leak Sensor		(YS7903-UC)
 Waterproof Temperature Sensor	(YS8004-UC)
 

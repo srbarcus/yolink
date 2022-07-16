@@ -1,12 +1,12 @@
 {
   "packageName": "YoLink Device Service",
   "author": "Steven Barcus",
-  "version": "1.0",
+  "version": "1.0.1",
   "minimumHEVersion": "2.1.9",
-  "dateReleased": "2022-06-23",
+  "dateReleased": "2022-07-15",
   "apps": [
     {
-      "id": "233c5bb2-07f9-4f96-9f13-84ad7136a88f",
+      "id": "1158942b-ae90-4d08-be94-cb370303b5d9",
       "name": "YoLink™ Device Service",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_Device_Service.groovy",
@@ -17,70 +17,70 @@
   ],
   "drivers": [
     {
-      "id": "6042b520-e77c-4ade-9357-38b145799be4",
+      "id": "c7c0e4ac-dccd-4851-bb22-6843ffb94431",
       "name": "YoLink Hub Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Hub_Device.groovy",
       "required": true
     },
     {
-      "id": "8b57cc35-06f0-4db3-a4b1-064242df5577",
+      "id": "f33ee806-67bf-4bab-a9b0-b1988dc2d221",
       "name": "YoLink SpeakerHub Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SpeakerHub_Device.groovy",
       "required": true
     },
     {
-      "id": "e6f4b7f0-c8e4-4870-90b5-fe07d6a5104d",
+      "id": "c72586b1-6729-48ef-a3fb-190a01d8d0ea",
       "name": "YoLink COSmokeSensor Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/COSmokeSensor_Device.groovy",
       "required": false
     },
     {
-      "id": "59ec2099-9d0a-4986-90e5-190a6b882744",
+      "id": "4a8c7a19-0055-42df-9ed9-f2176174b5c4",
       "name": "YoLink DoorSensor Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/DoorSensor_Device.groovy",
       "required": false
     },
     {
-      "id": "d02d618a-d8cd-4030-a787-dd3dd14427c7",
+      "id": "26d6354c-02e4-4113-9dd6-ff69137c2f71",
       "name": "YoLink Manipulator Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Manipulator_Device.groovy",
       "required": false
     },
     {
-      "id": "c56d112d-c8e0-4682-8897-8e2c63da2deb",
+      "id": "9bce348b-b618-4870-8d6d-aa0b61befe8c",
       "name": "YoLink MotionSensor Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MotionSensor_Device.groovy",
       "required": false
     },
     {
-      "id": "d0229e33-fd92-498c-af1d-a637f58d0f90",
+      "id": "4edfd557-327e-4747-bcae-27c6da33e1a9",
       "name": "YoLink Outlet Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
       "required": false
     },
     {
-      "id": "cca7bf2b-cb77-4a30-b139-81f733247fba",
+      "id": "9cb3c3c6-4a1e-4ed2-81c4-3c39abd43f7b",
       "name": "YoLink SmartRemoter Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SmartRemoter_Device.groovy",
       "required": false
     },
     {
-      "id": "ac49e38e-f110-44d9-adf4-cd4b75fd3236",
+      "id": "204848fa-7f83-4f1e-b8c2-0ed5290eb174",
       "name": "YoLink Switch Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
       "required": false
     },
     {
-      "id": "e22562b5-06c6-4839-8ba9-38945e8a610a",
+      "id": "85c9b63a-ba71-47e6-968d-90c92256415c",
       "name": "YoLink THSensor Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
