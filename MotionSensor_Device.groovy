@@ -15,11 +15,12 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
+ *  01.00.01 - Fixed debug messages appearing when debug is off. Fixed poll()
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.00"}
+def clientVersion() {return "01.00.01"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -82,12 +83,13 @@ def poll(force=null) {
 	  def min_time = (now()-(min_interval * 1000))
 	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
          log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-      } else {
-         getDevicestate() 
-         check_MQTT_Connection()
-         state.lastPoll = now()    
-      }    
+         return     
+       } 
     }    
+    
+    getDevicestate() 
+    check_MQTT_Connection()
+    state.lastPoll = now()    
  }
 
 def connect() {
@@ -145,7 +147,7 @@ def getDevicestate() {
                def motion = true
                if (devstate == "normal"){motion=false}
                 
-               log.info "Device State: online(${online}), " +
+               logDebug("Device State: online(${online}), " +
                         "Report At(${reportAt}), " +
                         "Alert Interval(${alertInterval}), " +
                         "Battery(${battery}), " +
@@ -155,7 +157,7 @@ def getDevicestate() {
                         "Sensitivity(${sensitivity}), " + 
                         "State(${devstate}), " +  
                         "Motion(${motion}), " + 
-                        "Firmware(${firmware})"               
+                        "Firmware(${firmware})")
 
                rememberState("online",online) 
                rememberState("reportAt",reportAt) 
@@ -191,7 +193,7 @@ def getDevicestate() {
 
 def check_MQTT_Connection() {
   def MQTT = interfaces.mqtt.isConnected()  
-  log.debug "MQTT is ${MQTT}"  
+  logDebug("MQTT connection is ${MQTT}")   
   if (MQTT) {  
      rememberState("API", "connected")     
   } else {    
@@ -217,7 +219,8 @@ def establish_MQTT_connection(mqtt_ID) {
          interfaces.mqtt.subscribe("${topic}", 0) 
          
          MQTT = "connected" 
-         log.debug "MQTT connection to YoLink successful"     
+          
+         logDebug("MQTT connection to YoLink successful")    
 		
 	    } catch (e) {	
             log.error ("establish_MQTT_connection() Exception: $e",)			

@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Hub (YS1603-UC)
+ *  YoLink™ Siren (YS7103-UC)
  *  © 2022 Steven Barcus
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -15,69 +15,56 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 01.00.01: Fixed errors in poll()
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.01"}
+def clientVersion() {return "01.00.00"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Hub (YS1603-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Driver Version", description: "Siren (YS7103-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
-/* As of 03-06-2022, was not supported by API  
-preferences {
-	input("SSID", "text", title: "WiFi SSID", description:
-		"The SSID of your wireless network", required: true)
-	input("WiFiPassword", "text", title: "WiFi SSID", description:
-		"The password of the wireless network with the SSID specified above", required: true)
-}
-*/
 
 metadata {
-    definition (name: "YoLink Hub Device", namespace: "srbarcus", author: "Steven Barcus") {     		
-		capability "Polling"						
-                                      
+    definition (name: "YoLink Siren Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+		capability "Polling"				
+		capability "Battery"
+        capability "Alarm"                  // ENUM ["strobe", "off", "both", "siren"]    
+        capability "PowerSource"            // ENUM ["battery", "dc", "mains", "unknown"]  API "usb" = "mains"
+       
         command "debug", ['boolean']
-        command "connect"                       // Attempt to establish MQTT connection
-        command "reset" 
-        
-      //command "setWiFi"                       // As of 03-06-2022, was not supported by API    
-        
+        command "connect"
+        command "reset"          
+             
         attribute "API", "String" 
         attribute "online", "String"
-        attribute "firmware", "String"  
+        attribute "firmware", "String"          
         attribute "signal", "String" 
-        attribute "lastResponse", "String"
-        //attribute "reportAt", "String"    
-        
-        attribute "wifi_ssid", "String"  
-        attribute "wifi_enabled", "String"  
-        attribute "wifi_ip", "String"  
-        attribute "wifi_gateway", "String"  
-        attribute "wifi_mask", "String"
-        attribute "ethernet_enabled", "String"
-        attribute "ethernet_ip", "String"
-        attribute "ethernet_gateway", "String"
-        attribute "ethernet_mask", "String"        
+        attribute "battery", "String" 
+        attribute "lastResponse", "String"    
+        attribute "reportAt", "String"
+                        
+        attribute "alarm", "String" 
+        attribute "volume", "Number" 
+        attribute "alarmDuration", "String"        
         }
    }
 
-void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) { 
-	state.debug = false		
+void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
+	state.debug = false	
     
     state.my_dni = Hubitat_dni      
     state.homeID = homeID    
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId             
-    
+    state.devId = devId   
+    	
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
-	
-    reset()       
+	    
+    reset()      
  }
 
 def installed() {
@@ -124,37 +111,76 @@ def debug(value) {
     }        
 }
 
+def strobe () {  
+   setSiren("True")       
+}
+
+def both () {  
+   setSiren("True")       
+}
+
+def siren () {  
+   setSiren("True")       
+}
+    
+def off () {
+   setSiren("False")  
+}     
+
+def setSiren(setState) {   
+   def params = [:] 
+   def alarm = [:] 
+    
+   alarm.put("alarm", setState.toBoolean())    
+   params.put("state", alarm)      
+    
+   def request = [:] 
+   request.put("method", "${state.type}.setState")      
+   request.put("targetDevice", "${state.devId}") 
+   request.put("token", "${state.token}")     
+   request.put("params", params)       
+ 
+   try {         
+      def object = parent.pollAPI(request, state.name, state.type)       
+    } catch (e) {	
+        log.error "setSiren() exception: $e"
+        lastResponse("Error ${e}")     
+        sendEvent(name:"alarm", value: "unknown", isStateChange:true)
+	} 
+          
+    getDevicestate()
+}   
+
 def getDevicestate() {
     state.driver=clientVersion()
     
 	logDebug("getDevicestate() obtaining device state")
     
-	boolean rc=false	//DEFAULT: Return Code = false   
+	boolean rc=false	//DEFAULT: Return Code = false
     
 	try {  
         def request = [:]
-            request.put("method", "${state.type}.getState")                
+            request.put("method", "${state.type}.getState")                   
             request.put("targetDevice", "${state.devId}") 
             request.put("token", "${state.token}") 
         
         def object = parent.pollAPI(request, state.name, state.type)
          
         if (object) {
-            logDebug("getDevicestate(): pollAPI() response: ${object}")                          
-         
-             if (successful(object)) {         
+            logDebug("getDevicestate()> pollAPI() response: ${object}")     
+            
+            if (successful(object)) {                
                 parseDevice(object)                     
                 rc = true	
                 rememberState("online", "true") 
-                lastResponse("Success")                 
+                lastResponse("Success") 
             } else {  //Error
-               pollError(object)
+               pollError(object)                
             }     
         } else {
             log.error "No response from API request"
-            lastResponse("No response from API")
-        }
-		
+            lastResponse("No response from API") 
+        } 
 	} catch (groovyx.net.http.HttpResponseException e) {	
             rc = false                        
 			if (e?.statusCode == UNAUTHORIZED_CODE) { 
@@ -162,48 +188,46 @@ def getDevicestate() {
             } else {
                     lastResponse("Exception $e")                
 					logDebug("getDevices() Exception $e")
-			}              
+			}           
 	}
     
 	return rc
 }    
 
-def parseDevice(object) {
+def parseDevice(object) {   
+    def online = true
+    def alarm = object.data.state
+    def volume = object.data.soundLevel    
+    def battery = parent.batterylevel(object.data.battery) 
+    def powerSource = object.data.powerSupply 
+    if (powerSource == "usb") {powerSource = "mains"}
+    def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error   
     def firmware = object.data.version
-    def wifi_ssid = object.data.wifi.ssid                    
-    def wifi_enabled = object.data.wifi.enable                             
-    def wifi_ip = object.data.wifi.ip  
-    def wifi_gateway = object.data.wifi.gateway 
-    def wifi_mask = object.data.wifi.mask       
-    def ethernet_enabled = object.data.eth.enable
-    def ethernet_ip = object.data.eth.ip
-    def ethernet_gateway = object.data.eth.gateway
-    def ethernet_mask = object.data.eth.mask                        
-            
-    logDebug("Hub Firmware Version (${firmware}), " +
-             "WiFi SSID(${wifi_ssid}), " +
-             "WiFi Enabled(${wifi_enabled}), " +
-             "WiFi IP(${wifi_ip}), " +
-             "WiFi Gateway(${wifi_gateway}), " +
-             "WiFi Mask(${wifi_mask}), " +
-             "Ethernet Enabled(${ethernet_enabled}), " +       
-             "Ethernet IP(${ethernet_ip}), " +
-             "Ethernet Gateway(${ethernet_gateway}), " +
-             "Ethernet Mask(${ethernet_mask})")
-               
-     rememberState("firmware", firmware)
-     rememberState("wifi_ssid", wifi_ssid)
-     rememberState("wifi_enabled", wifi_enabled)
-     rememberState("wifi_ip", wifi_ip)
-     rememberState("wifi_gateway", wifi_gateway)
-     rememberState("wifi_mask", wifi_mask)
-     rememberState("ethernet_enabled", ethernet_enabled)
-     rememberState("ethernet_ip", ethernet_ip)
-     rememberState("ethernet_gateway", ethernet_gateway)
-     rememberState("ethernet_mask", ethernet_mask)
-    
-     rememberState("online", "true")         
-}                
+    def signal = object.data.loraInfo.signal
+                   
+    logDebug("Device State: online(${online}), " +
+             "Alarm(${alarm}), " +
+             "Volume(${volume}), " +             
+             "Battery(${battery}), " + 
+             "Power Source(${powerSource}), " +
+             "Alarm Duration(${alarmDuration}), " +
+             "Firmware(${firmware}), " +
+             "Signal(${signal})")     
+             
+    rememberState("online",online)
+    rememberState("alarm",alarm)       
+    rememberState("volume",volume)
+    rememberState("battery",battery)
+    rememberState("powerSource",powerSource)    
+    rememberState("alarmDuration",alarmDuration)
+    rememberState("firmware",firmware)    
+    rememberState("signal",signal)
+}   
+
+def duration(seconds) {
+    if (seconds == 65535) {seconds = "Forever"}
+    return seconds                              
+}
 
 def check_MQTT_Connection() {
   def MQTT = interfaces.mqtt.isConnected()  
@@ -260,7 +284,7 @@ def mqttClientStatus(String message) {
     }
 }
 
-def parse(message) {
+def parse(message) { 
     def topic = interfaces.mqtt.parseMessage(message)
     def payload = new JsonSlurper().parseText(topic.payload)
     logDebug("parse(${payload})")
@@ -268,99 +292,63 @@ def parse(message) {
     processStateData(topic.payload)
 }
 
-
 def void processStateData(payload) {
-    rememberState("online","true")
+    rememberState("online","true")       
     
-    def object = new JsonSlurper().parseText(payload)
-    def devId = object.deviceId   
-   
-    if (state.devId == devId) {  // Only handle if message is for me   
+    def object = new JsonSlurper().parseText(payload)    
+    def devId = object.deviceId      
+    
+    if (state.devId == devId) {  // Only handle if message is for me         
         logDebug("processStateData(${payload})")
         
         def child = parent.getChildDevice(state.my_dni)
         def name = child.getLabel()                
         def event = object.event.replace("${state.type}.","")
-        log.debug "Received Message Type: ${event} for: $name"
+        logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
-		case "Alert":          
-            def swState = object.data.state
-            def alertType = object.data.alertType    
-            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.firmware    
-            def signal = object.data.loraInfo.signal    
-    
-            log.debug "Parsed: DeviceId=$devId, Switch=$swState, Alert=$alertType, Battery=$battery, Firmware=$firmware, Signal=$signal"  
-        
-            if (state.swState != swState) {sendEvent(name:"switch", value: swState, isStateChange:true)}
-            if (state.alertType != alertType) {sendEvent(name:"alertType", value: alertType, isStateChange:true)}
-            if (state.battery != battery) {sendEvent(name:"battery", value: battery, isStateChange:true)}
-            if (state.firmware != firmware) {sendEvent(name:"firmware", value: firmware, isStateChange:true)}
-            if (state.signal != signal) {sendEvent(name:"signal", value: signal, isStateChange:true)}   
-                
-            state.swState = swState
-            state.alertType = alertType    
-            state.battery = battery
-            state.firmware = firmware   
-            state.signal = signal   
-                                       
-                
+		case "Report":   
+        case "StatusChange":   
+        case "getState":       
+            parseDevice(object) 
+ 		    break;   
+            
+        case "setDuation": //API message has a spelling error    
+            def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error    
+            def signal = object.data.loraInfo.signal
+            rememberState("alarmDuration",alarmDuration)
+            rememberState("signal",signal)
+            break;   
+            
+        case "setState":  //"normal","alert","off"
+            def alarmState = object.data.state    
+            def signal = object.data.loraInfo.signal
+            rememberState("alarmState",alarmState)  
+            rememberState("signal",signal)
+            break; 
+           
 		default:
             log.error "Unknown event received: $event"
             log.error "Message received: ${payload}"
 			break;
-	    }
+	    }				
     }
 }
 
-/* Currently not supported by API as of 02/27/2022
-void setWiFi() { 
-   logDebug "setting WiFi: SSID=${settings.SSID}, Password=${settings.WiFiPassword}"
-
-   def params = [:] 
-   params.put("ssid", settings.SSID)    
-   params.put("password", settings.WiFiPassword) 
-    
-   def request = [:] 
-   request.put("method", "Hub.setWiFi")                
-   request.put("targetDevice", "${state.devId}") 
-   request.put("token", "${state.token}")     
-   request.put("params", params)       
- 
-   try {         
-        def object = parent.pollAPI(request, state.name, state.type)
-         
-        if (object) {
-            logDebug("setWiFi()> pollAPI() response: ${object}")                                            
-            return 							
-                
-	    } else { 			               
-            logDebug("setWiFi() failed")	
-        }     		
-	} catch (e) {	
-        log.error "setWiFi() exception: $e"
-	} 
-}   
-*/
-
-def reset(){          
+def reset(){       
     state.debug = false  
     state.remove("API")
-    state.remove("firmware") 
-    state.remove("swState")
-    state.remove("door")
-    state.remove("alertType")  
-    state.remove("battery")     
-    state.remove("signal")  
-    state.remove("online")
-    state.remove("reportAt")
-    state.remove("alertInterval")
-    state.remove("delay")           
-    state.remove("openRemindDelay")
-      
+    state.remove("online")  
+    state.remove("alarm")
+    state.remove("volume") 
+    state.remove("battery")
+    state.remove("alarmDuration")
+    state.remove("powerSource")    
+    state.remove("firmware")
+    state.remove("signal")
+          
     interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
-    connect()                         // Reconnect to API Cloud
+    connect()                         // Reconnect to API Cloud  
     poll(true)    
     
     logDebug("Device reset to default values")
@@ -378,7 +366,7 @@ def rememberState(name,value) {
 }   
 
 def successful(object) {
-  return (object.code  == "000000")     
+  return (object.code == "000000")     
 }    
 
 def notConnected(object) {
@@ -397,8 +385,8 @@ def pollError(object) {
     }
     
     return nc    
-} 
+}  
 
 def logDebug(msg) {
    if (state.debug) {log.debug msg}
-}
+} 

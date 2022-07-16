@@ -15,10 +15,12 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
+ * 01.00.01: Fixed errors in poll()
  */
+
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.00"}
+def clientVersion() {return "01.00.01"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ SpeakerHub (YS1604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -151,12 +153,13 @@ def poll(force=null) {
 	  def min_time = (now()-(min_interval * 1000))
 	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
          log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-      } else {
-         getDevicestate() 
-         check_MQTT_Connection()
-         state.lastPoll = now()    
-      }    
+         return     
+       } 
     }    
+    
+    getDevicestate() 
+    check_MQTT_Connection()
+    state.lastPoll = now()    
  }
 
 def connect() {

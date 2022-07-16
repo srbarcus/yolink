@@ -15,18 +15,18 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
+ * 01.00.01: Fixed switch errors in processStateData(). Fixed errors in poll()
  */
 
 import groovy.json.JsonSlurper
 import java.math.RoundingMode;
 
-def clientVersion() {return "01.00.00"}
+def clientVersion() {return "01.00.01"}
 
 preferences {
     input title: "Driver Version", description: "Smoke & CO Alarm (YS7A01-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
-
 
 metadata {
     definition (name: "YoLink COSmokeSensor Device", namespace: "srbarcus", author: "Steven Barcus") {     	
@@ -102,12 +102,13 @@ def poll(force=null) {
 	  def min_time = (now()-(min_interval * 1000))
 	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
          log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-      } else {
-         getDevicestate() 
-         check_MQTT_Connection()
-         state.lastPoll = now()    
-      }    
+         return     
+       } 
     }    
+    
+    getDevicestate() 
+    check_MQTT_Connection()
+    state.lastPoll = now()    
  }
 
 def connect() {
@@ -415,6 +416,7 @@ def void processStateData(payload) {
             def signal = object.data.loraInfo.signal 
             rememberState("alertInterval",alertInterval)
             rememberState("signal",signal)
+            break; 
             
 	    case "setSchedule":       
             def alarmTestType = object.data.type

@@ -13,6 +13,7 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
+ *  1.0.1 - Add support to determine correct driver for Temperature only sensors. Removed some superfluous log messages.
  */
 import groovy.json.JsonSlurper
 
@@ -30,7 +31,7 @@ definition(
 )
 
 private def get_APP_VERSION() {
-	return "1.0.0"
+	return "1.0.1"    
 }
 
 private def get_APP_NAME() {
@@ -134,7 +135,8 @@ def otherSettings() {
     log.debug "Creating debugging Device: ${devname}, ${devtype}, ${devtoken}, ${devId}"	
     def Hubitat_dni = "yolink_${devtype}_${devId}"
     Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
-    Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)  
+    if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}  
+    
     
     def children= getChildDevices()
 	children.each { 
@@ -181,6 +183,13 @@ def uninstalled() {
 }
 
 private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) { 	
+    log.trace "Creating $devname, $devtype"    
+    
+    if (devtype == "THSensor") {
+      log.info "$devname is a THSensor, determining device's capabilities..."  
+      devtype = getTHSensorDriver(devname,devtype,devtoken,devId) 	
+    }        
+    
     def newdni = Hubitat_dni
     def drivername = getYoLinkDriverName("$devtype")
     int countNewChildDevices = 0        
@@ -205,6 +214,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
 		} catch (IllegalArgumentException e) {
             failed = true
     		log.error "An error occcurred while trying add child device '$labelName'"
+            log.error "Exception: '$e'"
                                 
             if (e.message.contains("Please use a different DNI")){    //Could happen if user uninstalled app without deleting previous children                 
                   throw new IllegalArgumentException("A device with dni '$newdni' already exists. Delete the device and try running the " + get_APP_NAME() + " app again.")
@@ -219,6 +229,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
                   log.error "Unable to create device '$devname' because driver '$drivername' is not installed. Either the device is not currently supported by the YoLink™ Device Service, or you need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
                 }                 
             } else {    
+                  log.error "Exception: '$e'"
                   throw new IllegalArgumentException(e.message)  
             }                      
         } finally {
@@ -614,19 +625,16 @@ def convertTemperature(temperature) {
     }    
 }
     
-def celsiustofahrenheit(celsius) {return (celsius * 1.8) + 32}
+def celsiustofahrenheit(celsius) {return (celsius * 9 / 5) + 32}
 
 def scheduledDays(weekdays) {
    def days    
     
    def daysB = Integer.toBinaryString(weekdays.toInteger())                   
    def ndx = daysB.length()    
-    
-   log.debug "Parsing Binary Scheduled Days: ${daysB}(${ndx})"
    
    while (ndx >0) {
-     def bit = daysB.substring(ndx-1,ndx)   
-     log.debug "Bit ${ndx}: ${bit}"   
+     def bit = daysB.substring(ndx-1,ndx)     
      
      if (bit == "1") {  
         switch(daysB.length()-ndx) {
@@ -715,3 +723,50 @@ boolean validBoolean(setting,value) {            // Allow any one of ON, OFF, TR
    } 
    return rc
 }
+
+
+// Temperature/Humidity and Temperature Devices are both reported as "THSensor"
+// If device doesn't return humidity values, assume is doesn't have that capability
+def getTHSensorDriver(name,type,token,devId) {
+    def driver = "THSensor"
+	try {  
+        def request = [:]
+            request.put("method", "THSensor.getState")                   
+            request.put("targetDevice", "${devId}") 
+            request.put("token", "${token}") 
+        
+        def object = pollAPI(request, name, type)
+         
+        if (object) {
+            log.trace("getTHSensorDriver()> pollAPI() response: ${object}")     
+            
+            if (object.code == "000000") {             
+                def lowHumidity = object.data.state.alarm.lowHumidity                             
+                def highHumidity = object.data.state.alarm.highHumidity
+                def humidity = object.data.state.humidity            
+                def humidityCorrection = object.data.state.humidityCorrection        
+                def humidityLimitMax = object.data.state.humidityLimit.max
+                def humidityLimitMin = object.data.state.humidityLimit.min 
+                
+                if (lowHumidity == false && highHumidity == false && humidity == 0 && humidityCorrection == 0 && humidityLimitMax == 0 && humidityLimitMin == 0) {   //Assume device doesn't have humidity sensor
+                    log.info "$name appears to be a temperature only sensor."
+                    driver = "Temperature Sensor"
+                } else {
+                    log.info "$name appears to be a temperature and humidity sensor."
+                }    
+            } else {  //Error
+                log.error "API polling returned error: $object.code - " + translateCode(object.code)               
+            }     
+        } else {
+            log.error "No response from API request"
+        } 
+	} catch (groovyx.net.http.HttpResponseException e) {	
+            if (e?.statusCode == UNAUTHORIZED_CODE) { 
+                log.error("getTHSensorDriver() - Unauthorized Exception")
+            } else {
+				log.error("getTHSensorDriver() - Exception $e")
+			}                 
+	}
+    
+	return driver
+}    
