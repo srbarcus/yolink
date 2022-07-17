@@ -15,12 +15,14 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 01.00.01: Fixed errors in poll()
+ * 1.0.1: Fixed errors in poll()
+ * 1.0.2: (skipped)
+ * 1.0.3: Fix clientVersion()
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.00"}
+def clientVersion() {return "01.00.03"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"

@@ -15,15 +15,17 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- *  01.00.01 - Removed undocumented parameters, "Period" and "Code"
- *           - Corrected event parsing causing "null" signal 
- *           - Corrected errors in poll()
+ *  1.0.1 - Removed undocumented parameters, "Period" and "Code"
+ *        - Corrected event parsing causing "null" signal 
+ *        - Corrected errors in poll() 
+ *  1.0.2 - Corrected ServiceSetup error
+ *  1.0.3 - Fixed clientVersion()
  */
 
 import groovy.json.JsonSlurper
 import java.math.RoundingMode;
 
-def clientVersion() {return "01.00.01"}
+def clientVersion() {return "01.00.03"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Humidity Sensor (YS8003-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -170,8 +172,7 @@ def getDevicestate() {
 def parseDevice(object, source) {
     logDebug("parseDevice() Source: ${source}")
     
-    def online
-    def reportAt    
+    def online   
     def lowBattery
     def lowTemp
     def highTemp
@@ -189,37 +190,64 @@ def parseDevice(object, source) {
     def tempLimitMax 
     def tempLimitMin
     def temperature
-    def firmware
-    def signal    
+    def firmware   
+    def reportAt
+    def signal
     
     switch(source) {
-		case "devicestate":         
-            online = object.data.online  
-            devstate = object.data.state.state
-            lowBattery = object.data.state.alarm.lowBattery                             
-            lowTemp = object.data.state.alarm.lowTemp
-            highTemp = object.data.state.alarm.highTemp 
-            lowHumidity = object.data.state.alarm.lowHumidity       
-            highHumidity = object.data.state.alarm.highHumidity               
-            battery = parent.batterylevel(object.data.state.battery) 
-            humidity = object.data.state.humidity
-            humidity = Double.valueOf(humidity) + Double.valueOf(state.humidityCorrection)
-            humidity = round(humidity,1)
+   		case "devicestate":    
+            online             = object.data.online                                
+            lowBattery         = object.data.state.alarm.lowBattery                             
+            lowTemp            = object.data.state.alarm.lowTemp
+            highTemp           = object.data.state.alarm.highTemp 
+            lowHumidity        = object.data.state.alarm.lowHumidity       
+            highHumidity       = object.data.state.alarm.highHumidity               
+            battery            = object.data.state.battery 
+            humidity           = object.data.state.humidity 
             humidityCorrection = object.data.state.humidityCorrection
-            humidityLimitMax = object.data.state.humidityLimit.max
-            humidityLimitMin = object.data.state.humidityLimit.min
-            alertInterval = object.data.state.interval
-            temperatureScale = object.data.state.mode.toUpperCase()
-            tempCorrection = object.data.state.tempCorrection
-            tempLimitMax = object.data.state.tempLimit.max
-            tempLimitMin = object.data.state.tempLimit.min 
-            temperature = object.data.state.temperature  
-            firmware = object.data.state.version   
-            reportAt = object.data.reportAt    
+            humidityLimitMax   = object.data.state.humidityLimit.max
+            humidityLimitMin   = object.data.state.humidityLimit.min
+            alertInterval      = object.data.state.interval
+            temperatureScale   = object.data.state.mode.toUpperCase()
+            devstate           = object.data.state.state
+            tempCorrection     = object.data.state.tempCorrection
+            tempLimitMax       = object.data.state.tempLimit.max
+            tempLimitMin       = object.data.state.tempLimit.min 
+            temperature        = object.data.state.temperature  
+            firmware           = object.data.state.version   
+            reportAt           = object.data.reportAt    
         
+            logDebug("Device State: online(${online}), " +
+                     "State(${devstate}), " + 
+                     "Report At(${reportAt}), " +
+                     "Firmware(${firmware}), " +
+                     "Low Battery(${lowBattery}), " +
+                     "Low Temp:(${lowTemp}), " +
+                     "Hight Temp(${highTemp}), " +   
+                     "Low Humidity(${lowHumidity}), " +
+                     "High Humidity(${highHumidity}), " +
+                     "Battery(${battery}), " + 
+                     "Humidity(${humidity}), " + 
+                     "Humidity Correction(${humidityCorrection}), " + 
+                     "Humidity Limit Max(${humidityLimitMax}), " + 
+                     "Humidity Limit Min(${humidityLimitMin}), " + 
+                     "Alert Interval(${alertInterval}), " + 
+                     "Temperature Scale(${temperatureScale}), " +     
+                     "Temp Correction(${tempCorrection}), " + 
+                     "Temp Limit Max(${tempLimitMax}), " + 
+                     "Temp Limit Min(${tempLimitMin}), " +   
+                     "Temperature(${temperature})")       
+        
+            battery = parent.batterylevel(battery) 
+          
+            humidity = humidity.toDouble() + humidityCorrection.toDouble()
+            humidity = round(humidity,1)
+                  
             temperature = parent.convertTemperature(temperature)   
             tempLimitMax = parent.convertTemperature(tempLimitMax)
             tempLimitMin = parent.convertTemperature(tempLimitMin)
+                               
+            logDebug("Device State Adjusted: Temp Limit Max(${tempLimitMax}), Temp Limit Min(${tempLimitMin}), Temperature(${temperature})")
         
             rememberState("online",online)    
             
@@ -241,27 +269,7 @@ def parseDevice(object, source) {
             rememberState("humidityLimitMax",humidityLimitMax)
             rememberState("humidityLimitMin",humidityLimitMin)
             rememberState("firmware",firmware) 
-         
-            logDebug("Device State: online(${online}), " +
-                     "State(${devstate}), " + 
-                     "Report At(${reportAt}), " +
-                     "Firmware(${firmware}), " +
-                     "Low Battery(${lowBattery}), " +
-                     "Low Temp:(${lowTemp}), " +
-                     "Hight Temp(${highTemp}), " +   
-                     "Low Humidity(${lowHumidity}), " +
-                     "High Humidity(${highHumidity}), " +
-                     "Battery(${battery}), " + 
-                     "Humidity(${humidity}), " + 
-                     "Humidity Correction(${humidityCorrection}), " + 
-                     "Humidity Limit Max(${humidityLimitMax}), " + 
-                     "Humidity Limit Min(${humidityLimitMin}), " + 
-                     "Alert Interval(${alertInterval}), " + 
-                     "Temperature Scale(${temperatureScale}), " +     
-                     "Temp Correction(${tempCorrection}), " + 
-                     "Temp Limit Max(${tempLimitMax}), " + 
-                     "Temp Limit Min(${tempLimitMin}), " +   
-                     "Temperature(${temperature})")
+               
         	break;	
          
         case "report":                 
@@ -381,7 +389,7 @@ def parseDevice(object, source) {
 	    } 
 }   
 
-def check_MQTT_Connection() {
+def check_MQTT_Connection() {  
   def MQTT = interfaces.mqtt.isConnected()  
   logDebug("MQTT connection is ${MQTT}")  
   if (MQTT) {  
@@ -391,7 +399,7 @@ def check_MQTT_Connection() {
   }
 }    
 
-def establish_MQTT_connection(mqtt_ID) {
+def establish_MQTT_connection(mqtt_ID) { 
     parent.refreshAuthToken()
     def authToken = parent.AuthToken() 
       

@@ -15,12 +15,14 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
+ *  1.0.1 - Removed unused rounding code
+ *  1.0.2 - (skipped)
+ *  1.0.3 - Fixed clientVersion()
  */
 
 import groovy.json.JsonSlurper
-import java.math.RoundingMode;
 
-def clientVersion() {return "01.00.00"}
+def clientVersion() {return "01.00.03"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Sensor (YS8004-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -497,10 +499,6 @@ def reset(){
     
     logDebug("Device reset to default values")
 }
-
-def round(double strValue, int decimalPlace) {
-    return new BigDecimal(strValue).setScale(decimalPlace, RoundingMode.HALF_UP) //.stripTrailingZeros().toPlainString();
-  }
 
 def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
