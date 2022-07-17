@@ -11,7 +11,7 @@
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_Device_Service.groovy",
       "required": true,
       "oauth": false,
-      "primary": false
+      "primary": false,
       "version": "1.0.1"
     }
   ],
