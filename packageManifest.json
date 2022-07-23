@@ -3,6 +3,9 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
+  "releaseNotes": "- YoLink™ Device Service v1.0.2: Return temperature value as string\n- YoLink Temperature Sensor Device and YoLink THSensor Device v1.0.8: Fix Error: 'No such property: state'\n",
+  "documentationLink": "https://github.com/srbarcus/yolink/wiki",
+  "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
     {
       "id": "37d63098-6b13-4dd6-ba09-e359c2cdccb1",
@@ -12,7 +15,7 @@
       "required": true,
       "oauth": false,
       "primary": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     }
   ],
   "drivers": [
@@ -89,14 +92,6 @@
       "version": "1.0.1"
     },
     {
-      "id": "936452da-8a76-40e9-a1b1-b39579c08f03",
-      "name": "YoLink THSensor Device",
-      "namespace": "srbarcus",
-      "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
-      "required": false,
-      "version": "1.0.3"
-    },
-    {
       "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",
       "name": "YoLink MultiOutlet Device",
       "namespace": "srbarcus",
@@ -118,7 +113,15 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Temperature_Sensor_Device.groovy",
       "required": false,
-      "version": "1.0.3"
+      "version": "1.0.4"
+    },
+    {
+      "id": "936452da-8a76-40e9-a1b1-b39579c08f03",
+      "name": "YoLink THSensor Device",
+      "namespace": "srbarcus",
+      "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
+      "required": false,
+      "version": "1.0.4"
     },
     {
       "id": "379a9757-a79d-4584-9f64-61b0c32166f7",

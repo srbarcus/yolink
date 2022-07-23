@@ -14,6 +14,7 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
  *  1.0.1 - Add support to determine correct driver for Temperature only sensors. Removed some superfluous log messages.
+ *  1.0.2 - Return converted temperature as a String value.
  */
 import groovy.json.JsonSlurper
 
@@ -31,7 +32,7 @@ definition(
 )
 
 private def get_APP_VERSION() {
-	return "1.0.1"    
+	return "1.0.2"    
 }
 
 private def get_APP_NAME() {
@@ -625,7 +626,7 @@ def convertTemperature(temperature) {
     }    
 }
     
-def celsiustofahrenheit(celsius) {return (celsius * 9 / 5) + 32}
+def celsiustofahrenheit(celsius) {return ((celsius * 9 / 5) + 32).toString()}
 
 def scheduledDays(weekdays) {
    def days    

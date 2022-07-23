@@ -18,11 +18,12 @@
  *  1.0.1 - Removed unused rounding code
  *  1.0.2 - (skipped)
  *  1.0.3 - Fixed clientVersion()
+ *  1.0.4 - Fixed parsing error: groovy.lang.MissingPropertyException: No such property: state for class: java.lang.String on line nnn (method parse)
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.03"}
+def clientVersion() {return "01.00.04"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Sensor (YS8004-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -295,7 +296,7 @@ def parseDevice(object, source) {
             break;	 
                 
 		case "alert":
-            devstate = object.data.state.state
+            devstate = object.data.state                       //1.0.4
             lowBattery = object.data.alarm.lowBattery                             
             lowTemp = object.data.alarm.lowTemp
             highTemp = object.data.alarm.highTemp                    

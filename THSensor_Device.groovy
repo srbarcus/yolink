@@ -20,12 +20,13 @@
  *        - Corrected errors in poll() 
  *  1.0.2 - Corrected ServiceSetup error
  *  1.0.3 - Fixed clientVersion()
+ *  1.0.4 - Fixed parsing error: groovy.lang.MissingPropertyException: No such property: state for class: java.lang.String on line nnn (method parse)
  */
 
 import groovy.json.JsonSlurper
 import java.math.RoundingMode;
 
-def clientVersion() {return "01.00.03"}
+def clientVersion() {return "01.00.04"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Humidity Sensor (YS8003-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -273,7 +274,7 @@ def parseDevice(object, source) {
         	break;	
          
         case "report":                 
-            devstate = object.data.state.state
+            devstate = object.data.state                            //1.0.4
             lowBattery = object.data.alarm.lowBattery                             
             lowTemp = object.data.alarm.lowTemp
             highTemp = object.data.alarm.highTemp 
@@ -339,7 +340,7 @@ def parseDevice(object, source) {
             break;	 
                 
 		case "alert":
-            devstate = object.data.state.state
+            devstate = object.data.state                      //1.0.4
             lowBattery = object.data.alarm.lowBattery                             
             lowTemp = object.data.alarm.lowTemp
             highTemp = object.data.alarm.highTemp 
