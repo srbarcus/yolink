@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- YoLink™ Device Service v1.0.2: Return temperature value as string\n- YoLink Temperature Sensor Device and YoLink THSensor Device v1.0.8: Fix Error: 'No such property: state'\n",
+  "releaseNotes": "- YoLink™ Device Service v1.0.2: Return temperature value as string\n- YoLink™ Device Service v1.0.3 - Reduce number of messages by adding debug setting, misc. fixes\n- YoLink Temperature Sensor Device and YoLink THSensor Device v1.0.8: Fix Error: 'No such property: state'\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -15,7 +15,7 @@
       "required": true,
       "oauth": false,
       "primary": false,
-      "version": "1.0.2"
+      "version": "1.0.3"
     }
   ],
   "drivers": [
