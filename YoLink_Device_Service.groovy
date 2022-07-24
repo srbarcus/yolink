@@ -15,6 +15,7 @@
  * 
  *  1.0.1 - Add support to determine correct driver for Temperature only sensors. Removed some superfluous log messages.
  *  1.0.2 - Return converted temperature as a String value.
+ *  1.0.3 - Reduce number of messages by adding debug setting, misc. fixes
  */
 import groovy.json.JsonSlurper
 
@@ -32,7 +33,7 @@ definition(
 )
 
 private def get_APP_VERSION() {
-	return "1.0.2"    
+	return "1.0.3"    
 }
 
 private def get_APP_NAME() {
@@ -63,6 +64,9 @@ def about() {
               paragraph boldRedTitle ("WARNING: Removing this application will delete all Hubitat devices created by the app! (This option can be disabled in the additional settings before removal)")
             }    
 		}
+      section(smallTitle("Debug")) {
+			input "debugging", "enum", title:boldTitle("Enable Debugging"), required: true, options:["True","False"],defaultValue: "False"  
+		}  
 	}        
 }
 
@@ -97,7 +101,7 @@ def deviceList() {
  	    def devices=getDevices()
         int devicesCount=devices.size()    
         
-        log.debug "deviceList(): $devicesCount YoLink devices found: ${devices}"	    
+        log.info "$devicesCount YoLink devices were found"	    
 	    dynamicPage(name: "deviceList", title: sectionTitle("$devicesCount devices found. Select the devices you want available to Hubitat"), uninstall: false) {
     		section(""){
 	    		paragraph "Click below to see the list of devices available in your YoLink home"
@@ -112,7 +116,7 @@ def deviceList() {
 
 def otherSettings() {    
     int devicesCount=exposed.size()  
-    log.debug "$devicesCount devices were selected."
+    log.info "$devicesCount devices were selected"
         
     getGeneralInfo()	
     
@@ -123,7 +127,7 @@ def otherSettings() {
                     def devtype = state.deviceType."${dni}"
                     def devtoken = state.deviceToken."${dni}"
                     def devId = state.deviceId."${dni}"
-                    log.debug "Creating selected Device: ${devname}, ${devtype}, ${devtoken}, ${devId}"	
+                    log.info "Creating selected Device: ${devtype} - ${devname}"	
                     def Hubitat_dni = "yolink_${devtype}_${dni}"
                     Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
                     if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}
@@ -132,13 +136,11 @@ def otherSettings() {
     def devname = "YoLink Cloud Listener"
     def devtype = "MQTT Listener"
     def devtoken = state.UAID.plus("MQTT1")
-    def devId = state.UAID.plus("MQTT1")
-    log.debug "Creating debugging Device: ${devname}, ${devtype}, ${devtoken}, ${devId}"	
+    def devId = state.UAID.plus("MQTT1")    
     def Hubitat_dni = "yolink_${devtype}_${devId}"
     Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
     if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}  
-    
-    
+       
     def children= getChildDevices()
 	children.each { 
         if (!Keep_Hubitat_dni.contains(it.deviceNetworkId)){
@@ -156,7 +158,7 @@ def otherSettings() {
 		}
 		section(smallTitle("Device polling interval in minutes")) {
 			input "pollInterval", "enum", title:boldTitle("Select Polling Interval"), required: true, options:[1,2,5,10,15,30],defaultValue: 5
-		}
+		}        
         section(smallTitle("Remove associated Hubitat devices when this app is removed")) {
 			input "removeDevices", "enum", title:boldTitle("Remove Devices"), required: true, options:["True","False"],defaultValue: "True"             
        	}
@@ -184,8 +186,6 @@ def uninstalled() {
 }
 
 private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) { 	
-    log.trace "Creating $devname, $devtype"    
-    
     if (devtype == "THSensor") {
       log.info "$devname is a THSensor, determining device's capabilities..."  
       devtype = getTHSensorDriver(devname,devtype,devtoken,devId) 	
@@ -202,7 +202,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
 	if(!dev) {
         def labelName = "YoLink $devtype - ${devname}"
             
-		log.debug "Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken, "
+		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken")
         
         try {
            dev = addChildDevice("srbarcus", drivername, newdni, null, [label:"${labelName}"])
@@ -237,20 +237,20 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
             if (failed) {return null}
         }    
             
-        log.trace "Calling child device setup: $newdni, $state.homeID, $devname, $devtype, $devtoken, $devId"
+        logDebug("Calling child device setup: $newdni, $state.homeID, $devname, $devtype, $devtoken, $devId")
         dev.ServiceSetup(newdni,state.homeID,devname,devtype,devtoken,devId) 	// Initial setup of the Child Device             
-		log.trace "Setup of ${dev.displayName} with id $newdni has been completed"
+		logDebug("Setup of ${dev.displayName} with id $newdni has been completed")
             
 		countNewChildDevices++            
 	} else {
 		log.info "Child device ${dev.displayName} already exists with id $newdni, new device not created"
         if (devtype == "SpeakerHub") {
-           log.trace "A speaker Hub name $devname has been located." 
+           log.trace "A speaker Hub named '$devname' has been located." 
            state.speakerhub = newdni
         }  
 	}
 
-	log.info "Created $countNewChildDevices of ${exposed.size()} selected devices."
+	logDebug("Created $countNewChildDevices of ${exposed.size()} selected devices.")
     
     return newdni
 }
@@ -258,7 +258,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
 def pollDevices() {
     def children= getChildDevices()
     children.each { 
-       log.debug "Polling device ${it} (${it.deviceNetworkId})."
+       logDebug("Polling device ${it} (${it.deviceNetworkId})")
        it.poll()
     }             
 }
@@ -281,10 +281,10 @@ def schedulePolling() {
 private SpeakerHub() {    
     def dev = allChildDevices.find {it.deviceNetworkId.contains(state.speakerhub)}    
     if(dev) {
-       log.trace "SpeakerHub() = $dev.label"    
+       logDebug("SpeakerHub() = $dev.label")
        return dev
     } else {    
-       log.trace "SpeakerHub(): No speaker hub available"  
+       log.info "SpeakerHub(): No speaker hub available"  
        return null
     }    
 }  
@@ -315,8 +315,7 @@ private def getImagePath() {return "https://raw.githubusercontent.com/srbarcus/y
 
 def AuthToken() {state.access_token}  
 def refreshAuthToken() {   
-   
-	log.info ("Refreshing access token")
+	logDebug("Refreshing access token")
 	boolean rc=false    
             
     state?.UAID = UAID
@@ -334,17 +333,17 @@ def refreshAuthToken() {
             query : query
 	]
 
-    log.debug "Attempting to get access token using parameters: ${refreshParams}"   
+    logDebug("Attempting to get access token using parameters: ${refreshParams}")
     
 	try {     
 		httpPostJson(refreshParams) { resp ->                     
             
 			if (resp.status == SUCCESS()) {	
-                log.debug "API Response: SUCCESS"
+                logDebug("API Response: SUCCESS")
 				def object = resp.data
 
 				if (object) {                    
-					log.debug "Token Server Response: ${resp.data}"					
+					logDebug("Token Server Response: ${resp.data}")
                     
                     def tokenState = object?.state
                     def tokenMsg = object?.msg                    
@@ -355,7 +354,7 @@ def refreshAuthToken() {
                     } else {                                       
                         state.access_token = object?.access_token                    
                         state.access_token_ttl = object?.expires_in                    
-                        log.info "New access token = ${state.access_token}"                     
+                        logDebug("New access token = ${state.access_token}")
                         rc = true
                     }
 				}              
@@ -370,7 +369,7 @@ def refreshAuthToken() {
 			}            
 	}  
     
-    log.info "refreshAuthToken() RC = ${rc}"   
+    logDebug("refreshAuthToken() RC = ${rc}")
     
 	return rc
 }
@@ -379,13 +378,13 @@ boolean getGeneralInfo() {
     def body = [:]
         body.put("method", "Home.getGeneralInfo") 
                     
-    log.debug "Polling API to retrieve general info..."   
+    logDebug("Polling API to retrieve general info...")
     
 	try {         
         def object = pollAPI(body,"YoLink™ Device Service","App")
          
         if (object) {
-                log.debug "pollAPI() response: ${object}"                      
+                logDebug("pollAPI() response: ${object}")
                 
                 def code = object.code               
                 def time = object.time
@@ -393,7 +392,7 @@ boolean getGeneralInfo() {
                 def desc = object.desc 
                 state.homeID = object.data.id    //ID of home
             
-                log.info "Home ID: ${state.homeID}"                                                   
+                logDebug("Home ID: ${state.homeID}")
                     
                 return true							
                 
@@ -445,15 +444,15 @@ def getDevices() {
                     
                 if (object.data.devices instanceof Collection) { 
 					responseValues=object.data.devices           
-                    log.debug "Parsing multiple devices: ${responseValues}"
+                    logDebug("Parsing multiple devices: ${responseValues}")
 				} else {
 					responseValues[0]=object.data.devices                    
-                    log.debug "Parsing single device: ${responseValues}"
+                    logDebug("Parsing single device: ${responseValues}")
 				}                
                            
 				responseValues.each { device ->
 					if (device.name) {
-						log.info "Found ${device.type}, '${device.name}' ..."                        
+						log.info "Found '${device.name}', type=${device.type}"                        
                         
                         def dni = device.deviceId
                                       
@@ -492,12 +491,12 @@ def pollAPI(body, name=null, type=null){
              body    : body 
              ]     
         
-        log.trace "Attempting to poll API using parameters: ${Params}"          
+        logDebug("Attempting to poll API using parameters: ${Params}")
         
 	    try {     
 		     httpPostJson(Params) { resp ->
 			 	if (resp.data) {                    
-					log.trace "API Response: ${resp.data}"	                                  
+					logDebug("API Response: ${resp.data}")
                                  
                    	def object = resp.data
                     
@@ -508,12 +507,14 @@ def pollAPI(body, name=null, type=null){
                     
                     switch (desc) {
                     case "Success":
-                         log.trace "Polling of API completed successfully"                                               
+                         logDebug("Polling of API completed successfully")
                  	     rc = object
                          break;
-                        
+                    
+                    case "Can't connect to Device":    
                     case "Cannot connect to Device":
                          log.warn "Device '${name}' (Type=${type}) is offline"  
+                         rc = object
                          break;
                         
                    default:
@@ -528,19 +529,21 @@ def pollAPI(body, name=null, type=null){
 		    } /* end http post */
 	    } catch (groovyx.net.http.HttpResponseException | java.net.SocketTimeoutException e) {	
             log.error "pollAPI() Exception: $e"
-			if (e?.statusCode == UNAUTHORIZED()) { 
-                if (retry==0) {
-				  log.warn "Request was unauthorized. Attempting to refreshing access token and re-poll API."
-                  refreshAuthToken()                   
-                  retry = 1  // Retry once
-                } else {          
-                  log.error "Retry failed, final error status code: $e.statusCode"
-                  retry = -1 // Don't retry
-                } 
-            } else {    
-                log.error "pollAPI() error status code: $e.statusCode"  
-                retry = -1 // Don't retry
-			}            
+            if (e?.statusCode) { 
+			    if (e?.statusCode == UNAUTHORIZED()) { 
+                    if (retry==0) {
+				      log.warn "Request was unauthorized. Attempting to refreshing access token and re-poll API."
+                      refreshAuthToken()                   
+                      retry = 1  // Retry once
+                    } else {          
+                      log.error "Retry failed, final error status code: $e.statusCode"
+                      retry = -1 // Don't retry
+                    } 
+                } else {    
+                    log.error "pollAPI() error status code: $e.statusCode"  
+                    retry = -1 // Don't retry
+	    		}            
+            }      
 	    }
     }  //End While 
     
@@ -666,7 +669,7 @@ def scheduledDays(weekdays) {
      ndx--  
    }    
     
-   log.debug "Scheduled Days: ${days}" 
+   logDebug("Scheduled Days: ${days}")
    return days 
 }
 
@@ -739,7 +742,7 @@ def getTHSensorDriver(name,type,token,devId) {
         def object = pollAPI(request, name, type)
          
         if (object) {
-            log.trace("getTHSensorDriver()> pollAPI() response: ${object}")     
+            logDebug("getTHSensorDriver()> pollAPI() response: ${object}")     
             
             if (object.code == "000000") {             
                 def lowHumidity = object.data.state.alarm.lowHumidity                             
@@ -770,4 +773,10 @@ def getTHSensorDriver(name,type,token,devId) {
 	}
     
 	return driver
+}    
+
+def logDebug(msg) {
+    if (debugging == "True"){
+       log.debug msg
+    }   
 }    
