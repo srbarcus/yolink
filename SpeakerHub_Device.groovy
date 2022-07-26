@@ -21,7 +21,7 @@
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.0.2"} //plus
 
 preferences {
     input title: "Driver Version", description: "YoLink™ SpeakerHub (YS1604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -437,7 +437,8 @@ def DisableVoiceResults() {
     rememberState("voiceResults", false)       
     }
 
-def setVolume(value) {    
+def setVolume(value) {   
+    value = value.toInteger() 
     if (value < 0)  {
         value = 1
     } else {
@@ -452,12 +453,12 @@ def setVolume(value) {
     }
 
 def volumeDown() {
-    def newvol = state.volume - 1
+    def newvol = state.volume.toInteger() - 1
     setVolume(newvol)    
     }
 
 def volumeUp() {
-    def newvol = state.volume + 1
+    def newvol = state.volume.toInteger() + 1
     setVolume(newvol)    
     }
 
