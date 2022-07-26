@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- YoLink™ Device Service v1.0.2: Return temperature value as string\n- YoLink™ Device Service v1.0.3 - Reduce number of messages by adding debug setting, misc. fixes\n- YoLink Temperature Sensor Device and YoLink THSensor Device v1.0.8: Fix Error: 'No such property: state'\n",
+  "releaseNotes": "- Added constraints to debug command on drivers\n- Modified all drivers to return event values as String values per standards (https://docs.hubitat.com/index.php?title=Event_Object#value)\n- Return temperatures rounded to 1 decimal place\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -14,8 +14,8 @@
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_Device_Service.groovy",
       "required": true,
       "oauth": false,
-      "primary": false,
-      "version": "1.0.3"
+      "primary": true,
+      "version": "1.0.5"
     }
   ],
   "drivers": [
@@ -25,7 +25,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Hub_Device.groovy",
       "required": true,     
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "c543abee-ca5a-47f6-bc0a-8799fea1f780",
@@ -33,7 +33,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SpeakerHub_Device.groovy",
       "required": true,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "d353c8a6-55f0-44bb-b3cb-135d7dbaac23",
@@ -41,7 +41,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/COSmokeSensor_Device.groovy",
       "required": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "5f401922-ac87-4a38-9870-34fb52757b25",
@@ -49,7 +49,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/DoorSensor_Device.groovy",
       "required": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "8d22ba39-b6ea-4740-9f60-b6d56254d5c4",
@@ -57,7 +57,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Manipulator_Device.groovy",
       "required": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "2fc8dba4-61b1-4cfb-9fc7-8862d5368d93",
@@ -65,7 +65,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MotionSensor_Device.groovy",
       "required": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "ce627334-e153-4494-8f20-f6f5bc8c1d90",
@@ -73,7 +73,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
       "required": false,
-      "version": "1.0.3"
+      "version": "1.0.4"
     },
     {
       "id": "0b5e05f6-69a4-4a40-ac97-ae57d5e0dc9f",
@@ -81,7 +81,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SmartRemoter_Device.groovy",
       "required": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "b015e789-7c86-46fc-bb0f-a85989f2166f",
@@ -89,7 +89,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
       "required": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",
@@ -97,7 +97,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
       "required": false,
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
@@ -105,7 +105,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Siren_Device.groovy",
       "required": false,
-      "version": "1.0.0"
+      "version": "1.0.4"
     },
     {
       "id": "2d916bb7-267d-4654-abeb-f005980a95c8",
@@ -113,7 +113,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Temperature_Sensor_Device.groovy",
       "required": false,
-      "version": "1.0.4"
+      "version": "1.0.5"
     },
     {
       "id": "936452da-8a76-40e9-a1b1-b39579c08f03",
@@ -121,7 +121,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
       "required": false,
-      "version": "1.0.4"
+      "version": "1.0.5"
     },
     {
       "id": "379a9757-a79d-4584-9f64-61b0c32166f7",
@@ -129,7 +129,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor_Device.groovy",
       "required": false,
-      "version": "1.0.0"
+      "version": "1.0.1"
     }
   ]
 }

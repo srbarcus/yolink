@@ -16,6 +16,8 @@
  *  1.0.1 - Add support to determine correct driver for Temperature only sensors. Removed some superfluous log messages.
  *  1.0.2 - Return converted temperature as a String value.
  *  1.0.3 - Reduce number of messages by adding debug setting, misc. fixes
+ *  1.0.4 - Fix "No such property: statusCode for class: java.net.SocketTimeoutException" error, improved polling error diagnostic messages
+ *  1.0.5 - Return temperatures as a Number rounded to 1 decimal place, return battery level as a Number.
  */
 import groovy.json.JsonSlurper
 
@@ -33,7 +35,7 @@ definition(
 )
 
 private def get_APP_VERSION() {
-	return "1.0.3"    
+	return "1.0.5"    
 }
 
 private def get_APP_NAME() {
@@ -518,17 +520,18 @@ def pollAPI(body, name=null, type=null){
                          break;
                         
                    default:
-                         log.error "Polling of API failed: $desc" 
+                         log.error "Polling of API failed: $desc"
+                         log.error "Request: $Params" 
                          rc = object
                          break;
                    }
                 } else {
                      log.error "Polling of API failed ${resp.status} : ${resp.status.code}" 
+                     log.error "Request: $Params" 
                      rc = object                     
                 }  
 		    } /* end http post */
-	    } catch (groovyx.net.http.HttpResponseException | java.net.SocketTimeoutException e) {	
-            log.error "pollAPI() Exception: $e"
+	    } catch (groovyx.net.http.HttpResponseException e) {	            
             if (e?.statusCode) { 
 			    if (e?.statusCode == UNAUTHORIZED()) { 
                     if (retry==0) {
@@ -537,14 +540,22 @@ def pollAPI(body, name=null, type=null){
                       retry = 1  // Retry once
                     } else {          
                       log.error "Retry failed, final error status code: $e.statusCode"
+                      log.error "Request: $Params"  
                       retry = -1 // Don't retry
                     } 
                 } else {    
-                    log.error "pollAPI() error status code: $e.statusCode"  
+                    log.error "pollAPI() error status code: $e.statusCode"
+                    log.error "Request: $Params"
                     retry = -1 // Don't retry
 	    		}            
-            }      
-	    }
+            }
+        } catch (java.net.SocketTimeoutException e) {	                     
+            log.error "pollAPI() HTTP request timed out"
+            log.error "Request: $Params"
+	    } catch(Exception ex) {
+            log.error "pollAPI() Exception: $e"
+            log.error "Request: $Params"
+        }
     }  //End While 
     
 	return rc
@@ -583,11 +594,11 @@ def translateCode(code) {
 }  
 
 def batterylevel(level) {
-    def levels = '{"0":"0",' + 
-     '"1":"25",' +         
-     '"2":"50",' +
-     '"3":"75",' +
-     '"4":"100"' +     
+    def levels = '{"0":0,' + 
+     '"1":25,' +         
+     '"2":50,' +
+     '"3":75,' +
+     '"4":100' +     
      '}'
         
     def jsonSlurper = new JsonSlurper()
@@ -623,13 +634,13 @@ def relayState(value) {
 
 def convertTemperature(temperature) {
     if (settings.temperatureScale == "F") {
-        return celsiustofahrenheit(temperature)  
+        return celsiustofahrenheit(temperature).toDouble().round(1)        
     } else {    
-        return temperature  
+        return temperature
     }    
 }
     
-def celsiustofahrenheit(celsius) {return ((celsius * 9 / 5) + 32).toString()}
+def celsiustofahrenheit(celsius) {return ((celsius * 9 / 5) + 32)} 
 
 def scheduledDays(weekdays) {
    def days    

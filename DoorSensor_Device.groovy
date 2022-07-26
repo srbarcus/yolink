@@ -15,12 +15,13 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 01.00.01: Fixed errors in poll()
+ * 1.0.1: Fixed errors in poll()
+ * 1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.01"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Door Sensor (YS7707-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -33,7 +34,7 @@ metadata {
 		capability "Battery"				
         capability "ContactSensor"
                                       
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"
         command "reset" 
          
@@ -41,12 +42,10 @@ metadata {
         attribute "online", "String"
         attribute "firmware", "String"          
         attribute "signal", "String" 
-        attribute "battery", "String" 
         attribute "lastResponse", "String"         
         attribute "reportAt", "String"  
         
         attribute "switch", "String" 
-        attribute "contact", "String" 
         attribute "alertType", "String"  
         attribute "signal", "String"  
         attribute "alertInterval", "String"
@@ -363,10 +362,15 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }              
    }
 }   
 

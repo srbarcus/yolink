@@ -15,14 +15,16 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- *  1.0.1 - Remove superfluous code
- *  1.0.2 - (skipped)
- *  1.0.3 - Fixed clientVersion()
+ *  1.0.1: Remove superfluous code
+ *  1.0.2: (skipped)
+ *  1.0.3: Fixed clientVersion()
+ *  1.0.4: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *         - Correct attribute types
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.03"}
+def clientVersion() {return "1.0.4"}
 
 preferences {
     input title: "Driver Version", description: "Siren (YS7103-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -37,21 +39,19 @@ metadata {
         capability "Alarm"                  // ENUM ["strobe", "off", "both", "siren"]    
         capability "PowerSource"            // ENUM ["battery", "dc", "mains", "unknown"]  API "usb" = "mains"
        
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"
         command "reset"          
              
         attribute "API", "String" 
         attribute "online", "String"
         attribute "firmware", "String"          
-        attribute "signal", "String" 
-        attribute "battery", "String" 
+        attribute "signal", "String"  
         attribute "lastResponse", "String"    
         attribute "reportAt", "String"
-                        
-        attribute "alarm", "String" 
+
         attribute "volume", "Number" 
-        attribute "alarmDuration", "String"        
+        attribute "alarmDuration", "Number"        
         }
    }
 
@@ -359,12 +359,17 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }              
    }
-}   
+}    
 
 def successful(object) {
   return (object.code == "000000")     

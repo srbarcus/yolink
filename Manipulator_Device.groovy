@@ -15,12 +15,14 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 01.00.01: Fixed errors in poll()
+ *  1.0.1: Fixed errors in poll()
+ *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *         - Corrected attribute types
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.01"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Valve (YS4909-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -33,7 +35,7 @@ metadata {
         capability "Valve"
         capability "Battery"   
                              
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"                       // Attempt to establish MQTT connection
         command "reset"
 
@@ -45,16 +47,13 @@ metadata {
         attribute "firmware", "String"  
         attribute "signal", "String"
         attribute "lastResponse", "String" 
-        
-        attribute "valve", "String"
-        attribute "battery", "String" 
   
-        attribute "delay_ch", "String"     
-        attribute "delay_off", "String"  
-        attribute "openRemind", "String"        
+        attribute "delay_ch", "Number"     
+        attribute "delay_off", "Number"  
+        attribute "openRemind", "Number"        
         attribute "time", "String"
         attribute "tzone", "String"        
-        attribute "schedules", "integer"
+        attribute "schedules", "Number"
         attribute "schedule1", "String"
         attribute "schedule2", "String"
         attribute "schedule3", "String"
@@ -435,10 +434,15 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }              
    }
 }   
 

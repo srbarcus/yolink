@@ -15,12 +15,13 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 01.00.01: Fixed errors in poll()
+ * 1.0.1: Fixed errors in poll()
+ * 1.0.2: Add constraints to debug command
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.01"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Hub (YS1603-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -40,7 +41,7 @@ metadata {
     definition (name: "YoLink Hub Device", namespace: "srbarcus", author: "Steven Barcus") {     		
 		capability "Polling"						
                                       
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"                       // Attempt to establish MQTT connection
         command "reset" 
         
@@ -51,7 +52,7 @@ metadata {
         attribute "firmware", "String"  
         attribute "signal", "String" 
         attribute "lastResponse", "String"
-        //attribute "reportAt", "String"    
+      //attribute "reportAt", "String"    
         
         attribute "wifi_ssid", "String"  
         attribute "wifi_enabled", "String"  
@@ -370,10 +371,15 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }              
    }
 }   
 

@@ -15,15 +15,17 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- *  1.0.1 - Removed unused rounding code
- *  1.0.2 - (skipped)
- *  1.0.3 - Fixed clientVersion()
- *  1.0.4 - Fixed parsing error: groovy.lang.MissingPropertyException: No such property: state for class: java.lang.String on line nnn (method parse)
+ *  1.0.1: Removed unused rounding code
+ *  1.0.2: (skipped)
+ *  1.0.3: Fixed clientVersion()
+ *  1.0.4: Fixed parsing error: groovy.lang.MissingPropertyException: No such property: state for class: java.lang.String on line nnn (method parse)
+ *  1.0.5: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *         - Removed superfluous code, correct attribute types, correct attributes to match standards, correct data to match attribute
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.04"}
+def clientVersion() {return "1.0.5"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Sensor (YS8004-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -36,7 +38,7 @@ metadata {
 		capability "Battery"
         capability "TemperatureMeasurement"       
                                       
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]  
         command "connect"                       // Attempt to establish MQTT connection
         command "reset"                  
               
@@ -44,8 +46,7 @@ metadata {
         attribute "online", "String"
         attribute "firmware", "String"  
         attribute "reportAt", "String"
-        attribute "signal", "String" 
-        attribute "battery", "String"  
+        attribute "signal", "String"  
         attribute "batteryType", "String" 
         attribute "lastResponse", "String" 
         
@@ -54,10 +55,9 @@ metadata {
         attribute "highTemp", "String"        
         attribute "temperatureScale", "String"   
         attribute "state", "String"   
-        attribute "tempCorrection", "String"   
-        attribute "tempLimitMax", "String" 
-        attribute "tempLimitMin", "String" 
-        attribute "temperature", "String"                         
+        attribute "tempCorrection", "Number"   
+        attribute "tempLimitMax", "Number" 
+        attribute "tempLimitMin", "Number"                       
         }
    }
 
@@ -140,8 +140,7 @@ def getDevicestate() {
             
             if (successful(object)) {                
                 parseDevice(object,"devicestate")                     
-                rc = true	
-                rememberState("online", "true") 
+                rc = true	 
                 lastResponse("Success") 
             } else {  //Error
                pollError(object)                
@@ -185,11 +184,11 @@ def parseDevice(object, source) {
     
     switch(source) {
 		case "devicestate":      
-            online = object.data.online     
+            online = object.data.online.toString()
             devstate = object.data.state.state
-            lowBattery = object.data.state.alarm.lowBattery                             
-            lowTemp = object.data.state.alarm.lowTemp
-            highTemp = object.data.state.alarm.highTemp                         
+            lowBattery = object.data.state.alarm.lowBattery.toString()
+            lowTemp = object.data.state.alarm.lowTemp.toString()
+            highTemp = object.data.state.alarm.highTemp.toString()                         
             battery = parent.batterylevel(object.data.state.battery) 
             batteryType = object.data.state.batteryType
             alertInterval = object.data.state.interval
@@ -201,7 +200,7 @@ def parseDevice(object, source) {
             firmware = object.data.state.version   
             reportAt = object.data.reportAt     
         
-            temperature = parent.convertTemperature(temperature)   
+            temperature = parent.convertTemperature(temperature)
             tempLimitMax = parent.convertTemperature(tempLimitMax)
             tempLimitMin = parent.convertTemperature(tempLimitMin)
        
@@ -242,9 +241,9 @@ def parseDevice(object, source) {
         case "report":                 
             online = "true"        
             devstate = "normal"     
-            lowBattery = object.data.alarm.lowBattery                             
-            lowTemp = object.data.alarm.lowTemp
-            highTemp = object.data.alarm.highTemp             
+            lowBattery = object.data.alarm.lowBattery.toString()                             
+            lowTemp = object.data.alarm.lowTemp.toString()
+            highTemp = object.data.alarm.highTemp.toString()
             battery = parent.batterylevel(object.data.battery) 
             batteryType = object.data.batteryType
             alertInterval = object.data.interval
@@ -296,14 +295,14 @@ def parseDevice(object, source) {
             break;	 
                 
 		case "alert":
-            devstate = object.data.state                       //1.0.4
-            lowBattery = object.data.alarm.lowBattery                             
-            lowTemp = object.data.alarm.lowTemp
-            highTemp = object.data.alarm.highTemp                    
+            devstate = object.data.state                      
+            lowBattery = object.data.alarm.lowBattery.toString()                             
+            lowTemp = object.data.alarm.lowTemp.toString()
+            highTemp = object.data.alarm.highTemp.toString()                    
             battery = parent.batterylevel(object.data.battery) 
             temperatureScale = object.data.mode.toUpperCase()
             alertInterval = object.data.interval 
-            temperature = parent.convertTemperature(object.data.temperature)            
+            temperature = parent.convertTemperature(object.data.temperature)
             firmware = object.data.version           
             signal = object.data.loraInfo.signal    
           
@@ -476,7 +475,6 @@ def alarmState(temperature,tempLimitMin,tempLimitMax) { // Override Alarms - not
 }
 
 def reset(){       
-    state.debug = false  
     state.remove("API")
     state.remove("firmware")
     state.remove("reportAt")    
@@ -505,10 +503,15 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }           
    }
 }   
 

@@ -15,14 +15,16 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 1.0.1: Fixed errors in poll()
- * 1.0.2: (skipped)
- * 1.0.3: Fix clientVersion()
+ *  1.0.1: Fixed errors in poll()
+ *  1.0.2: (skipped)
+ *  1.0.3: Fix clientVersion()
+ *  1.0.4: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *         - Removed delay channel processing - always 1 (only one plug)
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.03"}
+def clientVersion() {return "1.0.4"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -34,7 +36,7 @@ metadata {
 		capability "Polling"	
         capability "RelaySwitch"
                                       
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection
         command "reset"
         command "announce", ['String'] 
@@ -48,9 +50,8 @@ metadata {
         attribute "signal", "String"
         attribute "lastResponse", "String" 
         
-        attribute "switch", "String"  
-        attribute "delay_on", "String"  
-        attribute "delay_off", "String"  
+        attribute "delay_on", "Number"  
+        attribute "delay_off", "Number"  
         attribute "time", "String"
         attribute "tzone", "String"        
         attribute "powerOnState", "String"  
@@ -188,8 +189,7 @@ def getDevicestate() {
 
 def parseDevice(object) {
    def devId = object.deviceId  
-   def swState = parent.relayState(object.data.state)
-   def delay_ch = object.data.delay.ch
+   def swState = parent.relayState(object.data.state)   
    def delay_on = object.data.delay.on
    def delay_off = object.data.delay.off    
    def power = object.data.power 
@@ -199,11 +199,10 @@ def parseDevice(object) {
    def tzone = object.data.tz
    def signal = object.data.loraInfo.signal         
     
-   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_ch=$delay_ch, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Time=$time, Timezone=$tzone, Firmware=$firmware, Signal=$signal")      
+   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Time=$time, Timezone=$tzone, Firmware=$firmware, Signal=$signal")      
                 
    rememberState("online", "true")
    rememberState("switch", swState)
-   rememberState("delay_ch", delay_ch)
    rememberState("delay_on", delay_on)
    rememberState("delay_off", delay_off)
    rememberState("power", power)      
@@ -302,12 +301,10 @@ def void processStateData(payload) {
 		    break;
             
          
-        case "setDelay":
-            def delay_ch = object.data.ch
+        case "setDelay":     
             def delay_on = object.data.delayOn
             def delay_off = object.data.delayOff    
    
-            rememberState("delay_ch", delay_ch)
             rememberState("delay_on", delay_on)
             rememberState("delay_off", delay_off)                
 			break;    
@@ -459,7 +456,7 @@ def reset(){
     state.remove("API")
     state.remove("firmware")
     state.remove("switch")
-    state.remove("delay_ch")
+    state.remove("delay_ch")        //Note: remove in future
     state.remove("delay_on")
     state.remove("delay_off")    
     state.remove("power")    
@@ -489,12 +486,17 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }              
    }
-}   
+}     
 
 def successful(object) {
   return (object.code  == "000000")     

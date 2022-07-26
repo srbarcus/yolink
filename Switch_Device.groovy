@@ -15,12 +15,15 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 01.00.01: Fixed errors in poll()
+ *  1.0.1: Fixed errors in poll()
+ *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *         - Removed "announce" command - My command to allow speaker hub announcements - support in future??
+ *         - Fixed delay attribute parsing
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.01"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Relay (YS5706-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -32,10 +35,9 @@ metadata {
 		capability "Polling"	
         capability "RelaySwitch"
                                       
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection
-        command "reset"
-        command "announce", ['String'] 
+        command "reset"        
         
         command "on"                         
         command "off"  
@@ -46,7 +48,6 @@ metadata {
         attribute "signal", "String"
         attribute "lastResponse", "String" 
         
-        attribute "switch", "String" 
         attribute "delay_ch", "String"  
         attribute "delay_on", "String"  
         attribute "delay_off", "String"  
@@ -189,10 +190,10 @@ def getDevicestate() {
 
 def parseDevice(object) {
    def devId = object.deviceId  
-   def swState = parent.relayState(object.data.state)
-   def delay_ch = object.data.delay_ch
-   def delay_on = object.data.delay_on
-   def delay_off = object.data.delay_off    
+   def swState = parent.relayState(object.data.state)    
+   def delay_ch = object.data.delay.ch
+   def delay_on = object.data.delay.on
+   def delay_off = object.data.delay.off    
    def power = object.data.power
    def watt = object.data.watt
    def firmware = object.data.version
@@ -477,12 +478,17 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }              
    }
-}   
+}    
 
 def successful(object) {
   return (object.code  == "000000")     

@@ -15,12 +15,15 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- *  01.00.01 - Fixed debug messages appearing when debug is off. Fixed poll()
+ *  1.0.1: Fixed debug messages appearing when debug is off. Fixed poll()
+ *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *         - Return Motion as ENUM ["inactive", "active"] per standards
+ *         - Correct attribute types
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "01.00.01"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -33,7 +36,7 @@ metadata {
 		capability "Battery"
         capability "Temperature Measurement"
                                       
-        command "debug", ['boolean']
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"                       // Attempt to establish MQTT connection
         command "reset" 
         
@@ -42,12 +45,10 @@ metadata {
         attribute "firmware", "String"  
         attribute "reportAt", "String"
         attribute "signal", "String" 
-        attribute "battery", "String"  
         attribute "lastResponse", "String" 
         
-        attribute "motion", "String"      
-        attribute "alertInterval", "String"      
-        attribute "openRemindDelay", "String"                    
+        attribute "alertInterval", "Number"      
+        attribute "openRemindDelay", "Number"                    
         }
    }
 
@@ -144,8 +145,8 @@ def getDevicestate() {
                def devstate = object.data.state.state    
                def firmware = object.data.state.version        
                     
-               def motion = true
-               if (devstate == "normal"){motion=false}
+               def motion = "active"                                 //ENUM ["inactive", "active"]
+               if (devstate == "normal"){motion="inactive"} 
                 
                logDebug("Device State: online(${online}), " +
                         "Report At(${reportAt}), " +
@@ -279,8 +280,8 @@ def void processStateData(payload) {
             def sensitivity = object.data.sensitivity              
             def signal = object.data.loraInfo.signal           
             
-            def motion = true
-            if (devstate == "normal"){motion=false}                              
+            def motion = "active"                                 //ENUM ["inactive", "active"]
+            if (devstate == "normal"){motion="inactive"}                               
     
             logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, Signal=$signal, Motion=$motion")
             
@@ -308,8 +309,8 @@ def void processStateData(payload) {
                 
             temperature = parent.convertTemperature(temperature) 
                         
-            def motion = true
-            if (devstate == "normal"){motion=false}                              
+            def motion = "active"                                 //ENUM ["inactive", "active"]
+            if (devstate == "normal"){motion="inactive"} 
     
             logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, Signal=$signal, Motion=$motion, Temperature=$temperature")
             
@@ -360,10 +361,15 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value) {
+def rememberState(name,value,unit=null) {
+   value=value.toString()
    if (state."$name" != value) {
      state."$name" = value   
-     sendEvent(name:"$name", value: "$value", isStateChange:true)
+     if (unit==null) {  
+         sendEvent(name:"$name", value: "$value", isStateChange:true)
+     } else {        
+         sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
+     }              
    }
 }   
 
