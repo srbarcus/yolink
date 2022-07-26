@@ -503,10 +503,10 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value,unit=null) {
-   value=value.toString()
+def rememberState(name,value,unit=null) {   
    if (state."$name" != value) {
      state."$name" = value   
+     value=value.toString()
      if (unit==null) {  
          sendEvent(name:"$name", value: "$value", isStateChange:true)
      } else {        
