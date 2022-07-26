@@ -241,7 +241,7 @@ def getDevicestate() {
                 rememberState("firmware", firmware)
                 rememberState("wifi_ap", wifi_ap)
                 rememberState("wifi_ssid", wifi_ssid)
-                rememberState("wifi_enabled", wifi_enabledx)
+                rememberState("wifi_enabled", wifi_enabled)
                 rememberState("wifi_ip", wifi_ip)
                 rememberState("wifi_gateway", wifi_gateway)
                 rememberState("wifi_mask", wifi_mask)
