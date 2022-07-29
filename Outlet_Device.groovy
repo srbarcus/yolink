@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Plug (YS6604-UC)
+ *  YoLink™ Plug (YS6604-UC) and In-wall outlet (YS6704-UC)
  *  © 2022 Steven Barcus
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -20,14 +20,15 @@
  *  1.0.3: Fix clientVersion()
  *  1.0.4: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Removed delay channel processing - always 1 (only one plug)
+ *  1.0.5: Verified support for In-wall outlet (YS6704-UC)
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.4"}
+def clientVersion() {return "1.0.5"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) or In-wall outlet (YS6704-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 

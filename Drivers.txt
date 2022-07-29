@@ -11,16 +11,17 @@ Door Sensor 			(YS7707-UC)
 Motion Sensor 			(YS7804-UC)
 Outdoor Motion Sensor 		(YS7805-UC)
 Temperature Humidity Sensor 	(YS8003-UC)
-Siren Alarm   			(YS7103-UC) - 07/15/2021
-MultiOutlet                     (YS6801-UC) - 07/15/2021
-Weatherproof Temperature Sensor (YS8004-UC) - 07/15/2021
-Leak Sensor                     (YS7903-UC) - 07/16/2021
+Siren Alarm   			(YS7103-UC) - 07/15/2022
+MultiOutlet                     (YS6801-UC) - 07/15/2022
+Weatherproof Temperature Sensor (YS8004-UC) - 07/15/2022
+Leak Sensor                     (YS7903-UC) - 07/16/2022
+In-wall Switch			(YS5705-UC) - 07/29/2022
+In-wall Outlet 			(YS6704-UC) - 07/29/2022
 
 
 UNDER DEVELOPMENT
 -----------------
-In-wall Switch			(YS5705-UC)
-In-wall outlet 			(YS6704-UC)
+
 
 
 NOT SUPPORTED

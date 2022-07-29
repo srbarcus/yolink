@@ -3,7 +3,10 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Added constraints to the 'debug' command on drivers\n- Modified all drivers to return event values as String values per standards (https://docs.hubitat.com/index.php?title=Event_Object#value)\n- Return temperatures rounded to 1 decimal place\n- Misc driver fixes\n",
+  "releaseNotes": "
+   - Remove any leading or trailing spaces in user's access credentials\n
+   - Add support for In-wall Switch (YS5705-UC)\n
+   - Add support for In-wall Outlet (YS6704-UC)\n"
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -15,7 +18,7 @@
       "required": true,
       "oauth": false,
       "primary": true,
-      "version": "1.0.5"
+      "version": "1.0.6"
     }
   ],
   "drivers": [
@@ -73,7 +76,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
       "required": false,
-      "version": "1.0.4"
+      "version": "1.0.5"
     },
     {
       "id": "0b5e05f6-69a4-4a40-ac97-ae57d5e0dc9f",
@@ -89,7 +92,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
       "required": false,
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     {
       "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",

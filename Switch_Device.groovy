@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Relay (YS5706-UC)
+ *  YoLink™ Relay (YS5706-UC) and In-wall Switch (YS5705-UC)
  *  © 2022 Steven Barcus
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -19,14 +19,15 @@
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Removed "announce" command - My command to allow speaker hub announcements - support in future??
  *         - Fixed delay attribute parsing
+ *  1.0.3: Support In-wall Switch (YS5705-UC), removed delay_ch as it's superfluous because it's a single switch
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.0.3"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Relay (YS5706-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Driver Version", description: "YoLink™ Relay (YS5706-UC) or In-wall Switch (YS5705-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
@@ -46,9 +47,8 @@ metadata {
         attribute "online", "String"
         attribute "firmware", "String"  
         attribute "signal", "String"
-        attribute "lastResponse", "String" 
-        
-        attribute "delay_ch", "String"  
+        attribute "lastResponse", "String"         
+    
         attribute "delay_on", "String"  
         attribute "delay_off", "String"  
         attribute "power", "String"  
@@ -190,8 +190,7 @@ def getDevicestate() {
 
 def parseDevice(object) {
    def devId = object.deviceId  
-   def swState = parent.relayState(object.data.state)    
-   def delay_ch = object.data.delay.ch
+   def swState = parent.relayState(object.data.state)       
    def delay_on = object.data.delay.on
    def delay_off = object.data.delay.off    
    def power = object.data.power
@@ -201,11 +200,10 @@ def parseDevice(object) {
    def tzone = object.data.tz
    def signal = object.data.loraInfo.signal         
     
-   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_ch=$delay_ch, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Watt=$watt, Time=$time, Timezone=$tzone, Firmware=$firmware, Signal=$signal")      
+   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Watt=$watt, Time=$time, Timezone=$tzone, Firmware=$firmware, Signal=$signal")      
                 
    rememberState("online", "true")
-   rememberState("switch", swState)
-   rememberState("delay_ch", delay_ch)
+   rememberState("switch", swState)   
    rememberState("delay_on", delay_on)
    rememberState("delay_off", delay_off)
    rememberState("power", power)
@@ -304,6 +302,14 @@ def void processStateData(payload) {
             rememberState("signal",signal)                          
     
 		    break;
+            
+        case "setDelay":     
+            def delay_on = object.data.delayOn
+            def delay_off = object.data.delayOff    
+   
+            rememberState("delay_on", delay_on)
+            rememberState("delay_off", delay_off)                
+			break;                
             
 		case "setInitState":
             def PowerOnState = parent.relayState(object.data.initState) 
@@ -447,8 +453,7 @@ def reset(){
     state.debug = false
     state.remove("API")
     state.remove("firmware")
-    state.remove("switch")
-    state.remove("delay_ch")
+    state.remove("switch")    
     state.remove("delay_on")
     state.remove("delay_off")    
     state.remove("power")

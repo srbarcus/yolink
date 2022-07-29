@@ -18,6 +18,7 @@
  *  1.0.3 - Reduce number of messages by adding debug setting, misc. fixes
  *  1.0.4 - Fix "No such property: statusCode for class: java.net.SocketTimeoutException" error, improved polling error diagnostic messages
  *  1.0.5 - Return temperatures as a Number rounded to 1 decimal place, return battery level as a Number.
+ *  1.0.6 - Remove any possible leading and/or trailing spaces in credentials.
  */
 import groovy.json.JsonSlurper
 
@@ -35,7 +36,7 @@ definition(
 )
 
 private def get_APP_VERSION() {
-	return "1.0.5"    
+	return "1.0.6"    
 }
 
 private def get_APP_NAME() {
@@ -320,8 +321,8 @@ def refreshAuthToken() {
 	logDebug("Refreshing access token")
 	boolean rc=false    
             
-    state?.UAID = UAID
-    state?.secret_key = secret_key 
+    state?.UAID = UAID.trim()
+    state?.secret_key = secret_key.trim()
     
     state.remove("access_token")            // Remove any old token  
    	
