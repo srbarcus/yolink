@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-29",
-  "releaseNotes": "- Remove any leading or trailing spaces in user's access credentials\n- Add support for In-wall Switch (YS5705-UC)\n- Add support for In-wall Outlet (YS6704-UC)\n",
+  "releaseNotes": "- Remove any leading or trailing spaces in user''s access credentials\n- Add support for In-wall Switch (YS5705-UC)\n- Add support for In-wall Outlet (YS6704-UC)\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
