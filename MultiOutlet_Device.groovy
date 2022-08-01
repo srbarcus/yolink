@@ -16,11 +16,12 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
  *  1.0.1: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *  1.0.2: Set switch state to "unknown" if unable to connect to device and remove "error" message in log.
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.1"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -330,13 +331,12 @@ def getDevicestate() {
                 lastResponse("Success") 
             } else {  //Error
                if (pollError(object) ) {  //Cannot connect to Device
-                  log.error "Unable to connect to device"
-                  lastResponse("No Poll Response")                       
+                 rememberState("switch", "unknown")                       
                }
             }     
         } else {
             log.error "No response from API request"
-            lastResponse("No Poll Response")                
+            lastResponse("No response from API")                
         }   
 	} catch (groovyx.net.http.HttpResponseException e) {	
             rc = false                        

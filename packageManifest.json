@@ -2,8 +2,9 @@
   "packageName": "YoLink Device Service",
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
-  "dateReleased": "2022-07-29",
-  "releaseNotes": "- Remove any leading or trailing spaces in access credentials\n- Add support for In-wall Switch (YS5705-UC)\n- Add support for In-wall Outlet (YS6704-UC)\n",
+  "dateReleased": "2022-07-17",
+  "releaseNotes": "
+   - YoLink™ MultiOutlet (YS6801-UC) v1.0.2: Set switch state to "unknown" if unable to connect to device and remove "error" message in log.\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -97,7 +98,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
       "required": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
