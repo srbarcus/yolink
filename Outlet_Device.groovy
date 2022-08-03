@@ -21,11 +21,12 @@
  *  1.0.4: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Removed delay channel processing - always 1 (only one plug)
  *  1.0.5: Verified support for In-wall outlet (YS6704-UC)
+ *  1.0.6: Added "Switch" capability
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.5"}
+def clientVersion() {return "1.0.6"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) or In-wall outlet (YS6704-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -36,6 +37,7 @@ metadata {
     definition (name: "YoLink Outlet Device", namespace: "srbarcus", author: "Steven Barcus") {     	
 		capability "Polling"	
         capability "RelaySwitch"
+        capability "Switch"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection

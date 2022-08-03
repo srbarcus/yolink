@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- YoLink MultiOutlet v1.0.2 - Set switch state to 'unknown' if unable to connect to device and remove 'error' message in log.\n",
+  "releaseNotes": "- Updated driver capabilities of the MotionSensor (added MotionSensor), Outlet (added Switch), MultiOutlet (added Switch), and the Switch (added Switch) to work with Built-In Rules apps\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -65,7 +65,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MotionSensor_Device.groovy",
       "required": false,
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     {
       "id": "ce627334-e153-4494-8f20-f6f5bc8c1d90",
@@ -73,7 +73,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
       "required": false,
-      "version": "1.0.5"
+      "version": "1.0.6"
     },
     {
       "id": "0b5e05f6-69a4-4a40-ac97-ae57d5e0dc9f",
@@ -89,7 +89,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
       "required": false,
-      "version": "1.0.3"
+      "version": "1.0.4"
     },
     {
       "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",
@@ -97,7 +97,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
       "required": false,
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     {
       "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",

@@ -20,11 +20,12 @@
  *         - Removed "announce" command - My command to allow speaker hub announcements - support in future??
  *         - Fixed delay attribute parsing
  *  1.0.3: Support In-wall Switch (YS5705-UC), removed delay_ch as it's superfluous because it's a single switch
+ *  1.0.4: Added "Switch" capability
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.3"}
+def clientVersion() {return "1.0.4"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Relay (YS5706-UC) or In-wall Switch (YS5705-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -35,6 +36,7 @@ metadata {
     definition (name: "YoLink Switch Device", namespace: "srbarcus", author: "Steven Barcus") {     	
 		capability "Polling"	
         capability "RelaySwitch"
+        capability "Switch"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection

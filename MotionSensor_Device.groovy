@@ -19,11 +19,12 @@
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Return Motion as ENUM ["inactive", "active"] per standards
  *         - Correct attribute types
+ *  1.0.3: Added MotionSensor capability
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.0.3"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -35,6 +36,7 @@ metadata {
 		capability "Polling"				
 		capability "Battery"
         capability "Temperature Measurement"
+        capability "MotionSensor"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"                       // Attempt to establish MQTT connection

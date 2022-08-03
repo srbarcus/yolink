@@ -17,11 +17,12 @@
  * 
  *  1.0.1: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *  1.0.2: Set switch state to "unknown" if unable to connect to device and remove "error" message in log.
+ *  1.0.3: Added "Switch" capability
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.0.3"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -32,6 +33,7 @@ metadata {
     definition (name: "YoLink MultiOutlet Device", namespace: "srbarcus", author: "Steven Barcus") {     	
 		capability "Polling"	
         capability "Outlet"
+        capability "Switch"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"                       // Attempt to establish MQTT connection
