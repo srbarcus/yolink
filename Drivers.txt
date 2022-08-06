@@ -19,9 +19,15 @@ In-wall Switch			(YS5705-UC) - 07/29/2022
 In-wall Outlet 			(YS6704-UC) - 07/29/2022
 
 
-UNDER DEVELOPMENT
------------------
+CURRENTLY UNDER DEVELOPMENT
+---------------------------
+Garage Door Sensor   	     	(YS7706-UC)
+Vibration, Shock, Glass Break Sensor (YS7201-UC)
 
+
+IN QUEUE FOR DEVELOPMENT
+------------------------
+Smart Garage Door Controller 	(YS4906-UC)
 
 
 NOT SUPPORTED
@@ -29,6 +35,7 @@ NOT SUPPORTED
 Remote 				(YS3603-UC) - Only supports manually paired YoLink devices (device to device)
 
 
-**********************************************************
-** ADDITIONAL DEVICES WILL BE SUPPORTED BASED ON DEMAND **
-**********************************************************
+*******************************************************
+** ADDITIONAL DEVICES WILL BE SUPPORTED ON REQUEST   **
+** A DONATION MOVES YOUR REQUEST HIGHER IN THE QUEUE **
+*******************************************************
