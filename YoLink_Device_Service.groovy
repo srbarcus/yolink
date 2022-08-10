@@ -19,6 +19,8 @@
  *  1.0.4 - Fix "No such property: statusCode for class: java.net.SocketTimeoutException" error, improved polling error diagnostic messages
  *  1.0.5 - Return temperatures as a Number rounded to 1 decimal place, return battery level as a Number.
  *  1.0.6 - Remove any possible leading and/or trailing spaces in credentials.
+ *  1.0.7 - Add temperature scale function
+ *        - Sync temperature scale changes with all devices - NOTE: YoLink mobile app settings will override!
  */
 import groovy.json.JsonSlurper
 
@@ -35,13 +37,8 @@ definition(
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
-private def get_APP_VERSION() {
-	return "1.0.6"    
-}
-
-private def get_APP_NAME() {
-	return "YoLink™ Device Service"
-}
+private def get_APP_VERSION() {return "1.0.7"}
+private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
 	page(name: "about", title: "About", nextPage: "credentials")
@@ -170,12 +167,14 @@ def otherSettings() {
 
 def installed() {
     log.info "${get_APP_NAME()} app installed."
+    syncTempScale()
    	pollDevices()   
     schedulePolling()
 }
 
 def updated() {
 	log.info "${get_APP_NAME()} app updated."    
+    syncTempScale()
     pollDevices()   
     schedulePolling()
 }
@@ -640,6 +639,22 @@ def convertTemperature(temperature) {
         return temperature
     }    
 }
+
+def temperatureScale() {
+    return settings.temperatureScale
+}
+
+def syncTempScale() {
+    def children= getChildDevices()
+    children.each { 
+       logDebug("Syncing temperature scale on device ${it}")
+       try {                                                //Not all devices support temperature
+            it.temperatureScale(settings.temperatureScale)  
+	   } catch (Exception e) {                 
+            log.warn ("Temperature scale not supported on device ${it}")                  
+       }             
+    }
+}
     
 def celsiustofahrenheit(celsius) {return ((celsius * 9 / 5) + 32)} 
 
@@ -712,7 +727,6 @@ def scheduledDay(weekday) {
 
    return weekday 
 }
-
 
 def commaConcat(oldvalue,newvalue) {
     if (!oldvalue) {

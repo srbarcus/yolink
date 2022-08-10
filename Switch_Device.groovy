@@ -21,11 +21,12 @@
  *         - Fixed delay attribute parsing
  *  1.0.3: Support In-wall Switch (YS5705-UC), removed delay_ch as it's superfluous because it's a single switch
  *  1.0.4: Added "Switch" capability
+ *  1.0.5: def temperatureScale()
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.4"}
+def clientVersion() {return "1.0.5"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Relay (YS5706-UC) or In-wall Switch (YS5705-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -112,6 +113,8 @@ def poll(force=null) {
 def connect() {
     establish_MQTT_connection(state.my_dni)
  }
+
+def temperatureScale(value) {}
 
 def debug(value) { 
     def bool = parent.validBoolean("debug",value)

@@ -17,11 +17,12 @@
  * 
  *  1.0.1: Fixed errors in poll()
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *  1.0.3: Fix syncing of Temperature scale with YoLink™ Device Service app
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.0.3"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Fob (YS3604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -125,6 +126,10 @@ def hold(button) {
 
 def connect() {
     establish_MQTT_connection(state.my_dni)
+ }
+
+def temperatureScale(value) {
+    state.temperatureScale = value
  }
 
 def debug(value) { 

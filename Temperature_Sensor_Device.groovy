@@ -21,11 +21,12 @@
  *  1.0.4: Fixed parsing error: groovy.lang.MissingPropertyException: No such property: state for class: java.lang.String on line nnn (method parse)
  *  1.0.5: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Removed superfluous code, correct attribute types, correct attributes to match standards, correct data to match attribute
+ *  1.0.6: Fix syncing of Temperature scale with YoLink™ Device Service app
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.5"}
+def clientVersion() {return "1.0.6"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Sensor (YS8004-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -104,6 +105,10 @@ def poll(force=null) {
 
 def connect() {
     establish_MQTT_connection(state.my_dni)
+ }
+
+def temperatureScale(value) {
+    state.temperatureScale = value
  }
 
 def debug(value) { 

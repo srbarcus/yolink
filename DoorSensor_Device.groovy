@@ -1,5 +1,6 @@
 /***
  *  YoLink™ Door Sensor (YS7707-UC)
+ *  YoLink™ Garage Door Sensor 2 (YS7706-UC)
  *  © 2022 Steven Barcus
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -15,13 +16,14 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- * 1.0.1: Fixed errors in poll()
- * 1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value 
+ *  1.0.1: Fixed errors in poll()
+ *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value 
+ *  1.0.3: Remove undefined responses
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.0.3"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Door Sensor (YS7707-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -45,11 +47,9 @@ metadata {
         attribute "lastResponse", "String"         
         attribute "reportAt", "String"  
         
-        attribute "switch", "String" 
-        attribute "alertType", "String"  
+        attribute "switch", "String"   
         attribute "signal", "String"  
-        attribute "alertInterval", "String"
-        attribute "delay", "String"          
+        attribute "alertInterval", "String"  
         attribute "openRemindDelay", "String" 
         }
    }
@@ -98,6 +98,8 @@ def poll(force=null) {
 def connect() {
     establish_MQTT_connection(state.my_dni)
  }
+
+def temperatureScale(value) {}
 
 def debug(value) { 
     def bool = parent.validBoolean("debug",value)
@@ -163,7 +165,6 @@ def parseDevice(object) {
     def reportAt = object.data.reportAt 
     def alertInterval = object.data.state.alertInterval                             
     def battery = parent.batterylevel(object.data.state.battery)
-    def delay = object.data.state.delay 
     def openRemindDelay = object.data.state.openRemindDelay       
     def devstate = object.data.state.state               
     def firmware = object.data.state.version
@@ -176,7 +177,6 @@ def parseDevice(object) {
              "Report At(${reportAt}), " +
              "Alert Interval(${alertInterval}), " +
              "Battery(${battery}), " +
-             "Delay(${delay}), " +   
              "Open Reminder Delay(${openRemindDelay}), " +
              "Switch(${swState}), " +
              "Contact(${contact}), " + 
@@ -186,7 +186,6 @@ def parseDevice(object) {
     rememberState("reportAt",reportAt)
     rememberState("alertInterval",alertInterval)
     rememberState("battery",battery)
-    rememberState("delay",delay)               
     rememberState("openRemindDelay",openRemindDelay) 
     rememberState("switch",swState)
     rememberState("contact",contact)
@@ -272,8 +271,7 @@ def void processStateData(payload) {
         
         switch(event) {
 		case "Alert":            
-			def devstate = object.data.state          
-            def alertType = object.data.alertType    
+			def devstate = object.data.state           
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version    
             def signal = object.data.loraInfo.signal           
@@ -284,7 +282,6 @@ def void processStateData(payload) {
             
             rememberState("switch",swState)
             rememberState("contact",contact)
-            rememberState("alertType",alertType)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
             rememberState("signal",signal)      
@@ -293,9 +290,7 @@ def void processStateData(payload) {
                 
 		case "Report":
             def devstate = object.data.state          
-            def alertType = object.data.alertType    
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def delay = object.data.delay
             def firmware = object.data.version    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
@@ -307,7 +302,6 @@ def void processStateData(payload) {
             
             rememberState("switch",swState)
             rememberState("contact",contact)
-            rememberState("alertType",alertType)
             rememberState("battery",battery)
             rememberState("delay",delay)               
             rememberState("firmware",firmware)
@@ -317,12 +311,10 @@ def void processStateData(payload) {
 		    break;  
             
         case "setOpenRemind":    
-            def delay = object.data.delay 
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
             def signal = object.data.loraInfo.signal  
     
-            rememberState("delay",delay)               
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
             rememberState("signal",signal)                  
@@ -342,14 +334,15 @@ def reset(){
     state.remove("firmware") 
     state.remove("swState")
     state.remove("contact")
-    state.remove("alertType")  
     state.remove("battery")     
     state.remove("signal")  
     state.remove("online")
     state.remove("reportAt")
     state.remove("alertInterval")
-    state.remove("delay")           
+    state.remove("alertType")              //Remove undocumented response - delete statment in future
+    state.remove("delay")                  //Remove undocumented response - delete statment in future
     state.remove("openRemindDelay")
+    state.temperatureScale = parent.temperatureScale
       
     interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
     connect()                         // Reconnect to API Cloud 

@@ -20,11 +20,12 @@
  *  1.0.3: Fixed clientVersion()
  *  1.0.4: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Correct attribute types
+ *  1.0.5: def temperatureScale()
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.4"}
+def clientVersion() {return "1.0.5"}
 
 preferences {
     input title: "Driver Version", description: "Siren (YS7103-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -99,6 +100,8 @@ def poll(force=null) {
 def connect() {
     establish_MQTT_connection(state.my_dni)
  }
+
+def temperatureScale(value) {}
 
 def debug(value) { 
     def bool = parent.validBoolean("debug",value)

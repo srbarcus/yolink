@@ -17,17 +17,17 @@ Weatherproof Temperature Sensor (YS8004-UC) - 07/15/2022
 Leak Sensor                     (YS7903-UC) - 07/16/2022
 In-wall Switch			(YS5705-UC) - 07/29/2022
 In-wall Outlet 			(YS6704-UC) - 07/29/2022
+Garage Door Sensor   	     	(YS7706-UC) - 08-09-2022
+Vibration, Glass Break Sensor   (YS7201-UC) - 08-09-2022
 
 
 CURRENTLY UNDER DEVELOPMENT
 ---------------------------
-Garage Door Sensor   	     	(YS7706-UC)
-Vibration, Shock, Glass Break Sensor (YS7201-UC)
+Smart Garage Door Controller 	(YS4906-UC)
 
 
 IN QUEUE FOR DEVELOPMENT
 ------------------------
-Smart Garage Door Controller 	(YS4906-UC)
 
 
 NOT SUPPORTED

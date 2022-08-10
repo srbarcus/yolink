@@ -20,11 +20,12 @@
  *         - Return Motion as ENUM ["inactive", "active"] per standards
  *         - Correct attribute types
  *  1.0.3: Added MotionSensor capability
+ *  1.0.4: Minor tracing fix, Fix syncing of Temperature scale with YoLink™ Device Service app
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.3"}
+def clientVersion() {return "1.0.4"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -97,6 +98,10 @@ def poll(force=null) {
 
 def connect() {
     establish_MQTT_connection(state.my_dni)
+ }
+
+def temperatureScale(value) {
+    state.temperatureScale = value
  }
 
 def debug(value) { 
@@ -218,7 +223,7 @@ def establish_MQTT_connection(mqtt_ID) {
       
          interfaces.mqtt.connect("tcp://api.yosmart.com:8003","${mqtt_ID}",authToken,null)                         	
           
-         log.info "Subscribing to MQTT topic '${topic}'"    
+         logDebug("Subscribing to MQTT topic '${topic}'")
          interfaces.mqtt.subscribe("${topic}", 0) 
          
          MQTT = "connected" 

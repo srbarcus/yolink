@@ -22,11 +22,12 @@
  *         - Removed delay channel processing - always 1 (only one plug)
  *  1.0.5: Verified support for In-wall outlet (YS6704-UC)
  *  1.0.6: Added "Switch" capability
+ *  1.0.7: def temperatureScale()
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.6"}
+def clientVersion() {return "1.0.7"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) or In-wall outlet (YS6704-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -112,6 +113,8 @@ def poll(force=null) {
 def connect() {
     establish_MQTT_connection(state.my_dni)
  }
+
+def temperatureScale(value) {}
 
 def debug(value) { 
     def bool = parent.validBoolean("debug",value)

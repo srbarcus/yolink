@@ -15,13 +15,15 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  *  
- *  v1.0.1 - Process "Report" notification
- *         - Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *  1.0.1: Process "Report" notification
+ *          - Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *  1.0.2: Fix syncing of Temperature scale with YoLink™ Device Service app
+ *
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.1"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ LeakSensor (YS7903-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -105,6 +107,10 @@ def poll(force=null) {
 
 def connect() {
     establish_MQTT_connection(state.my_dni)
+ }
+
+def temperatureScale(value) {
+    state.temperatureScale = value
  }
 
 def debug(value) { 
