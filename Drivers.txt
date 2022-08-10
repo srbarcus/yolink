@@ -23,7 +23,8 @@ Vibration, Glass Break Sensor   (YS7201-UC) - 08-09-2022
 
 CURRENTLY UNDER DEVELOPMENT
 ---------------------------
-Smart Garage Door Controller 	(YS4906-UC)
+Garage Door Controller 		(YS4906-UC)
+Plug With Power Monitoring	(YS6602-UC)
 
 
 IN QUEUE FOR DEVELOPMENT
