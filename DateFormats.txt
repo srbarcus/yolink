@@ -1,0 +1,29 @@
+Example: "MM/dd/yyyy hh:mm:ss a" produces "08/11/2022 05:07:44 PM"
+
+ 
+Symbol		Meaning    	           	Type	         Example
+  G	     	Era	            	        String	         AD; Anno Domini
+  y	     	Year of era     		Year	         2004 or 04
+  u	     	Year of era     	    	Year	         Similar to ‘y’ but returns proleptic year.
+  D	     	Day of year     	    	Number	         235
+  M / L		Month of year	            	Number / String  7 or 07; J or Jul or July. 
+  d	     	Day of month	            	Number	         21  
+  Y	    	Week based year	        	Year	         1996 or 96
+  w	     	Week of week based year    	Number	         32
+  W	     	Week of month	            	Number	         3
+  E	     	Day of week	            	String	         T or Tue or Tuesday
+  F	     	Week of month	            	Number	         3
+  a	     	am / pm of day	            	String	         PM
+  h	     	Clock hour of am pm (1-12)	Number	         12
+  K	     	Hour of am pm (0-11)	    	Number	         0
+  k	     	Clock hour of am pm (1-24)	Number	         15
+  H	     	Hour of day (0-23)	        Number	         15
+  m	     	Minute of hour	            	Number	         30
+  s	     	Second of minute	        Number	         55
+  S	     	Fraction of second	        Fraction         978
+  z	     	Time zone name	            	Zone-name	 Pacific Standard Time or PST 
+  Z	  	Zone offset	         	Offset-Z    	 +0000 or –0800 or –08:00 
+  X	     	Zone offset Z for zero	    	Offset-X	 Z or –08 or –0830 or –08:30 or –083015 or –08:30:15 
+
+Note: Repetition of a letter in the pattern may have different meanings.
+For example, 'MMM' produces 'Jan', whereas 'MMMM' produces 'January.'"
