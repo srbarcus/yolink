@@ -18,16 +18,19 @@
  *  1.0.1: Process "Report" notification
  *          - Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *  1.0.2: Fix syncing of Temperature scale with YoLink™ Device Service app
+ *  1.1.0: - Fix donation URL 
+ *         - New Function: Formats event timestamp according to user specifiable format
  *
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.1.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ LeakSensor (YS7903-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -40,6 +43,7 @@ metadata {
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]  
         command "connect"                       // Attempt to establish MQTT connection
         command "reset"
+        command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
 
       //command "interval", ['integer']                                                                                                  // Not supported? Get device connection error
       //command "beep", [[name:"beep",type:"ENUM", description:"Beep when device alerts", constraints:["True", "False"]]]                // Not supported
@@ -111,6 +115,23 @@ def connect() {
 
 def temperatureScale(value) {
     state.temperatureScale = value
+ }
+
+def timestampFormat(value) {
+    value = value ?: "MM/dd/yyyy hh:mm:ss a" // No value, reset to default
+    def oldvalue = state.timestampFormat 
+    
+    //Validate requested value
+    try{                           
+       def date = new Date()  
+       def stamp = date.format(value)   
+       state.timestampFormat = value   
+       logDebug("Date format set to '${value}'")
+       logDebug("Current date and time in requested format: '${stamp}'")  
+     } catch(Exception e) {       
+       //log.error "dateFormat() exception: ${e}"
+       log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
+     } 
  }
 
 def debug(value) { 
@@ -224,7 +245,8 @@ def parseDevice(object) {
    def firmware = object.data.state.version
    def reportAt = object.data.reportAt
        
-   temperature = parent.convertTemperature(temperature)  
+   temperature = parent.convertTemperature(temperature) 
+   stateChangedAt = formatTimestamp(stateChangedAt) 
    swState = contactState(swState)    
      
    logDebug("Parsed: Online=$online, State=$swState, Battery=$battery, Temperature=$temperature, Alert Interval=$interval, Mode=$mode, Firmware=$firmware, State Changed At=$stateChangedAt, Support Change Mode=$supportChangeMode, Reported at=$reportAt")      
@@ -346,6 +368,7 @@ def void processStateData(payload) {
             def stateChangedAt = object.data.stateChangedAt
        
             temperature = parent.convertTemperature(temperature) 
+            stateChangedAt = formatTimestamp(stateChangedAt) 
             swState = contactState(swState)
             
             logDebug("Parsed: Mode=$mode, State=$swState, Battery=$battery, Temperature=$temperature, Firmware=$firmware, State Changed At=$stateChangedAt, Signal=$signal")      
@@ -432,6 +455,17 @@ def contactState(value) {
    }    
 }    
 
+def formatTimestamp(timestamp){    
+    if (state.timestampFormat != null) {
+      def date = new Date( timestamp as long )    
+      date = date.format(state.timestampFormat)
+      logDebug("formatTimestamp(): '$state.timestampFormat' = '$date'")
+      return date  
+    } else {
+      return timestamp  
+    }    
+}
+
 def reset(){          
     state.debug = false
     state.remove("API")
@@ -444,6 +478,8 @@ def reset(){
     state.remove("firmware")
     state.remove("reportAt")
     state.remove("stateChangedAt")
+    
+    state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     
   //state.remove("beep")               - Not Supported
   //state.remove("mode")               - Supported, but irrelevant since can't be changed

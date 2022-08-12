@@ -19,15 +19,19 @@
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Removed superfluous Round code
  *  1.0.3: Fix syncing of Temperature scale with YoLink™ Device Service app
+ *  1.0.4: Fix 'Unknown event received: StatusChange' error
+ *  1.1.0: - Fix donation URL 
+ *         - New Function: Formats event timestamps according to user specifiable format
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.3"}
+def clientVersion() {return "1.1.0"}
 
 preferences {
-    input title: "Driver Version", description: "Smoke & CO Alarm (YS7A01-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Driver Version", description: "Smoke & CO Alarm (YS7A01-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"	
+    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -41,6 +45,7 @@ metadata {
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"
         command "reset"  
+        command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
        
         attribute "API", "String" 
         attribute "online", "String"
@@ -67,7 +72,7 @@ metadata {
         attribute "lastTest", "String"
         }
    }
-
+        
 void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
 	state.debug = false	
     
@@ -115,6 +120,23 @@ def connect() {
 
 def temperatureScale(value) {
     state.temperatureScale = value
+ }
+
+def timestampFormat(value) {
+    value = value ?: "MM/dd/yyyy hh:mm:ss a" // No value, reset to default
+    def oldvalue = state.timestampFormat 
+    
+    //Validate requested value
+    try{                           
+       def date = new Date()  
+       def stamp = date.format(value)   
+       state.timestampFormat = value   
+       logDebug("Date format set to '${value}'")
+       logDebug("Current date and time in requested format: '${stamp}'")  
+     } catch(Exception e) {       
+       //log.error "dateFormat() exception: ${e}"
+       log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
+     } 
  }
 
 def debug(value) { 
@@ -200,7 +222,11 @@ def parseDevice(object) {
 
     def gasAlarmChanged = object.data.state.stateChangedAt.gasAlarm
     def smokeAlarmChanged = object.data.state.stateChangedAt.smokeAlarm
-    def unexpectedChanged = object.data.state.stateChangedAt.unexpected
+    def unexpectedChanged = object.data.state.stateChangedAt.unexpected    
+  
+    gasAlarmChanged = formatTimestamp(gasAlarmChanged)    
+    smokeAlarmChanged = formatTimestamp(smokeAlarmChanged)    
+    unexpectedChanged = formatTimestamp(unexpectedChanged)               
                    
     logDebug("Device State: online(${online}), " +
              "Report At(${reportAt}), " +
@@ -221,8 +247,7 @@ def parseDevice(object) {
              "Silence Alarm(${silence}), " +
              "Gas Alarm Changed(${gasAlarmChanged}), " +
              "Smoke Alarm Changed(${smokeAlarmChanged}), " +
-             "Unexpected Alarm Changed(${unexpectedChanged})")     
-             
+             "Unexpected Alarm Changed(${unexpectedChanged})")                  
         
     rememberState("online",online)
     rememberState("reportAt",reportAt)       
@@ -333,7 +358,7 @@ def void processStateData(payload) {
         logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
-		case "Report":           
+		case "Report": case "StatusChange":           
            def unexpected = object.data.state.unexpected
            def lowBattery = object.data.state.sLowBattery
            def smokeAlarm = object.data.state.smokeAlarm
@@ -354,12 +379,16 @@ def void processStateData(payload) {
            if (alarmTestType != "monthly") {alarmTestDay = parent.scheduledDay(alarmTestDay)} 
                
            def alarmTestTime = object.data.sche.time  
-               
+              
            def signal = object.data.loraInfo.signal  
-
            def gasAlarmChanged = object.data.stateChangedAt.gasAlarm
            def smokeAlarmChanged = object.data.stateChangedAt.smokeAlarm
-           def unexpectedChanged = object.data.stateChangedAt.unexpected
+           def unexpectedChanged = object.data.stateChangedAt.unexpected          
+  
+           lastInspection = formatTimestamp(lastInspection)     
+           gasAlarmChanged = formatTimestamp(gasAlarmChanged)    
+           smokeAlarmChanged = formatTimestamp(smokeAlarmChanged)    
+           unexpectedChanged = formatTimestamp(unexpectedChanged)            
                     
            logDebug("Time Zone(${timeZone}), " +
                  "Firmware(${firmware}), " +
@@ -446,6 +475,17 @@ def void processStateData(payload) {
     }
 }
 
+def formatTimestamp(timestamp){    
+    if (state.timestampFormat != null) {
+      def date = new Date( timestamp as long )    
+      date = date.format(state.timestampFormat)
+      logDebug("formatTimestamp(): '$state.timestampFormat' = '$date'")
+      return date  
+    } else {
+      return timestamp  
+    }    
+}
+
 def reset(){       
     state.debug = false  
     state.remove("API")
@@ -472,6 +512,8 @@ def reset(){
     state.remove("carbonMonoxide")
     state.remove("smoke")
       
+    state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
+    
     interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
     connect()                         // Reconnect to API Cloud  
     poll(true)    

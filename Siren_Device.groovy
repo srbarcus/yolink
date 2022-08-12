@@ -21,15 +21,16 @@
  *  1.0.4: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *         - Correct attribute types
  *  1.0.5: def temperatureScale()
+ *  1.0.6: Fix donation URL
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.5"}
+def clientVersion() {return "1.0.6"}
 
 preferences {
     input title: "Driver Version", description: "Siren (YS7103-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 

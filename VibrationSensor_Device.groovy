@@ -15,15 +15,16 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
+ *  1.0.1: Fix donation URL
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.0"}
+def clientVersion() {return "1.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ VibrationSensor Device (YS7201-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {

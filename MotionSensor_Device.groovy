@@ -21,15 +21,16 @@
  *         - Correct attribute types
  *  1.0.3: Added MotionSensor capability
  *  1.0.4: Minor tracing fix, Fix syncing of Temperature scale with YoLink™ Device Service app
+ *  1.0.5: Fix donation URL
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.4"}
+def clientVersion() {return "1.0.5"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-	input title: "Please donate", description: "Donations allow me to purchase more YoLink devices for development. Copy and Paste the following into your browser: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {

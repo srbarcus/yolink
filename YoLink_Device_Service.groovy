@@ -13,14 +13,15 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
- *  1.0.1 - Add support to determine correct driver for Temperature only sensors. Removed some superfluous log messages.
- *  1.0.2 - Return converted temperature as a String value.
- *  1.0.3 - Reduce number of messages by adding debug setting, misc. fixes
- *  1.0.4 - Fix "No such property: statusCode for class: java.net.SocketTimeoutException" error, improved polling error diagnostic messages
- *  1.0.5 - Return temperatures as a Number rounded to 1 decimal place, return battery level as a Number.
- *  1.0.6 - Remove any possible leading and/or trailing spaces in credentials.
- *  1.0.7 - Add temperature scale function
- *        - Sync temperature scale changes with all devices - NOTE: YoLink mobile app settings will override!
+ *  1.0.1: Add support to determine correct driver for Temperature only sensors. Removed some superfluous log messages.
+ *  1.0.2: Return converted temperature as a String value.
+ *  1.0.3: Reduce number of messages by adding debug setting, misc. fixes
+ *  1.0.4: Fix "No such property: statusCode for class: java.net.SocketTimeoutException" error, improved polling error diagnostic messages
+ *  1.0.5: Return temperatures as a Number rounded to 1 decimal place, return battery level as a Number.
+ *  1.0.6: Remove any possible leading and/or trailing spaces in credentials.
+ *  1.0.7: - Add temperature scale function
+ *         - Sync temperature scale changes with all devices - NOTE: YoLink mobile app settings will override!
+ *  1.0.8: Fix donation URL
  */
 import groovy.json.JsonSlurper
 
@@ -37,7 +38,7 @@ definition(
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
-private def get_APP_VERSION() {return "1.0.7"}
+private def get_APP_VERSION() {return "1.0.8"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
@@ -55,7 +56,7 @@ def about() {
             paragraph blueTitle("The app is neither developed, endorsed, or associated with YoLink™ or YoSmart, Inc.") 
 	        paragraph blueTitle("Provided 'AS IS', without warranties or conditions of any kind, either express or implied.") 		
             paragraph boldTitle ("")
-			paragraph "Donations are appreciated and allow me to purchase new YoLink™ devices for development. Please donate via PayPal by clicking on this Paypal button:"
+			paragraph "Please donate and support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. Please donate via PayPal by clicking on this Paypal button:"
                 href url:"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD", title:"Paypal donation..."
 			paragraph boldTitle ("© 2022 Steven Barcus. All rights reserved.")	                           
             paragraph boldTitle ("")
