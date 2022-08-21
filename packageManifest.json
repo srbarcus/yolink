@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Update SpeakerHub Driver to allow Rules Engine to send text message to the SpeakerHub\n Support Garage Door Controller (YS4906-UC)\nSupport Garage Door Sensor 2 (YS7706-UC)\n Support Plug w/Power Monitoring (YS6602-UC)\n,
+  "releaseNotes": "- Update SpeakerHub Driver to allow Rules Engine to send text message to the SpeakerHub\n- Support Garage Door Controller YS4906-UC\nSupport Garage Door Sensor 2 YS7706-UC\n- Support Plug with Power Monitoring YS6602-UC\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
