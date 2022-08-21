@@ -20,15 +20,17 @@
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value 
  *  1.0.3: Remove undefined responses
  *  1.0.4: Fix donation URL
+ *  1.0.5: Support binding to Garage Door Controller, add attribute "stateChangedAt" and allow formatting of timestamp
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.4"}
+def clientVersion() {return "1.0.5"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Door Sensor (YS7707-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"    
 }
 
 metadata {
@@ -40,6 +42,7 @@ metadata {
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "connect"
         command "reset" 
+        command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
          
         attribute "API", "String" 
         attribute "online", "String"
@@ -49,9 +52,10 @@ metadata {
         attribute "reportAt", "String"  
         
         attribute "switch", "String"   
+        attribute "stateChangedAt", "String"
         attribute "signal", "String"  
         attribute "alertInterval", "String"  
-        attribute "openRemindDelay", "String" 
+        attribute "openRemindDelay", "String"         
         }
    }
 
@@ -63,12 +67,23 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
-    	
+    state.devId = devId    
+        	
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
 	    
     reset()     
  }
+
+public def getSetup() {
+    def setup = [:]
+        setup.put("my_dni", "${state.my_dni}")                   
+        setup.put("homeID", "${state.homeID}") 
+        setup.put("name", "${state.name}") 
+        setup.put("type", "${state.type}") 
+        setup.put("token", "${state.token}") 
+        setup.put("devId", "${state.devId}") 
+    return setup
+}
 
 def installed() {
  }
@@ -101,6 +116,23 @@ def connect() {
  }
 
 def temperatureScale(value) {}
+
+def timestampFormat(value) {
+    value = value ?: "MM/dd/yyyy hh:mm:ss a" // No value, reset to default
+    def oldvalue = state.timestampFormat 
+    
+    //Validate requested value
+    try{                           
+       def date = new Date()  
+       def stamp = date.format(value)   
+       state.timestampFormat = value   
+       logDebug("Date format set to '${value}'")
+       logDebug("Current date and time in requested format: '${stamp}'")  
+     } catch(Exception e) {       
+       //log.error "dateFormat() exception: ${e}"
+       log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
+     } 
+ }
 
 def debug(value) { 
     def bool = parent.validBoolean("debug",value)
@@ -281,11 +313,15 @@ def void processStateData(payload) {
             def swState = "on"
             if (contact == "open"){swState = "off"}
             
+            def stateChangedAt = object.data.stateChangedAt 
+            stateChangedAt = formatTimestamp(stateChangedAt)
+            
             rememberState("switch",swState)
             rememberState("contact",contact)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
             rememberState("signal",signal)      
+            rememberState("stateChangedAt",stateChangedAt)
 		    break;           
 		
                 
@@ -329,6 +365,17 @@ def void processStateData(payload) {
     }
 }
 
+def formatTimestamp(timestamp){    
+    if ((state.timestampFormat != null) && (timestamp != null)) {
+      def date = new Date( timestamp as long )    
+      date = date.format(state.timestampFormat)
+      logDebug("formatTimestamp(): '$state.timestampFormat' = '$date'")
+      return date  
+    } else {
+      return timestamp  
+    }    
+}
+
 def reset(){          
     state.debug = false  
     state.remove("API")
@@ -344,7 +391,9 @@ def reset(){
     state.remove("delay")                  //Remove undocumented response - delete statment in future
     state.remove("openRemindDelay")
     state.temperatureScale = parent.temperatureScale
-      
+    
+    state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
+          
     interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
     connect()                         // Reconnect to API Cloud 
     poll(true)    

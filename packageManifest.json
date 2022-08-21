@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Update SpeakerHub Driver to allow Rules Engine to send text message to the SpeakerHub\n",
+  "releaseNotes": "- Update SpeakerHub Driver to allow Rules Engine to send text message to the SpeakerHub\n Support Garage Door Controller (YS4906-UC)\nSupport Garage Door Sensor 2 (YS7706-UC)\n Support Plug w/Power Monitoring (YS6602-UC)\n,
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -49,7 +49,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/DoorSensor_Device.groovy",
       "required": false,
-      "version": "1.0.4"
+      "version": "1.0.5"
     },
     {
       "id": "8d22ba39-b6ea-4740-9f60-b6d56254d5c4",
@@ -73,7 +73,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
       "required": false,
-      "version": "1.0.8"
+      "version": "1.1.0"
     },
     {
       "id": "0b5e05f6-69a4-4a40-ac97-ae57d5e0dc9f",
@@ -97,7 +97,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
       "required": false,
-      "version": "1.0.5"
+      "version": "1.0.6"
     },
     {
       "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
@@ -138,6 +138,14 @@
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/VibrationSensor_Device.groovy",
       "required": false,
       "version": "1.0.1"
+    },
+    {
+      "id": "dd11542d-2856-4488-a7f3-938dc3eabdda",
+      "name": "YoLink GarageDoor Device",
+      "namespace": "srbarcus",
+      "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/GarageDoor_Device.groovy",
+      "required": false,
+      "version": "1.0.0"
     }
   ]
 }

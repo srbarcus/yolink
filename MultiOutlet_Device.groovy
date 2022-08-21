@@ -20,11 +20,12 @@
  *  1.0.3: Added "Switch" capability
  *  1.0.4: def temperatureScale()
  *  1.0.5: Fix donation URL
+ *  1.0.6: Added getSetup()
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.5"}
+def clientVersion() {return "1.0.6"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -124,6 +125,17 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     
     reset()      
  }
+
+public def getSetup() {
+    def setup = [:]
+        setup.put("my_dni", "${state.my_dni}")                   
+        setup.put("homeID", "${state.homeID}") 
+        setup.put("name", "${state.name}") 
+        setup.put("type", "${state.type}") 
+        setup.put("token", "${state.token}") 
+        setup.put("devId", "${state.devId}") 
+    return setup
+}
 
 def installed() {
  }

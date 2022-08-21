@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Plug (YS6604-UC) and In-wall outlet (YS6704-UC)
+ *  YoLink™ Plug (YS6604-UC), Plug w/Power Monitoring (YS6602-UC), and In-wall outlet (YS6704-UC)
  *  © 2022 Steven Barcus
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -24,15 +24,17 @@
  *  1.0.6: Added "Switch" capability
  *  1.0.7: def temperatureScale()
  *  1.0.8: Fix donation URL
+ *  1.1.0: Support Plug w/Power Monitoring (YS6602-UC)
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.8"}
+def clientVersion() {return "1.1.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) or In-wall outlet (YS6704-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -43,11 +45,8 @@ metadata {
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection
-        command "reset"
-        command "announce", ['String'] 
-        
-        command "on"                         
-        command "off"  
+        command "reset"        
+        command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
         
         attribute "API", "String" 
         attribute "online", "String"
@@ -67,6 +66,25 @@ metadata {
         attribute "schedule4", "String"
         attribute "schedule5", "String"
         attribute "schedule6", "String"
+        
+        attribute "power", "String"     
+        attribute "watt", "String"
+        attribute "time1","String"
+        attribute "watt1","String"
+        attribute "time2","String"
+        attribute "watt2","String"
+        attribute "time3","String"
+        attribute "watt3","String"
+        attribute "time4","String"
+        attribute "watt4","String"     
+        
+        attribute "alertInterval","String"
+        attribute "powerLimitHigh","String"
+        attribute "powerLimitLow","String"   
+                
+        attribute "overload","String"
+        attribute "underload","String"
+        attribute "remind","String"
         }
  }
 
@@ -84,6 +102,17 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     
     reset()      
  }
+
+public def getSetup() {
+    def setup = [:]
+        setup.put("my_dni", "${state.my_dni}")                   
+        setup.put("homeID", "${state.homeID}") 
+        setup.put("name", "${state.name}") 
+        setup.put("type", "${state.type}") 
+        setup.put("token", "${state.token}") 
+        setup.put("devId", "${state.devId}") 
+    return setup
+}
 
 def installed() {
  }
@@ -116,6 +145,23 @@ def connect() {
  }
 
 def temperatureScale(value) {}
+
+def timestampFormat(value) {
+    value = value ?: "MM/dd/yyyy hh:mm:ss a" // No value, reset to default
+    def oldvalue = state.timestampFormat 
+    
+    //Validate requested value
+    try{                           
+       def date = new Date()  
+       def stamp = date.format(value)   
+       state.timestampFormat = value   
+       logDebug("Date format set to '${value}'")
+       logDebug("Current date and time in requested format: '${stamp}'")  
+     } catch(Exception e) {       
+       //log.error "dateFormat() exception: ${e}"
+       log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
+     } 
+ }
 
 def debug(value) { 
     def bool = parent.validBoolean("debug",value)
@@ -199,20 +245,23 @@ def parseDevice(object) {
    def swState = parent.relayState(object.data.state)   
    def delay_on = object.data.delay.on
    def delay_off = object.data.delay.off    
-   def power = object.data.power 
+   def power = object.data.power/10 
    def watt = object.data.watt 
    def firmware = object.data.version
    def time = object.data.time
    def tzone = object.data.tz
-   def signal = object.data.loraInfo.signal         
+   def signal = object.data.loraInfo.signal     
     
-   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Time=$time, Timezone=$tzone, Firmware=$firmware, Signal=$signal")      
+   if (swState == "off") {power = 0} 
+    
+   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Watt=$watt, Time=$time, Timezone=$tzone, Firmware=$firmware, Signal=$signal")      
                 
    rememberState("online", "true")
    rememberState("switch", swState)
    rememberState("delay_on", delay_on)
    rememberState("delay_off", delay_off)
    rememberState("power", power)      
+   rememberState("watt", watt) 
    rememberState("firmware", firmware)
    rememberState("time", time)
    rememberState("tzone", tzone)
@@ -299,14 +348,19 @@ def void processStateData(payload) {
         switch(event) {
 		case "StatusChange":
             def swState = parent.relayState(object.data.state)            
-            def signal = object.data.loraInfo.signal             
+            def signal = object.data.loraInfo.signal                    
+            def overload = object.data.alertType.overload
+            def lowLoad = object.data.alertType.lowLoad
+            def remind = object.data.alertType.remind
     
-            logDebug("Parsed: DeviceId=$devId, Switch=$swState, Signal=$signal")
+            logDebug("Parsed: swState=$swState, overload=$overload, lowLoad=$lowLoad, remind=$remind, signal=$signal")
             
             rememberState("switch",swState)
-            rememberState("signal",signal)                              
+            rememberState("signal",signal)  
+            rememberState("overload",overload)
+            rememberState("underload",lowLoad)
+            rememberState("remind",remind)
 		    break;
-            
          
         case "setDelay":     
             def delay_on = object.data.delayOn
@@ -327,6 +381,39 @@ def void processStateData(payload) {
             logDebug("Parsed: Timezone=$tzone")
             rememberState("tzone",tzone)                          
 			break;
+            
+        case "powerReport":            
+            def watts = object.data.watts
+            logDebug("Watt Report = ${watts}")
+
+            def time1 = watts.time[0]
+            def watt1 = watts.watt[0]
+            time1 = formatTimestamp(time1)  
+                        
+            def time2 = watts.time[1]
+            def watt2 = watts.watt[1]
+            time2 = formatTimestamp(time2)  
+                        
+            def time3 = watts.time[2]
+            def watt3 = watts.watt[2]
+            time3 = formatTimestamp(time3)  
+                        
+            def time4 = watts.time[3]
+            def watt4 = watts.watt[3]            
+            time4 = formatTimestamp(time4)  
+                        
+            logDebug("Parsed: time1 = ${time1}, watt1 = ${watt1}, time2 = ${time2}, watt2 = ${watt2}, time3 = ${time3}, watt3 = ${watt3}, time4 = ${time4}, watt4 = ${watt4}")
+            
+            rememberState("time1",time1)
+            rememberState("watt1",watt1)
+            rememberState("time2",time2)
+            rememberState("watt2",watt2)
+            rememberState("time3",time3)
+            rememberState("watt3",watt3)
+            rememberState("time4",time4)
+            rememberState("watt4",watt4)
+            
+            break;
             
         case "setState":
             def swState = parent.relayState(object.data.state)   
@@ -393,7 +480,41 @@ def void processStateData(payload) {
 			break; 
             
         case "getSchedules":    //Old schedule
-            break;         
+            break;       
+
+        case "setAlarm": 
+            def alertInterval = object.data.alertInterval
+            def powerLimitHigh = object.data.powerLimitHigh/10
+            def powerLimitLow = object.data.powerLimitLow/10
+    
+            logDebug("Parsed: alertInterval=$alertInterval, powerLimitHigh=$powerLimitHigh, powerLimitLow=$powerLimitLow")
+            
+            rememberState("alertInterval",alertInterval)
+            rememberState("powerLimitHigh",powerLimitHigh)
+            rememberState("powerLimitLow",powerLimitLow)             
+            break;    
+            
+        case "Alert":
+            def swState = parent.relayState(object.data.state) 
+            def overload = object.data.alertType.overload
+            def lowLoad = object.data.alertType.lowLoad
+            def remind = object.data.alertType.remind
+            def power = object.data.power/10 
+            def powerLimitHigh = object.data.powerLimitHigh/10
+            def powerLimitLow = object.data.powerLimitLow/10
+            def signal = object.data.loraInfo.signal 
+            
+            logDebug("Parsed: swState=$swState, overload=$overload, lowLoad=$lowLoad, remind=$remind, power=$power, powerLimitHigh=$powerLimitHigh, powerLimitLow=$powerLimitLow, signal=$signal")
+            
+            rememberState("swState",swState)
+            rememberState("overload",overload)
+            rememberState("underload",lowLoad)
+            rememberState("remind",remind)
+            rememberState("power",power)            
+            rememberState("powerLimitHigh",powerLimitHigh)
+            rememberState("powerLimitLow",powerLimitLow) 
+            rememberState("signal",signal)            
+            break;    
             
 		default:
             log.error "Unknown event received: $event"
@@ -458,6 +579,17 @@ def setSwitch(setState) {
 	} 
 }  
 
+def formatTimestamp(timestamp){    
+    if ((state.timestampFormat != null) && (timestamp != null)) {
+      def date = new Date( timestamp as long )    
+      date = date.format(state.timestampFormat)
+      logDebug("formatTimestamp(): '$state.timestampFormat' = '$date'")
+      return date  
+    } else {
+      return timestamp  
+    }    
+}
+
 def reset(){          
     state.debug = false
     state.remove("API")
@@ -465,9 +597,7 @@ def reset(){
     state.remove("switch")
     state.remove("delay_ch")        //Note: remove in future
     state.remove("delay_on")
-    state.remove("delay_off")    
-    state.remove("power")    
-    state.remove("watt")   
+    state.remove("delay_off")       
     state.remove("time")  
     state.remove("tzone")   
     state.remove("signal")    
@@ -481,6 +611,27 @@ def reset(){
     state.remove("schedule4")
     state.remove("schedule5")
     state.remove("schedule6")
+    
+    state.remove("power")    
+    state.remove("watt")
+    state.remove("time1")
+    state.remove("watt1")
+    state.remove("time2")
+    state.remove("watt2")
+    state.remove("time3")
+    state.remove("watt3")
+    state.remove("time4")
+    state.remove("watt4")
+    
+    state.remove("alertInterval")
+    state.remove("powerLimitHigh")
+    state.remove("powerLimitLow")
+    
+    state.remove("overload")
+    state.remove("underload")
+    state.remove("remind")  
+    
+    state.timestampFormat = "MM/dd/yyyy hh:mm:ss a"     
         
     interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
     connect()                         // Reconnect to API Cloud  
