@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Update SpeakerHub Driver to allow 'Rules Engine' to send text message to the SpeakerHub\n",
+  "releaseNotes": "- Update SpeakerHub Driver to allow Rules Engine to send text message to the SpeakerHub\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
