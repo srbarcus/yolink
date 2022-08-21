@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- New Functionality: COSmokeSensor Device event times formatted as specified by user\n- New Functionality: LeakSensor Device event time formatted as specified by user\n- Simplify donations\n",
+  "releaseNotes": "- Update SpeakerHub Driver to allow "Rules Engine" to send text message to the SpeakerHub\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -33,7 +33,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SpeakerHub_Device.groovy",
       "required": true,
-      "version": "1.0.4"
+      "version": "1.0.5"
     },
     {
       "id": "d353c8a6-55f0-44bb-b3cb-135d7dbaac23",

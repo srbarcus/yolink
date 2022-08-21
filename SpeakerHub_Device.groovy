@@ -19,11 +19,12 @@
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *  1.0.3: def temperatureScale()
  *  1.0.4: Fix donation URL
+ *  1.0.5: Support "Rules Engine" notification action
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.4"}
+def clientVersion() {return "1.0.5"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ SpeakerHub (YS1604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -47,6 +48,7 @@ metadata {
 		capability "Polling"	
         capability "AudioNotification"
         capability "AudioVolume"
+        capability "Notification"
         
         
         command "setVolume", [[name:"volume",type:"ENUM", description:"Speaker volume", constraints:[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]]    
@@ -95,6 +97,7 @@ metadata {
         command "DisableBeep"
         command "EnableVoiceResults"
         command "DisableVoiceResults"
+        command "deviceNotification", [[name:"deviceNotification",type:"STRING", description:"Text to be played on SpeakerHub"]]
         
       //command "setWiFi"                       // As of 03-06-2022, was not supported by API  
         
@@ -389,7 +392,7 @@ def void processStateData(payload) {
     } else { log.error "Event for other device received"}
 }
 
-
+def deviceNotification(text) {playText(text,null)}
 def playTextAndRestore(text,volume=null) {playText(text,volume)}
 def playTextAndResume(text,volume=null) {playText(text,volume)}
 def playText(text,volume=null) {
