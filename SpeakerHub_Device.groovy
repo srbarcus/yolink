@@ -20,11 +20,12 @@
  *  1.0.3: def temperatureScale()
  *  1.0.4: Fix donation URL
  *  1.0.5: Support "Rules Engine" notification action
+ *  1.0.6: Stop error message announcement "Unable to connect Speaker Hub to YoLink Cloud. Exception is: MqttException (0) - java.net.SocketTimeoutException: connect timed out"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.5"}
+def clientVersion() {return "1.0.6"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ SpeakerHub (YS1604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -314,9 +315,7 @@ def establish_MQTT_connection(mqtt_ID) {
          voiceResult("Speaker Hub successfully connected to the YoLink Cloud")
 		
 	    } catch (e) {	
-            log.error ("establish_MQTT_connection() Exception: $e")
-            playText("Unable to connect Speaker Hub to YoLink Cloud",5)
-            playText("Exception is: $e",5)
+            log.error ("establish_MQTT_connection() Exception: $e")           
     	}
     
     rememberState("API",MQTT)
