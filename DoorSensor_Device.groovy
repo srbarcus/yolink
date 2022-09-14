@@ -321,9 +321,7 @@ def reset(){
     state.temperatureScale = parent.temperatureScale
     
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
-          
-    interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
-    connect()                         // Reconnect to API Cloud 
+         
     poll(true)    
     
     logDebug("Device reset to default values")
