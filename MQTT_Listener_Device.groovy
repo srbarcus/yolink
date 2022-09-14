@@ -46,9 +46,9 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {  //dev.Se
     state.token = devtoken
     state.devId = devId   
     	
-	log.debug "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
+    log.debug "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
 	    
-    establish_MQTT_connection(state.my_dni)      //Establish MQTT connection to YoLink API   
+    connect()      //Establish MQTT connection to YoLink API 
  }
 
 public def getSetup() {
