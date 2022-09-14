@@ -15,11 +15,13 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
+ *  1.0.1: Remove MQTT Connection to this device - device has no callbacks defined
+ *  2.0.0: Sync version with reengineered app
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.0"}
+def clientVersion() {return "2.0.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ GarageDoor Device (YS4906-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -28,7 +30,8 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink GarageDoor Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink GarageDoor Device", namespace: "srbarcus", author: "Steven Barcus") {     
+		capability "Polling"        
         capability "Momentary"
         capability "ContactSensor"
                                       
@@ -39,7 +42,7 @@ metadata {
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
         command "bind", [[name:"bind",type:"STRING", description:"Device ID (devId) of Garage Door Sensor to be bound to this controller. See 'sensors' under 'State Variables' below and copy & paste a Sensor here."]] 
         
-        attribute "API", "String"         
+        attribute "API", "String"
         attribute "online", "String"
         attribute "signal", "String"
         attribute "stateChangedAt", "String"
@@ -80,16 +83,17 @@ def updated() {
  }
 
 def uninstalled() {
-   interfaces.mqtt.disconnect() // Guarantee we're disconnected  
+   interfaces.mqtt.disconnect() // Guarantee we're disconnected
    log.warn "Device '${state.name}' (Type=${state.type}) has been uninstalled"     
  }
 
-def poll(force=null) { //NOT SUPPORTED - For APP compatibly only
+def poll(force=null) { 
+   if (state.bound_devId != null) {check_MQTT_Connection()}
 }    
 
 def connect() {
-   establish_MQTT_connection(state.homeID,state.my_dni)                                               //Establish MQTT connection to YoLink API for this device
-   if (state.bound_devId != null) {establish_MQTT_connection(state.bound_homeID, state.bound_devId)}  //Establish MQTT connection to YoLink API for bound device
+ //establish_MQTT_connection(state.my_dni, state.homeID, state.devId)                                            //Establish MQTT connection to YoLink API for this device Removed v1.0.1
+   if (state.bound_devId != null) {establish_MQTT_connection(bound_dni, state.bound_homeID, state.bound_devId)}  //Establish MQTT connection to YoLink API for bound device
  }
 
 def temperatureScale(value) {}
@@ -101,7 +105,7 @@ def scan() {
   int devicesCount=devices.size()      
   logDebug("Located $devicesCount devices: $devices")
  
-  def dev = "<br>Copy and Paste one of these into the 'Bind' value above, then click 'Bind'; to bind Sensor with Controller:"
+  def dev = "<br>Copy and Paste one of these into the 'Bind' value above then click 'Bind' to bind Sensor with Controller:"
     
   devices.each { dni ->  
      def id = dni.toString() 
@@ -132,9 +136,9 @@ def bind(sensorid) {
       if (state.bound_devId == null) {
           log.error "Device ID to be bound was not specified"
       } else {    
-          unbind()    
+          unbind()                          // Unbind current switch sensor
           interfaces.mqtt.disconnect()      // Guarantee we're disconnected            
-          connect()                         // Reconnect to API Cloud  
+        //connect()                         // Reconnect to API Cloud  Removed v1.0.1
       }    
     return  
   }     
@@ -210,7 +214,7 @@ def bind(sensorid) {
   state.bound_token = token
   state.bound_devId = devId
      
-  establish_MQTT_connection(state.bound_homeID, state.bound_devId)
+  establish_MQTT_connection(state.bound_dni, state.bound_homeID, state.bound_devId)
    
   if (state.API == "connected") {  
      msg = "Controller bound to device '$bound'"
@@ -241,36 +245,32 @@ def timestampFormat(value) {
  }
 
 def debug(value) { 
-    def bool = parent.validBoolean("debug",value)
-    
-    if (bool != null) {
-        if (bool) {
-            state.debug = true
-            log.info "Debugging enabled"
-        } else {
-            state.debug = false
-            log.info "Debugging disabled"
-        }   
-    }        
+   rememberState("debug",value)
+   if (value) {
+     log.info "Debugging enabled"
+   } else {
+     log.info "Debugging disabled"
+   }    
 }
 
 def check_MQTT_Connection() {
-  def MQTT = interfaces.mqtt.isConnected()  
-  logDebug("MQTT connection is ${MQTT}")  
-  if (MQTT) {  
-     rememberState("API", "connected")     
-  } else {    
-     establish_MQTT_connection(state.homeID,state.my_dni)                                               //Establish MQTT connection to YoLink API for this device
-     if (state.bound_devId != null) {establish_MQTT_connection(state.bound_homeID, state.bound_devId)}  //Establish MQTT connection to YoLink API for bound device
-  }
+  if (state.bound_devId != null) {  
+      def MQTT = interfaces.mqtt.isConnected()  
+      logDebug("MQTT connection is ${MQTT}")  
+      if (MQTT) {  
+         rememberState("API", "connected")     
+      } else {    
+         connect()
+      }
+  }    
 }    
 
-def establish_MQTT_connection(homeID, devId) {
+def establish_MQTT_connection(mqtt_ID, homeID, devId) {
     parent.refreshAuthToken()
     def authToken = parent.AuthToken() 
       
     def MQTT = "disconnected"
-    
+        
     def topic = "yl-home/${homeID}/${devId}/report"
     
     try {  	
@@ -288,10 +288,10 @@ def establish_MQTT_connection(homeID, devId) {
 		
 	} catch (e) {	
         log.error ("establish_MQTT_connection() Exception: $e")	
+    } finally {    
+        rememberState("API", MQTT)    
+        lastResponse("API MQTT ${MQTT}")    
     }
-     
-    rememberState("API", MQTT)    
-    lastResponse("API MQTT ${MQTT}")    
 }    
 
 def mqttClientStatus(String message) {                          
@@ -444,6 +444,9 @@ def unbind() {
     state.remove("bound_token")  
     state.remove("bound_devId") 
     state.remove("contact")
+    
+    interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
+    rememberState("API", "not bound")  
 }
 
 def formatTimestamp(timestamp){    
@@ -471,9 +474,6 @@ def reset(){
     
     unbind()
         
-    interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
-    connect()                         // Reconnect to API Cloud  
-   
     scan()
     
     logDebug("Device reset to default values")

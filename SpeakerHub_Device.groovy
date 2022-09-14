@@ -21,11 +21,13 @@
  *  1.0.4: Fix donation URL
  *  1.0.5: Support "Rules Engine" notification action
  *  1.0.6: Stop error message announcement "Unable to connect Speaker Hub to YoLink Cloud. Exception is: MqttException (0) - java.net.SocketTimeoutException: connect timed out"
+ *  1.0.7: Remove MQTT Connection - device has no callbacks defined
+ *  2.0.0: Sync version number with reengineered app due to new YoLink service restrictions
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.6"}
+def clientVersion() {return "2.0.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ SpeakerHub (YS1604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -91,7 +93,6 @@ metadata {
 
 
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
-        command "connect"                       // Attempt to establish MQTT connection
         command "reset" 
         command "Repeat", [[name:"repeat",type:"ENUM", description:"Number of times to repeat audio", constraints:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]]
         command "EnableBeep"
@@ -102,7 +103,6 @@ metadata {
         
       //command "setWiFi"                       // As of 03-06-2022, was not supported by API  
         
-        attribute "API", "String" 
         attribute "online", "String"
         attribute "firmware", "String"  
         attribute "signal", "String" 
@@ -142,6 +142,17 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     reset(true)   
  }
 
+public def getSetup() {
+    def setup = [:]
+        setup.put("my_dni", "${state.my_dni}")                   
+        setup.put("homeID", "${state.homeID}") 
+        setup.put("name", "${state.name}") 
+        setup.put("type", "${state.type}") 
+        setup.put("token", "${state.token}") 
+        setup.put("devId", "${state.devId}") 
+    return setup
+}
+
 def installed() {
  }
 
@@ -149,7 +160,6 @@ def updated() {
  }
 
 def uninstalled() {
-   interfaces.mqtt.disconnect() // Guarantee we're disconnected
    log.warn "Device '${state.name}' (Type=${state.type}) has been uninstalled"  
    Announce("The speaker Hub is being uninstalled from Hubitat","Arpeggio","Arpeggio")      
  }
@@ -165,28 +175,18 @@ def poll(force=null) {
     }    
     
     getDevicestate() 
-    check_MQTT_Connection()
     state.lastPoll = now()    
- }
-
-def connect() {
-    establish_MQTT_connection(state.my_dni)
  }
 
 def temperatureScale(value) {}
 
 def debug(value) { 
-    def bool = parent.validBoolean("debug",value)
-    
-    if (bool != null) {
-        if (bool) {
-            state.debug = true
-            log.info "Debugging enabled"
-        } else {
-            state.debug = false
-            log.info "Debugging disabled"
-        }   
-    }        
+   rememberState("debug",value)
+   if (value) {
+     log.info "Debugging enabled"
+   } else {
+     log.info "Debugging disabled"
+   }    
 }
 
 def getDevicestate() {
@@ -200,21 +200,14 @@ def getDevicestate() {
         def request = [:]
             request.put("method", "${state.type}.getState")                  
             request.put("targetDevice", "${state.devId}") 
-            request.put("token", "${state.token}") 
-        
-        logDebug("pollAPI($request, $state.name, $state.type)") 
+            request.put("token", "${state.token}")        
         
         def object = parent.pollAPI(request, state.name, state.type)
          
         if (object) {
-            logDebug("getDevicestate()> pollAPI() response: ${object}")                          
+             logDebug("getDevicestate(): pollAPI() response: ${object}")                           
          
             if (successful(object)) {
-                if (state.online != "true") {
-                   state.online = "true"
-                   sendEvent(name:"online", value: state.online, isStateChange:true)   
-                }
-                
                 def firmware = object.data.version
                 def wifi_ap = object.data.wifi.ap
                 def wifi_ssid = object.data.wifi.ssid                    
@@ -257,9 +250,9 @@ def getDevicestate() {
                 rememberState("mute", mute)
                 rememberState("volume", volume)
                 rememberState("confirmationBeep", confirmationBeep)              
-                                 
-  	    	    rc = true	
+                                
                 rememberState("online", "true") 
+                rc = true
                 lastResponse("Success")  	                
             } else {                
                 pollError(object)               
@@ -281,115 +274,6 @@ def getDevicestate() {
     
 	return rc
 }    
-
-def check_MQTT_Connection() {
-  def MQTT = interfaces.mqtt.isConnected()  
-  logDebug("MQTT connected is ${MQTT}")  
-  if (MQTT) {  
-      rememberState("API","connected")
-  } else {    
-      rememberState("API","disconnected")
-      establish_MQTT_connection(state.my_dni)      //Re-establish MQTT connection to YoLink API
-  }
-}    
-
-def establish_MQTT_connection(mqtt_ID) {
-      def authToken = parent.AuthToken()    
-           
-      def MQTT = "disconnected"
-    
-      def topic = "yl-home/${state.homeID}/${state.devId}/report"
-    
-      try {  	
-         mqtt_ID =  "${mqtt_ID}_${state.homeID}"
-         log.info "Connecting to MQTT with ID '${mqtt_ID}', Topic:'${topic}, Token:'${authToken}"    
-      
-         interfaces.mqtt.connect("tcp://api.yosmart.com:8003","${mqtt_ID}",authToken,null)                         	
-          
-         log.info "Subscribing to MQTT topic '${topic}'"    
-         interfaces.mqtt.subscribe("${topic}", 0) 
-         
-         MQTT = "connected" 
-         log.debug "MQTT connection to YoLink cloud successful"  
-          
-         voiceResult("Speaker Hub successfully connected to the YoLink Cloud")
-		
-	    } catch (e) {	
-            log.error ("establish_MQTT_connection() Exception: $e")           
-    	}
-    
-    rememberState("API",MQTT)
-    lastResponse("API MQTT ${MQTT}")  
-}    
-
-def mqttClientStatus(String message) {                          
-    log.debug "mqttClientStatus(${message})"
-
-    if (message.startsWith("Error:")) {
-        log.error "MQTT Error: ${message}"
-
-        try {
-            log.info "Disconnecting from MQTT"    
-            interfaces.mqtt.disconnect()          // Guarantee we're disconnected
-            rememberState("API","disconnected")
-        }
-        catch (e) {
-        } 
-    }
-}
-
-def parse(message) {
-    def topic = interfaces.mqtt.parseMessage(message)
-    def payload = new JsonSlurper().parseText(topic.payload)
-    logger("trace", "parse(${payload})")
-
-    processStateData(topic.payload)
-}
-
-def void processStateData(payload) {
-    rememberState("online","true") 
-    
-    def object = new JsonSlurper().parseText(payload)
-    def devId = object.deviceId   
-   
-    if (state.devId == devId) {  // Only handle if message is for me   
-        logger("debug", "processStateData(${payload})")
-        
-        def child = parent.getChildDevice(state.my_dni)
-        def name = child.getLabel()                
-        def event = object.event.replace("${state.type}.","")
-        log.debug "Received Message Type: ${event} for: $name"
-        
-        switch(event) {
-		case "Alert":          
-            def swState = object.data.state
-            def alertType = object.data.alertType    
-            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version    
-            def signal = object.data.loraInfo.signal    
-    
-            log.debug "Parsed: DeviceId=$devId, Switch=$swState, Alert=$alertType, Battery=$battery, Firmware=$firmware, Signal=$signal"  
-        
-            if (state.swState != swState) {sendEvent(name:"switch", value: swState, isStateChange:true)}
-            if (state.alertType != alertType) {sendEvent(name:"alertType", value: alertType, isStateChange:true)}
-            if (state.battery != battery) {sendEvent(name:"battery", value: battery, isStateChange:true)}
-            if (state.firmware != firmware) {sendEvent(name:"firmware", value: firmware, isStateChange:true)}
-            if (state.signal != signal) {sendEvent(name:"signal", value: signal, isStateChange:true)}   
-                
-            state.swState = swState
-            state.alertType = alertType    
-            state.battery = battery
-            state.firmware = firmware   
-            state.signal = signal  
-            break;
-                
-		default:
-            log.error "Unknown event received: $event"
-            log.error "Message received: ${payload}"
-			break;
-	    }
-    } else { log.error "Event for other device received"}
-}
 
 def deviceNotification(text) {playText(text,null)}
 def playTextAndRestore(text,volume=null) {playText(text,volume)}
@@ -692,7 +576,6 @@ def hubTones() {
 
 def reset(setup = false){ 
     state.debug = false
-    state.remove("API")
     state.remove("firmware")
     state.remove("wifi_enabled")   
     state.remove("wifi_ssid")
@@ -722,10 +605,6 @@ def reset(setup = false){
     setVolume(5)    
     Repeat(0)
     DisableBeep()
-    
-    interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
-    connect()                         // Reconnect to API Cloud
-    
     DisableVoiceResults()
        
     poll(true)    

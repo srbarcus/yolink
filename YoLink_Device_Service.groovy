@@ -22,6 +22,9 @@
  *  1.0.7: - Add temperature scale function
  *         - Sync temperature scale changes with all devices - NOTE: YoLink mobile app settings will override!
  *  1.0.8: Fix donation URL
+ *  2.0.0: - Reengineer app and drivers to use centralized MQTT listener due to new YoLink service restrictions
+ *         - Update API return code translations  
+ *  
  */
 import groovy.json.JsonSlurper
 
@@ -38,7 +41,7 @@ definition(
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
-private def get_APP_VERSION() {return "1.0.8"}
+private def get_APP_VERSION() {return "2.0.0"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
@@ -229,9 +232,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
             failed = true
     		                                
             if (e.message.contains("not found")) {                
-                if (e.message.contains("MQTT Listener") == false){ 
                   log.error "Unable to create device '$devname' because driver '$drivername' is not installed. Either the device is not currently supported by the YoLink™ Device Service, or you need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
-                }                 
             } else {    
                   log.error "Exception: '$e'"
                   throw new IllegalArgumentException(e.message)  
@@ -264,6 +265,27 @@ def pollDevices() {
        logDebug("Polling device ${it} (${it.deviceNetworkId})")
        it.poll()
     }             
+}
+
+def passMQTT(topic) {
+    logDebug("passMQTT(${topic})")
+        
+    def payload = new JsonSlurper().parseText(topic.payload)
+    logDebug("payload (${payload})")
+    
+    def deviceDNI = payload.deviceId
+    
+    logDebug("Searching for deviceID ${deviceDNI}")
+    
+    def dev = allChildDevices.find {it.deviceNetworkId.contains(deviceDNI)}
+    
+    if(dev) {
+        logDebug("Passing MQTT message ${topic} to device ${dev} (${dev.deviceNetworkId})")
+        dev.parse(topic)
+        return true     
+    } else {             
+        return false   
+    }    
 }
 
 def schedulePolling() {		
@@ -565,10 +587,10 @@ def pollAPI(body, name=null, type=null){
 
 def translateCode(code) {
     def codes = '{"000000":"Success",' + 
-     '"000101":"Cannot connect to Hub",' +         
-     '"000102":"Hub cannot response to this command",' +
-     '"000103":"Token not valid",' +
-     '"000201":"Cannot connect to Device",' +
+     '"000101":"Cannot connect to the Hub",' +         
+     '"000102":"Hub cannot respond to this command",' +
+     '"000103":"Token is invalid",' +
+     '"000201":"Cannot connect to the Device",' +
      '"000202":"Device cannot response to this command",' +
      '"000203":"Cannot connect to Device",' +
      '"010000":"Connection not available, try again",' +
@@ -576,9 +598,9 @@ def translateCode(code) {
      '"010201":"Body Error! Time can not be null",' +
      '"010203":"Unsupported Request",' +                         //Was returned trying to set WiFi - not documented, but seems to mean "Unsupported"  
      '"020102":"Device mask error",' +
-     '"020201":"Not any device searched",' + 
+     '"020201":"No device searched",' + 
      '"030101":"No Data found",'+
-     '"999999":"UnKnown Error,Please email to service@YoSmart.com"' +
+     '"999999":"UnKnown Error, Please email to support@YoSmart.com"' +
      '}'
         
     def jsonSlurper = new JsonSlurper()
@@ -754,7 +776,6 @@ boolean validBoolean(setting,value) {            // Allow any one of ON, OFF, TR
    } 
    return rc
 }
-
 
 // Temperature/Humidity and Temperature Devices are both reported as "THSensor"
 // If device doesn't return humidity values, assume is doesn't have that capability

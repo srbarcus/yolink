@@ -25,11 +25,12 @@
  *  1.0.7: def temperatureScale()
  *  1.0.8: Fix donation URL
  *  1.1.0: Support Plug w/Power Monitoring (YS6602-UC)
+ *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.1.0"}
+def clientVersion() {return "2.0.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Plug (YS6604-UC) or In-wall outlet (YS6704-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -44,11 +45,9 @@ metadata {
         capability "Switch"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
-        command "connect"                       // Attempt to establish MQTT connection
         command "reset"        
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
         
-        attribute "API", "String" 
         attribute "online", "String"
         attribute "firmware", "String"  
         attribute "signal", "String"
@@ -121,7 +120,6 @@ def updated() {
  }
 
 def uninstalled() {
-   interfaces.mqtt.disconnect() // Guarantee we're disconnected  
    log.warn "Device '${state.name}' (Type=${state.type}) has been uninstalled"     
  }
 
@@ -136,12 +134,7 @@ def poll(force=null) {
     }    
     
     getDevicestate() 
-    check_MQTT_Connection()
     state.lastPoll = now()    
- }
-
-def connect() {
-    establish_MQTT_connection(state.my_dni)
  }
 
 def temperatureScale(value) {}
@@ -164,17 +157,12 @@ def timestampFormat(value) {
  }
 
 def debug(value) { 
-    def bool = parent.validBoolean("debug",value)
-    
-    if (bool != null) {
-        if (bool) {
-            state.debug = true
-            log.info "Debugging enabled"
-        } else {
-            state.debug = false
-            log.info "Debugging disabled"
-        }   
-    }        
+   rememberState("debug",value)
+   if (value) {
+     log.info "Debugging enabled"
+   } else {
+     log.info "Debugging disabled"
+   }    
 }
 
 def on () {
@@ -268,66 +256,7 @@ def parseDevice(object) {
    rememberState("signal", signal)                         
 }   
 
-def check_MQTT_Connection() {
-  def MQTT = interfaces.mqtt.isConnected()  
-  logDebug("MQTT connection is ${MQTT}")  
-  if (MQTT) {  
-     rememberState("API", "connected")     
-  } else {    
-     establish_MQTT_connection(state.my_dni)      //Establish MQTT connection to YoLink API
-  }
-}    
-
-def establish_MQTT_connection(mqtt_ID) {
-    parent.refreshAuthToken()
-    def authToken = parent.AuthToken() 
-      
-    def MQTT = "disconnected"
-    
-    def topic = "yl-home/${state.homeID}/${state.devId}/report"
-    
-    try {  	
-        mqtt_ID =  "${mqtt_ID}_${state.homeID}"
-        logDebug("Connecting to MQTT with ID '${mqtt_ID}', Topic:'${topic}, Token:'${authToken}")
-      
-        interfaces.mqtt.connect("tcp://api.yosmart.com:8003","${mqtt_ID}",authToken,null)                         	
-          
-        logDebug("Subscribing to MQTT topic '${topic}'")
-        interfaces.mqtt.subscribe("${topic}", 0) 
-         
-        MQTT = "connected"          
-          
-        logDebug("MQTT connection to YoLink successful")
-		
-	} catch (e) {	
-        log.error ("establish_MQTT_connection() Exception: $e")	
-    }
-     
-    rememberState("API", MQTT)    
-    lastResponse("API MQTT ${MQTT}")    
-}    
-
-def mqttClientStatus(String message) {                          
-    logDebug("mqttClientStatus(${message})")
-
-    if (message.startsWith("Error:")) {
-        log.error "MQTT Error: ${message}"
-
-        try {
-            log.warn "Disconnecting from MQTT"    
-            interfaces.mqtt.disconnect()           // Guarantee we're disconnected            
-            rememberState("API","disconnected") 
-        }
-        catch (e) {
-        } 
-    }
-}
-
-def parse(message) { 
-    def topic = interfaces.mqtt.parseMessage(message)
-    def payload = new JsonSlurper().parseText(topic.payload)
-    logDebug("parse(${payload})")
-
+def parse(topic) {     
     processStateData(topic.payload)
 }
 
@@ -592,7 +521,6 @@ def formatTimestamp(timestamp){
 
 def reset(){          
     state.debug = false
-    state.remove("API")
     state.remove("firmware")
     state.remove("switch")
     state.remove("delay_ch")        //Note: remove in future
@@ -632,9 +560,7 @@ def reset(){
     state.remove("remind")  
     
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a"     
-        
-    interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
-    connect()                         // Reconnect to API Cloud  
+
     poll(true)
    
     logDebug("Device reset to default values")

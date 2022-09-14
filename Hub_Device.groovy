@@ -19,11 +19,12 @@
  *  1.0.2: Add constraints to debug command
  *  1.0.3: def temperatureScale()
  *  1.0.4: Fix donation URL
+ *  2.0.0: Sync version number with reengineered app due to new YoLink service restrictions
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.4"}
+def clientVersion() {return "2.0.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Hub (YS1603-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -44,12 +45,10 @@ metadata {
 		capability "Polling"						
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
-        command "connect"                       // Attempt to establish MQTT connection
         command "reset" 
         
       //command "setWiFi"                       // As of 03-06-2022, was not supported by API    
         
-        attribute "API", "String" 
         attribute "online", "String"
         attribute "firmware", "String"  
         attribute "signal", "String" 
@@ -83,6 +82,17 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     reset()       
  }
 
+public def getSetup() {
+    def setup = [:]
+        setup.put("my_dni", "${state.my_dni}")                   
+        setup.put("homeID", "${state.homeID}") 
+        setup.put("name", "${state.name}") 
+        setup.put("type", "${state.type}") 
+        setup.put("token", "${state.token}") 
+        setup.put("devId", "${state.devId}") 
+    return setup
+}
+
 def installed() {
  }
 
@@ -90,7 +100,7 @@ def updated() {
  }
 
 def uninstalled() {
-   interfaces.mqtt.disconnect() // Guarantee we're disconnected 
+ //interfaces.mqtt.disconnect() // Guarantee we're disconnected Removed v1.0.7
    log.warn "Device '${state.name}' (Type=${state.type}) has been uninstalled"     
  }
 
@@ -105,28 +115,18 @@ def poll(force=null) {
     }    
     
     getDevicestate() 
-    check_MQTT_Connection()
     state.lastPoll = now()    
- }
-
-def connect() {
-    establish_MQTT_connection(state.my_dni)
  }
 
 def temperatureScale(value) {}
 
 def debug(value) { 
-    def bool = parent.validBoolean("debug",value)
-    
-    if (bool != null) {
-        if (bool) {
-            state.debug = true
-            log.info "Debugging enabled"
-        } else {
-            state.debug = false
-            log.info "Debugging disabled"
-        }   
-    }        
+   rememberState("debug",value)
+   if (value) {
+     log.info "Debugging enabled"
+   } else {
+     log.info "Debugging disabled"
+   }    
 }
 
 def getDevicestate() {
@@ -149,8 +149,7 @@ def getDevicestate() {
          
              if (successful(object)) {         
                 parseDevice(object)                     
-                rc = true	
-                rememberState("online", "true") 
+                rc = true	  
                 lastResponse("Success")                 
             } else {  //Error
                pollError(object)
@@ -210,115 +209,6 @@ def parseDevice(object) {
      rememberState("online", "true")         
 }                
 
-def check_MQTT_Connection() {
-  def MQTT = interfaces.mqtt.isConnected()  
-  logDebug("MQTT connection is ${MQTT}")  
-  if (MQTT) {  
-     rememberState("API", "connected")     
-  } else {    
-     establish_MQTT_connection(state.my_dni)      //Establish MQTT connection to YoLink API
-  }
-}    
-
-def establish_MQTT_connection(mqtt_ID) {
-    parent.refreshAuthToken()
-    def authToken = parent.AuthToken() 
-      
-    def MQTT = "disconnected"
-    
-    def topic = "yl-home/${state.homeID}/${state.devId}/report"
-    
-    try {  	
-        mqtt_ID =  "${mqtt_ID}_${state.homeID}"
-        logDebug("Connecting to MQTT with ID '${mqtt_ID}', Topic:'${topic}, Token:'${authToken}")
-      
-        interfaces.mqtt.connect("tcp://api.yosmart.com:8003","${mqtt_ID}",authToken,null)                         	
-          
-        logDebug("Subscribing to MQTT topic '${topic}'")
-        interfaces.mqtt.subscribe("${topic}", 0) 
-         
-        MQTT = "connected"          
-          
-        logDebug("MQTT connection to YoLink successful")
-		
-	} catch (e) {	
-        log.error ("establish_MQTT_connection() Exception: $e")	
-    }
-     
-    rememberState("API", MQTT)    
-    lastResponse("API MQTT ${MQTT}")  
-}    
-
-def mqttClientStatus(String message) {                          
-    logDebug("mqttClientStatus(${message})")
-
-    if (message.startsWith("Error:")) {
-        log.error "MQTT Error: ${message}"
-
-        try {
-            log.warn "Disconnecting from MQTT"    
-            interfaces.mqtt.disconnect()           // Guarantee we're disconnected            
-            rememberState("API","disconnected") 
-        }
-        catch (e) {
-        } 
-    }
-}
-
-def parse(message) {
-    def topic = interfaces.mqtt.parseMessage(message)
-    def payload = new JsonSlurper().parseText(topic.payload)
-    logDebug("parse(${payload})")
-
-    processStateData(topic.payload)
-}
-
-
-def void processStateData(payload) {
-    rememberState("online","true")
-    
-    def object = new JsonSlurper().parseText(payload)
-    def devId = object.deviceId   
-   
-    if (state.devId == devId) {  // Only handle if message is for me   
-        logDebug("processStateData(${payload})")
-        
-        def child = parent.getChildDevice(state.my_dni)
-        def name = child.getLabel()                
-        def event = object.event.replace("${state.type}.","")
-        log.debug "Received Message Type: ${event} for: $name"
-        
-        switch(event) {
-		case "Alert":          
-            def swState = object.data.state
-            def alertType = object.data.alertType    
-            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.firmware    
-            def signal = object.data.loraInfo.signal    
-    
-            log.debug "Parsed: DeviceId=$devId, Switch=$swState, Alert=$alertType, Battery=$battery, Firmware=$firmware, Signal=$signal"  
-        
-            if (state.swState != swState) {sendEvent(name:"switch", value: swState, isStateChange:true)}
-            if (state.alertType != alertType) {sendEvent(name:"alertType", value: alertType, isStateChange:true)}
-            if (state.battery != battery) {sendEvent(name:"battery", value: battery, isStateChange:true)}
-            if (state.firmware != firmware) {sendEvent(name:"firmware", value: firmware, isStateChange:true)}
-            if (state.signal != signal) {sendEvent(name:"signal", value: signal, isStateChange:true)}   
-                
-            state.swState = swState
-            state.alertType = alertType    
-            state.battery = battery
-            state.firmware = firmware   
-            state.signal = signal   
-                                       
-                
-		default:
-            log.error "Unknown event received: $event"
-            log.error "Message received: ${payload}"
-			break;
-	    }
-    }
-}
-
 /* Currently not supported by API as of 02/27/2022
 void setWiFi() { 
    logDebug "setting WiFi: SSID=${settings.SSID}, Password=${settings.WiFiPassword}"
@@ -351,7 +241,6 @@ void setWiFi() {
 
 def reset(){          
     state.debug = false  
-    state.remove("API")
     state.remove("firmware") 
     state.remove("swState")
     state.remove("door")
@@ -363,9 +252,7 @@ def reset(){
     state.remove("alertInterval")
     state.remove("delay")           
     state.remove("openRemindDelay")
-      
-    interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
-    connect()                         // Reconnect to API Cloud
+
     poll(true)    
     
     logDebug("Device reset to default values")
