@@ -396,14 +396,14 @@ def void processStateData(payload) {
 }
 
 def close() {
-    if ((state.door == "open") || (!state.door)) {  
+    if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
       push()
       rememberState("door","closing")    
     }    
 }
 
 def open() {    
-   if ((state.door == "closed") || (!state.door)) {  
+   if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
       push()
       rememberState("door","opening")  
     }    
