@@ -17,11 +17,12 @@
  * 
  *  1.0.1: Remove MQTT Connection to this device - device has no callbacks defined
  *  2.0.0: Sync version with reengineered app
+ *  2.0.1: Added 'GarageDoorControl' capability to 'GarageDoor Device' driver. For this capabilityto work properly, the controller must be bound to the garage door sensor!
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ GarageDoor Device (YS4906-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -34,6 +35,7 @@ metadata {
 		capability "Polling"        
         capability "Momentary"
         capability "ContactSensor"
+        capability "GarageDoorControl"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection
@@ -346,6 +348,7 @@ def void processStateData(payload) {
             def contact = devstate 
              
             rememberState("contact",contact)
+            rememberState("door",contact)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
             rememberState("signal",signal)      
@@ -365,6 +368,7 @@ def void processStateData(payload) {
             def contact = devstate 
             
             rememberState("contact",contact)
+            rememberState("door",contact)
             rememberState("battery",battery)
             rememberState("delay",delay)               
             rememberState("firmware",firmware)
@@ -389,6 +393,20 @@ def void processStateData(payload) {
 			break;
 	    }
     }      
+}
+
+def close() {
+    if ((state.door == "open") || (!state.door)) {  
+      push()
+      rememberState("door","closing")    
+    }    
+}
+
+def open() {    
+   if ((state.door == "closed") || (!state.door)) {  
+      push()
+      rememberState("door","opening")  
+    }    
 }
 
 def push() {
@@ -466,6 +484,7 @@ def reset(){
     state.remove("online")  
     state.remove("signal")     
     state.remove("contact")
+    rememberState("door","unknown") 
     state.remove("stateChangedAt")
     state.remove("LastResponse")  
     state.remove("sensors")  
