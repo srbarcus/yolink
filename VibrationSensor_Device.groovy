@@ -18,11 +18,12 @@
  *  1.0.1: Fix donation URL
  *  1.0.2: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
+ *  2.0.1: Added "ShockSensor" capability: State "shock" - ENUM ["clear", "detected"] 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ VibrationSensor Device (YS7201-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -35,6 +36,7 @@ metadata {
 		capability "Battery"
         capability "Temperature Measurement"
         capability "MotionSensor"
+        capability "ShockSensor"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "reset" 
@@ -152,6 +154,9 @@ def getDevicestate() {
                def motion = "active"                                 //ENUM ["inactive", "active"]
                if (devstate == "normal"){motion="inactive"} 
                 
+               def shock = "detected"                                //ENUM ["clear", "detected"] 
+               if (devstate == "normal"){shock="clear"}  
+                
                logDebug("Device State: online(${online}), " +
                         "Report At(${reportAt}), " +
                         "Alert Interval(${alertInterval}), " +
@@ -162,6 +167,7 @@ def getDevicestate() {
                         "Sensitivity(${sensitivity}), " + 
                         "State(${devstate}), " +  
                         "Motion(${motion}), " + 
+                        "Shock(${shock}), " + 
                         "Firmware(${firmware})")
 
                rememberState("online",online) 
@@ -174,6 +180,7 @@ def getDevicestate() {
                rememberState("sensitivity",sensitivity)
                rememberState("state",devstate)
                rememberState("motion",motion)
+               rememberState("shock",shock) 
                rememberState("firmware",firmware)                      
                     
   		       rc = true	
@@ -229,9 +236,12 @@ def void processStateData(payload) {
             def signal = object.data.loraInfo.signal           
             
             def motion = "active"                                 //ENUM ["inactive", "active"]
-            if (devstate == "normal"){motion="inactive"}                               
+            if (devstate == "normal"){motion="inactive"}   
+                        
+            def shock = "detected"                                //ENUM ["clear", "detected"] 
+            if (devstate == "normal"){shock="clear"} 
     
-            logDebug("Parsed: State=$devstate, Battery=$battery, Alert Interval=$alertInterval, No Vibration Delay=$nomotionDelay, Sensitivity=$sensitivity, Temperature=$temperature, Signal=$signal, Motion=$motion")
+            logDebug("Parsed: State=$devstate, Battery=$battery, Alert Interval=$alertInterval, No Vibration Delay=$nomotionDelay, Sensitivity=$sensitivity, Temperature=$temperature, Signal=$signal, Motion=$motion, Shock=$shock")
             
             rememberState("state",devstate)
             rememberState("battery",battery)                     
@@ -240,7 +250,8 @@ def void processStateData(payload) {
             rememberState("sensitivity",sensitivity)  
             rememberState("temperature",temperature) 
             rememberState("signal",signal)  
-            rememberState("motion",motion)           
+            rememberState("motion",motion)
+            rememberState("shock",shock)
  		    break;      
             
         case "Report":
@@ -258,8 +269,11 @@ def void processStateData(payload) {
                         
             def motion = "active"                                 //ENUM ["inactive", "active"]
             if (devstate == "normal"){motion="inactive"} 
+            
+            def shock = "detected"                                //ENUM ["clear", "detected"] 
+            if (devstate == "normal"){shock="clear"}                        
     
-            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, Signal=$signal, Motion=$motion, Temperature=$temperature")
+            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, Signal=$signal, Motion=$motion, Shock=$shock, Temperature=$temperature")
             
             rememberState("state",devstate)
             rememberState("battery",battery)            
@@ -270,6 +284,7 @@ def void processStateData(payload) {
             rememberState("signal",signal)              
             rememberState("temperature",temperature)
             rememberState("motion",motion)
+            rememberState("shock",shock)
  		    break;    
             
        case "setOpenRemind": 
@@ -302,6 +317,8 @@ def reset(){
     state.remove("signal")  
     state.remove("online")
     state.remove("reportAt")
+    state.remove("motion")
+    state.remove("shock")
     state.remove("temperature")
     state.remove("alertInterval")
     state.remove("noVibrationDelay")

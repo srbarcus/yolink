@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Added 'GarageDoorControl' capability to 'GarageDoor Device' driver. For this capability to work properly, the controller must be bound to the garage door sensor!\n",
+  "releaseNotes": "- Added "ShockSensor" capability to 'VibrationSensor Device' - New Device State: 'shock' ('clear', 'detected')\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -137,7 +137,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/VibrationSensor_Device.groovy",
       "required": false,
-      "version": "2.0.0"
+      "version": "2.0.1"
     },
     {
       "id": "dd11542d-2856-4488-a7f3-938dc3eabdda",
