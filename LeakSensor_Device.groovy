@@ -21,12 +21,13 @@
  *  1.1.0: - Fix donation URL 
  *         - New Function: Formats event timestamp according to user specifiable format
  *  1.1.1: Added getSetup()
- *  2.0.0: - Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
+ *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
+ *  2.0.1: Added correct state ('water') for WaterSensor capability - fixes dashboard errors. Remove unused setSwitch() routine.
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ LeakSensor (YS7903-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -217,7 +218,8 @@ def getDevicestate() {
                 lastResponse("Success") 
             } else {  //Error
                if (pollError(object) ) {  //Cannot connect to Device
-                 rememberState("switch", "unknown")                      
+                 rememberState("switch", "unknown")
+                 rememberState("water", "unknown")   
                }
             }     
         } else {
@@ -257,6 +259,7 @@ def parseDevice(object) {
                 
    rememberState("online", online)
    rememberState("state", swState)
+   rememberState("water", swState) 
    rememberState("battery", battery)
    rememberState("temperature", temperature) 
    rememberState("interval", interval)
@@ -320,6 +323,7 @@ def void processStateData(payload) {
                 
             rememberState("online", "true")
             rememberState("state", swState)
+            rememberState("water", swState)
             rememberState("battery", battery)
             rememberState("firmware", firmware)
             rememberState("temperature", temperature) 
@@ -336,57 +340,6 @@ def void processStateData(payload) {
 	    }
     }      
 }
-
-def setSwitch(setState) {
-   def params = [:] 
-   params.put("state", setState)    
-    
-   def request = [:]    
-   request.put("method", "${state.type}.setState")   
-   request.put("targetDevice", "${state.devId}") 
-   request.put("token", "${state.token}")     
-   request.put("params", params)       
- 
-   try {         
-        def object = parent.pollAPI(request, state.name, state.type)
-        def swState
-         
-        if (object) {
-            logDebug("setSwitch(): pollAPI() response: ${object}")  
-                              
-            if (successful(object)) {               
-                swState = parent.relayState(object.data.state)   
-                def signal = object.data.loraInfo.signal       
-                logDebug("Parsed: Switch=$swState, Signal=$signal")
-                rememberState("switch",swState)
-                rememberState("signal",signal)  
-                lastResponse("Switch ${swState}")     
-                               
-            } else {
-                swState = "unknown"
-                if (notConnected(object)) {  //Cannot connect to Device
-                   rememberState("switch","unknown")  
-                   rememberState("online","false")                    
-                   log.warn "Device '${state.name}' (Type=${state.type}) is offline"  
-                   lastResponse("Device is offline")     
-               }
-            }                     
-                                        
-            return swState							
-                
-	    } else { 			               
-            logDebug("setSwitch() failed")	
-            state.swState = "unknown"
-            sendEvent(name:"switch", value: state.swState, isStateChange:true)
-            lastResponse("setSwitch() failed")     
-        }     		
-	} catch (e) {	
-        log.error "setSwitch() exception: $e"
-        lastResponse("Error ${e}")     
-        state.swState = "unknown"
-        sendEvent(name:"switch", value: state.swState, isStateChange:true)  
-	} 
-}   
 
 def contactState(value) {
    if (value == "alert") {
@@ -416,6 +369,7 @@ def reset(){
      
     state.remove("online")
     state.remove("state")
+    state.remove("water")
     state.remove("battery")
     state.remove("temperature")
     state.remove("interval")
