@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Added 'water' to Current States on YoLink LeakSensor Device per 'WaterSensor capability' standards. Fixes issue with Dashboards not displaying sensor state.\n",
+  "releaseNotes": "- Added creation of individual outlet devices on a MultiOutlet device to allow direct control of an outlet. This is especially useful for Dashboards. After you update the driver, open the MultiOutlet device on Hubitat and click 'Reset' to create the devices or uninstall and reinstall the MultiOutlet Device.\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -154,7 +154,14 @@
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MQTT_Listener_Device.groovy",
       "required": true,
       "version": "2.0.0"
+    },
+    {
+      "id": "47acf80a-7244-410f-bdb1-0dbcfcdec984",
+      "name": "MultiOutlet Outlet",
+      "namespace": "srbarcus",
+      "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
+      "required": true,
+      "version": "1.0.0"
     }
-
   ]
 }

@@ -22,11 +22,12 @@
  *  1.0.5: Fix donation URL
  *  1.0.6: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
+ *  2.1.0: Add child devices for each outlet and USB ports
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.1.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -171,6 +172,71 @@ def debug(value) {
    }    
 }
 
+private create_children() { 
+   def dev = create_child("outlet1","Outlet1") 
+   if (dev) {state.outlet1DNI = dev.deviceNetworkId}
+    
+   dev = create_child("outlet2","Outlet2") 
+   if (dev) {state.outlet2DNI = dev.deviceNetworkId}
+    
+   dev = create_child("outlet3","Outlet3") 
+   if (dev) {state.outlet3DNI = dev.deviceNetworkId}
+    
+   dev = create_child("outlet4","Outlet4") 
+   if (dev) {state.outlet4DNI = dev.deviceNetworkId}
+    
+   dev = create_child("usbPorts","USBports")  
+   if (dev) {state.USBportsDNI = dev.deviceNetworkId} 
+    
+   syncOutlets()         
+}    
+
+private create_child(devname, label) { 	       
+    def newdni = state.my_dni + "_" + devname
+            
+	def dev = allChildDevices.find {it.deviceNetworkId.contains(newdni)}	
+    
+    def failed = false
+
+	if (!dev) {
+        def labelName = state.name + " " + label
+            
+		logDebug("Creating child device named ${labelName} with id $newdni")
+        
+        try {
+           dev = addChildDevice("srbarcus", "MultiOutlet Outlet", newdni, [label:"${labelName}",isComponent:false])              
+           dev.DeviceSetup(devname)            
+            
+		} catch (IllegalArgumentException e) {
+            failed = true
+    		log.error "An error occcurred while trying add child device '$labelName'"
+            log.error "Exception: '$e'"
+                                
+            if (e.message.contains("Please use a different DNI")){    //Could happen if user uninstalled app without deleting previous children                 
+                  throw new IllegalArgumentException("A device with dni '$newdni' already exists. Delete the device and try running the " + get_APP_NAME() + " app again.")
+            } else {    
+                  throw new IllegalArgumentException(e.message)  
+            }                  
+        } catch (Exception e) {
+            failed = true
+    		                                
+            if (e.message.contains("not found")) {                
+                  log.error "Unable to create device '$devname' because driver 'MultiOutlet Outlet' is not installed. You need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
+            } else {    
+                  log.error "Exception: '$e'"
+                  throw new IllegalArgumentException(e.message)  
+            }                      
+        } finally {
+            if (failed) {return null}
+        }              
+            
+	} else {
+		log.info "Child device ${dev.displayName} already exists with id $newdni, new device not created"
+	}
+    
+    return dev
+}
+
 def on () {
    setSwitch(255,"open") 
 }
@@ -252,19 +318,19 @@ def outlet4TimerOff(minutes) {
 } 
 
 def outlet1Delays(onoff) {
-    outletDelays(1,onoff)
+  outletDelays(1,onoff)
 }
 
 def outlet2Delays(onoff) {
-    outletDelays(2,onoff)
+  outletDelays(2,onoff)
 }
 
 def outlet3Delays(onoff) {
-    outletDelays(3,onoff)
+  outletDelays(3,onoff)
 }
 
 def outlet4Delays(onoff) {
-    outletDelays(4,onoff)
+  outletDelays(4,onoff)
 }
 
 def outletDelays(outlet,onoff) {
@@ -366,6 +432,8 @@ def parseDevice(object) {
    def outlet2  = outletSwitch(object.data.state[2])
    def outlet3  = outletSwitch(object.data.state[3])
    def outlet4  = outletSwitch(object.data.state[4])
+    
+   syncOutlets() 
     
    if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
         rememberState("switch","off")
@@ -495,10 +563,12 @@ def void processStateData(payload) {
             
             rememberState("signal",signal)
             rememberState("USBports",USB)
-            rememberState("outlet1",USB)
-            rememberState("outlet2",USB)
-            rememberState("outlet3",USB)
-            rememberState("outlet4",USB)
+            rememberState("outlet1",outlet1)
+            rememberState("outlet2",outlet2)
+            rememberState("outlet3",outlet3)
+            rememberState("outlet4",outlet4)
+            
+            syncOutlets()
             
             logDebug("$event: USBports=$USB, Outlet1=$outlet1, Outlet2=$outlet2, Outlet3=$outlet3, Outlet4=$outlet4, Signal=$signal") 
    
@@ -588,13 +658,15 @@ def setSwitch(mask,SWstate) {
                 def outlet2  = outletSwitch(object.data.state[2])
                 def outlet3  = outletSwitch(object.data.state[3])
                 def outlet4  = outletSwitch(object.data.state[4])
-                
+                            
                 rememberState("signal",signal)  
                 rememberState("USBports",USB)
                 rememberState("outlet1",outlet1)
                 rememberState("outlet2",outlet2)
                 rememberState("outlet3",outlet3)
                 rememberState("outlet4",outlet4)
+                
+                syncOutlets()                                
                 
                 if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
                      rememberState("switch","off")
@@ -626,6 +698,19 @@ def setSwitch(mask,SWstate) {
         lastResponse("setSwitch() exception: ${e}")     
 	} 
 }  
+
+def syncOutlets() {
+     def dev = getChildDevice(state.outlet1DNI)
+     if (state.outlet1 == "on") {dev.on(false)} else {dev.off(false)}   
+     dev = getChildDevice(state.outlet2DNI)
+     if (state.outlet2 == "on") {dev.on(false)} else {dev.off(false)}  
+     dev = getChildDevice(state.outlet3DNI)
+     if (state.outlet3 == "on") {dev.on(false)} else {dev.off(false)}  
+     dev = getChildDevice(state.outlet4DNI)
+     if (state.outlet4 == "on") {dev.on(false)} else {dev.off(false)}  
+     dev = getChildDevice(state.USBportsDNI)
+     if (state.USBports == "on") {dev.on(false)} else {dev.off(false)}  
+}
 
 def setDelay(outlet, minuteson, minutesoff) {
    logDebug("setDelay($outlet, $minuteson, $minutesoff)")  
@@ -685,7 +770,6 @@ def setDelay(outlet, minuteson, minutesoff) {
 }    
 
 def reset(){          
-    state.debug = false
     state.remove("firmware")
     state.remove("switch")
     state.remove("delay_ch")
@@ -704,6 +788,13 @@ def reset(){
     state.remove("outlet2")
     state.remove("outlet3")
     state.remove("outlet4")
+    
+    state.remove("outlet1DNI")
+    state.remove("outlet2DNI")
+    state.remove("outlet3DNI")
+    state.remove("outlet4DNI")
+    state.remove("USBportsDNI")
+      
     state.remove("timer1on")
     state.remove("timer1off")
     state.remove("timer2on")
@@ -720,6 +811,10 @@ def reset(){
     state.remove("timer3offHM")
     state.remove("timer4onHM")
     state.remove("timer4offHM")
+    
+    def children= getChildDevices()
+	children.each {deleteChildDevice(it.deviceNetworkId)}    
+    create_children()     
     
     removeSchedules()
               
