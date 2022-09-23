@@ -97,7 +97,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
       "required": false,
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
@@ -153,7 +153,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MQTT_Listener_Device.groovy",
       "required": true,
-      "version": "2.0.0"
+      "version": "2.0.1"
     },
     {
       "id": "47acf80a-7244-410f-bdb1-0dbcfcdec984",
