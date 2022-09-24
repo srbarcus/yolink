@@ -23,13 +23,15 @@
  *  1.0.6: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
  *  2.1.0: Add child devices for each outlet and USB ports
+ *  2.1.1: Add preference "AllowMixed" to allow 'Mixed' state if some outlets are on and some are off (original behavior). Default is "false": If one or more outlets "on", then switch = "on", else switch = "off"  
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.1.0"}
+def clientVersion() {return "2.1.1"}
 
 preferences {
+    input title: "Allow 'Mixed' switch state if some outlets are on and some are off", name: "AllowMixed", type: "bool", required: true, defaultValue: "false" 
     input title: "Driver Version", description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
@@ -109,7 +111,7 @@ metadata {
         attribute "timer4onHM", "String"
         attribute "timer4offHM", "String"     
     }
- }
+}
 
 void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {  
     state.debug = false
@@ -137,10 +139,12 @@ public def getSetup() {
     return setup
 }
 
-def installed() {
+def installed() {    
  }
 
 def updated() {
+   logDebug("Allow Mixed: ${settings.AllowMixed}")
+   setSwitchState()    
  }
 
 def uninstalled() {
@@ -434,17 +438,7 @@ def parseDevice(object) {
    def outlet4  = outletSwitch(object.data.state[4])
     
    syncOutlets() 
-    
-   if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
-        rememberState("switch","off")
-   } else {
-       if (USB == "on" && outlet1 == "on" && outlet2 == "on" && outlet3 == "on" && outlet4 == "on") {
-            rememberState("switch","on")
-       } else {
-           rememberState("switch","mixed")
-       }    
-   }       
-    
+      
    def timer1on   = object.data.delays[0].on 
    def timer1off  = object.data.delays[0].off  
    def timer2on   = object.data.delays[1].on 
@@ -492,7 +486,35 @@ def parseDevice(object) {
    rememberState("timer4onHM",timer4onHM)     
    rememberState("timer4off",timer4off) 
    rememberState("timer4offHM",timer4offHM) 
+    
+   setSwitchState()   
 }   
+
+def setSwitchState() {
+    def USB = state.USBports
+    def outlet1 = state.outlet1
+    def outlet2 = state.outlet2
+    def outlet3 = state.outlet3
+    def outlet4 = state.outlet4
+    
+    if (settings.AllowMixed) { 
+      if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
+         rememberState("switch","off")
+      } else {
+           if (USB == "on" && outlet1 == "on" && outlet2 == "on" && outlet3 == "on" && outlet4 == "on") {
+                rememberState("switch","on")
+           } else {
+               rememberState("switch","mixed")
+           }    
+      }       
+    } else {
+      if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
+         rememberState("switch","off")
+      } else {
+         rememberState("switch","on")
+      }           
+    }    
+}    
 
 def outletSwitch(state) {
     def status
@@ -551,22 +573,14 @@ def void processStateData(payload) {
             def outlet3  = outletSwitch(object.data.state[3])
             def outlet4  = outletSwitch(object.data.state[4])
             
-            if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
-               rememberState("switch","off")
-            } else {
-                if (USB == "on" && outlet1 == "on" && outlet2 == "on" && outlet3 == "on" && outlet4 == "on") {
-                    rememberState("switch","on")
-                } else {
-                    rememberState("switch","mixed")
-                }    
-            }                   
-            
             rememberState("signal",signal)
             rememberState("USBports",USB)
             rememberState("outlet1",outlet1)
             rememberState("outlet2",outlet2)
             rememberState("outlet3",outlet3)
             rememberState("outlet4",outlet4)
+            
+            setSwitchState() 
             
             syncOutlets()
             
@@ -666,17 +680,9 @@ def setSwitch(mask,SWstate) {
                 rememberState("outlet3",outlet3)
                 rememberState("outlet4",outlet4)
                 
-                syncOutlets()                                
+                setSwitchState() 
                 
-                if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
-                     rememberState("switch","off")
-                } else {
-                    if (USB == "on" && outlet1 == "on" && outlet2 == "on" && outlet3 == "on" && outlet4 == "on") {
-                         rememberState("switch","on")
-                    } else {
-                        rememberState("switch","mixed")
-                    }    
-                }       
+                syncOutlets()               
                 
                 if (mask == 255) {
                    lastResponse("All outlets set to " + outletSwitch(SWstate))                                    

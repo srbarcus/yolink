@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Added creation of individual outlet devices on a MultiOutlet device to allow direct control of an outlet. This is especially useful for Dashboards. After you update the driver, open the MultiOutlet device on Hubitat and click 'Reset' to create the devices or uninstall and reinstall the MultiOutlet Device.\nMinor MQTT Listener fix>\n",
+  "releaseNotes": "- Added a parameter setting on a MultiOutlet device to allow 'Mixed' switch state if some outlets are on and some are off.\nDefault is 'false': If one or more outlets 'on', then switch='on', else switch='off'\n- Added creation of individual outlet devices on a MultiOutlet device to allow direct control of an outlet. This is especially useful for Dashboards. After you update the driver, open the MultiOutlet device on Hubitat and click 'Reset' to create the devices or uninstall and reinstall the MultiOutlet Device.\n- Minor MQTT Listener fix>\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -97,7 +97,7 @@
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
       "required": false,
-      "version": "2.1.0"
+      "version": "2.1.1"
     },
     {
       "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
