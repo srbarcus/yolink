@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Added a parameter setting on a MultiOutlet device to allow 'Mixed' switch state if some outlets are on and some are off.\nDefault is 'false': If one or more outlets 'on', then switch='on', else switch='off'\n- Added creation of individual outlet devices on a MultiOutlet device to allow direct control of an outlet. This is especially useful for Dashboards. After you update the driver, open the MultiOutlet device on Hubitat and click 'Reset' to create the devices or uninstall and reinstall the MultiOutlet Device.\n- Minor MQTT Listener fix>\n",
+  "releaseNotes": "- Updated YoLink Device Service app to support Smart Outdoor Plug (YS6802-UC)\n- New 'Smart Outdoor Plug Device' driver\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -15,7 +15,7 @@
       "required": true,
       "oauth": false,
       "primary": true,
-      "version": "2.0.0"
+      "version": "2.0.1"
     }
   ],
   "drivers": [
@@ -160,6 +160,14 @@
       "name": "MultiOutlet Outlet",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
+      "required": true,
+      "version": "1.0.0"
+    },
+    {
+      "id": "a248278d-ec49-4cdc-a616-2cdebb8c203f",
+      "name": "YoLink Smart Outdoor Plug Device",
+      "namespace": "srbarcus",
+      "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Smart_Outdoor_Plug_Device.groovy",
       "required": true,
       "version": "1.0.0"
     }
