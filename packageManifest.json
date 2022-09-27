@@ -160,7 +160,7 @@
       "name": "MultiOutlet Outlet",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
-      "required": true,
+      "required": false,
       "version": "1.0.0"
     },
     {
@@ -168,7 +168,7 @@
       "name": "YoLink Smart Outdoor Plug Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Smart_Outdoor_Plug_Device.groovy",
-      "required": true,
+      "required": false,
       "version": "1.0.0"
     }
   ]
