@@ -25,6 +25,7 @@
  *  2.0.0: - Reengineer app and drivers to use centralized MQTT listener due to new YoLink service restrictions
  *         - Update API return code translations  
  *  
+ *  2.1.0: Add support for Smart Outdoor Plug (YS6802-UC/SH-18A)
  */
 import groovy.json.JsonSlurper
 
@@ -41,7 +42,7 @@ definition(
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
-private def get_APP_VERSION() {return "2.0.0"}
+private def get_APP_VERSION() {return "2.1.0"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
@@ -126,6 +127,8 @@ def otherSettings() {
     
     def Keep_Hubitat_dni 
     
+    int countNewChildDevices = 0   
+    
     exposed.each { dni ->                   
                     def devname = state.deviceName."${dni}"
                     def devtype = state.deviceType."${dni}"
@@ -134,7 +137,11 @@ def otherSettings() {
                     log.info "Creating selected Device: ${devtype} - ${devname}"	
                     def Hubitat_dni = "yolink_${devtype}_${dni}"
                     Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
-                    if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}
+                    if (Hubitat_dni != null) {
+                        Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)
+                        countNewChildDevices++     
+                        logDebug("Created $countNewChildDevices of ${exposed.size()} selected devices.")    
+                    }
 				} 	 
     
     def devname = "YoLink Cloud Listener"
@@ -197,9 +204,13 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
       devtype = getTHSensorDriver(devname,devtype,devtoken,devId) 	
     }        
     
+    if (devtype == "MultiOutlet") {
+      log.info "$devname is a MultiOutlet, determining device's capabilities..."  
+      devtype = getMultiOutletDriver(devname,devtype,devtoken,devId) 	
+    }   
+   
     def newdni = Hubitat_dni
-    def drivername = getYoLinkDriverName("$devtype")
-    int countNewChildDevices = 0        
+    def drivername = getYoLinkDriverName("$devtype")     
         
 	def dev = allChildDevices.find {it.deviceNetworkId.contains(newdni)}	
     
@@ -243,9 +254,8 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
             
         logDebug("Calling child device setup: $newdni, $state.homeID, $devname, $devtype, $devtoken, $devId")
         dev.ServiceSetup(newdni,state.homeID,devname,devtype,devtoken,devId) 	// Initial setup of the Child Device             
-		logDebug("Setup of ${dev.displayName} with id $newdni has been completed")
-            
-		countNewChildDevices++            
+		logDebug("Setup of ${dev.displayName} with id $newdni has been completed")            
+	   
 	} else {
 		log.info "Child device ${dev.displayName} already exists with id $newdni, new device not created"
         if (devtype == "SpeakerHub") {
@@ -253,8 +263,6 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
            state.speakerhub = newdni
         }  
 	}
-
-	logDebug("Created $countNewChildDevices of ${exposed.size()} selected devices.")
     
     return newdni
 }
@@ -822,6 +830,48 @@ def getTHSensorDriver(name,type,token,devId) {
     
 	return driver
 }    
+
+// YoLink™ MultiOutlet (YS6801-UC) and Smart Outdoor Plug (YS6802-UC/SH-18A) are both reported as "MultiOutlet"
+// If device only returns delays on 2 channels (0 and 1), assume it's a Smart Outdoor Plug 
+def getMultiOutletDriver(name,type,token,devId) {
+    def driver = "MultiOutlet"
+	try {  
+        def request = [:]
+            request.put("method", "MultiOutlet.getState")                   
+            request.put("targetDevice", "${devId}") 
+            request.put("token", "${token}") 
+        
+        def object = pollAPI(request, name, type)
+         
+        if (object) {
+            logDebug("getMultiOutletDriver() - pollAPI() response: ${object}")     
+            
+            if (object.code == "000000") {             
+                def delay = object.data?.delays[2]                                            
+                
+                if (delay==null) { 
+                    log.info "$name appears to be a Smart Outdoor Plug."
+                    driver = "Smart Outdoor Plug"
+                } else {
+                    log.info "$name appears to be a MultiOutlet Device."
+                }    
+            } else {  //Error
+                log.error "API polling returned error: $object.code - " + translateCode(object.code)               
+            }     
+        } else {
+            log.error "No response from API request"
+        } 
+	} catch (groovyx.net.http.HttpResponseException e) {	
+            if (e?.statusCode == UNAUTHORIZED_CODE) { 
+                log.error("getMultiOutletDriver() - Unauthorized Exception")
+            } else {
+				log.error("getMultiOutletDriver() - Exception $e")
+			}                 
+	}
+    
+	return driver
+}   
+
 
 def logDebug(msg) {
     if (debugging == "True"){
