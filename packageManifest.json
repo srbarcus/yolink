@@ -3,7 +3,7 @@
   "author": "Steven Barcus",  
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-07-17",
-  "releaseNotes": "- Updated YoLink Device Service app to support Smart Outdoor Plug (YS6802-UC)\n- New 'Smart Outdoor Plug Device' driver\n",
+  "releaseNotes": "- New driver to support 'YoLink Finger Device (YS4908-UC)'\n",
   "documentationLink": "https://github.com/srbarcus/yolink/wiki",
   "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
   "apps": [
@@ -157,7 +157,7 @@
     },
     {
       "id": "47acf80a-7244-410f-bdb1-0dbcfcdec984",
-      "name": "MultiOutlet Outlet",
+      "name": "YoLink MultiOutlet Outlet",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
       "required": false,
@@ -168,6 +168,14 @@
       "name": "YoLink Smart Outdoor Plug Device",
       "namespace": "srbarcus",
       "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Smart_Outdoor_Plug_Device.groovy",
+      "required": false,
+      "version": "1.0.0"
+    },
+   {
+      "id": "dc9415dd-c81c-42dd-b42e-4962ac9aed1a",
+      "name": "YoLink Finger Device",
+      "namespace": "srbarcus",
+      "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
       "required": false,
       "version": "1.0.0"
     }
