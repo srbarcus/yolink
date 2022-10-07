@@ -20,15 +20,14 @@ In-wall Outlet 			(YS6704-UC) - 07/29/2022
 Garage Door Sensor   	     	(YS7706-UC) - 08-09-2022
 Vibration, Glass Break Sensor   (YS7201-UC) - 08-09-2022
 Garage Door Controller 		(YS4906-UC) - 08-20-2022
-Garage Door Sensor 2 		(YS7706-UC) - 08-20-2022
 Plug w/Power Monitoring		(YS6602-UC) - 08-20-2022
+In-wall outlet 			(YS6704-UC) - 08-21-2022
+Vibration Sensor		(YS7201-UC) - 09-18-2022
+Smart Outdoor Plug 		(YS6802-UC) - 09-27-2022
+Finger Device 			(YS4908-UC) - 09-29-2022
+
 
 
 NOT SUPPORTED
 -------------
 Remote 				(YS3603-UC) - Only supports manually paired YoLink devices (device to device)
-
-
-
-CURRENTLY UNDER DEVELOPMENT
----------------------------
