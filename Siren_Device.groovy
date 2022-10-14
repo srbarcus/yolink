@@ -24,11 +24,14 @@
  *  1.0.6: Fix donation URL
  *  1.0.7: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
+ *  2.0.1: - Add 'Switch' capability to support Hubitat Dashboard
+ *         - Correct Alarm state 
+ *         - Recognize when device is turned off
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "Siren (YS7103-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -42,6 +45,7 @@ metadata {
 		capability "Battery"
         capability "Alarm"                  // ENUM ["strobe", "off", "both", "siren"]    
         capability "PowerSource"            // ENUM ["battery", "dc", "mains", "unknown"]  API "usb" = "mains"
+        capability "Switch"                 // ENUM ["on", "off"]
        
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
         command "reset"          
@@ -129,11 +133,15 @@ def both () {
 def siren () {  
    setSiren("True")       
 }
-    
+
+def on () {
+   setSiren("True") 
+   }       
+
 def off () {
    setSiren("False")  
-}     
-
+}    
+    
 def setSiren(setState) {   
    def params = [:] 
    def alarm = [:] 
@@ -200,7 +208,6 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) {   
-    def online = true
     def alarm = object.data.state
     def volume = object.data.soundLevel    
     def battery = parent.batterylevel(object.data.battery) 
@@ -209,25 +216,65 @@ def parseDevice(object) {
     def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error   
     def firmware = object.data.version
     def signal = object.data.loraInfo.signal
-                   
-    logDebug("Device State: online(${online}), " +
-             "Alarm(${alarm}), " +
-             "Volume(${volume}), " +             
-             "Battery(${battery}), " + 
-             "Power Source(${powerSource}), " +
-             "Alarm Duration(${alarmDuration}), " +
-             "Firmware(${firmware}), " +
-             "Signal(${signal})")     
-             
-    rememberState("online",online)
-    rememberState("alarm",alarm)       
+    
     rememberState("volume",volume)
     rememberState("battery",battery)
     rememberState("powerSource",powerSource)    
     rememberState("alarmDuration",alarmDuration)
     rememberState("firmware",firmware)    
     rememberState("signal",signal)
+    
+    setAlarmState(alarm)
+                   
+    logDebug("Device State: online(${online}), " +
+             "Alarm(${state.alarm}), " +
+             "Switch(${state.switch}), " +
+             "Volume(${volume}), " +             
+             "Battery(${battery}), " + 
+             "Power Source(${state.powerSource}), " +
+             "Alarm Duration(${alarmDuration}), " +
+             "Firmware(${firmware}), " +
+             "Signal(${signal})")    
 }   
+
+def setAlarmState(alarm) {
+    def swstate
+    def online = true
+       
+    switch(alarm) {		
+        case "normal":       
+            alarm = "off" 
+            swstate = "off" 
+ 		    break;   
+            
+        case "alert":
+            alarm = "both" 
+            swstate = "on"  
+            break;   
+            
+        case "off":
+            alarm = "disabled" 
+            swstate = "disabled"                      
+            log.warn "Siren has been turned off using the device's switch"
+            online = false
+            rememberState("powerSource","unknown") 
+            break; 
+           
+		default:
+            alarm = "unknown" 
+            swstate ="unknown"            
+            log.error "Unknown siren state received: ${alarm}"
+            online = false
+			break;
+	    }				
+    
+    rememberState("alarm",alarm)         
+    rememberState("switch",swstate)  
+    rememberState("online",online) 
+    
+    logDebug("setAlarmState(): Alarm(${state.alarm}), Switch(${state.switch})")
+}    
+
 
 def duration(seconds) {
     if (seconds == 65535) {seconds = "Forever"}
@@ -267,9 +314,11 @@ def void processStateData(payload) {
             break;   
             
         case "setState":  //"normal","alert","off"
-            def alarmState = object.data.state    
+            def alarm = object.data.state    
             def signal = object.data.loraInfo.signal
-            rememberState("alarmState",alarmState)  
+            
+            setAlarmState(alarm)
+            
             rememberState("signal",signal)
             break; 
            
@@ -285,6 +334,7 @@ def reset(){
     state.debug = false  
     state.remove("online")  
     state.remove("alarm")
+    state.remove("switch")
     state.remove("volume") 
     state.remove("battery")
     state.remove("alarmDuration")
