@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.1.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Updated driver for 'YoLink™ Siren (YS7103-UC)' to supprt 'Switch' capabilities to allow siren to be turned on and off using Hubitat Dashboard. Also updated to recognize that the device was turned off using its volume switch. The 'alarm' and 'switch' attributes will be set to 'disabled'.\n",
+    "releaseNotes": "- Updated driver for 'YoLink™ Siren (YS7103-UC)' to support 'Switch' capabilities to allow siren to be turned on and off using Hubitat Dashboard. Also updated to recognize that the device was turned off using its volume switch. The 'alarm' and 'switch' attributes will be set to 'disabled'.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
