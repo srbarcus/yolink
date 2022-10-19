@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.1.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Updated driver for 'YoLink™ Siren (YS7103-UC)' to support 'Switch' capabilities to allow siren to be turned on and off using Hubitat Dashboard. Also updated to recognize that the device was turned off using its volume switch. The 'alarm' and 'switch' attributes will be set to 'disabled'.\n",
+    "releaseNotes": "Updated drivers for 'Temperature Sensor (YS8004-UC)' and Temperature Humidity Sensor (YS8003-UC):\n  - Add 'Alarm' capabilities (Any alert condition will set 'alarm' attribute to 'both', otherwise it'll be 'off'.\n  - Fix error where temperature is set to 'null' on an alert.\n  - Fix numerous alert processing errors.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -113,7 +113,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Temperature_Sensor_Device.groovy",
             "required": false,
-            "version": "2.0.0"
+            "version": "2.0.2"
         },
         {
             "id": "936452da-8a76-40e9-a1b1-b39579c08f03",
@@ -121,7 +121,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
             "required": false,
-            "version": "2.0.1"
+            "version": "2.0.2"
         },
         {
             "id": "379a9757-a79d-4584-9f64-61b0c32166f7",

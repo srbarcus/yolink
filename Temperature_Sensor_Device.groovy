@@ -25,11 +25,13 @@
  *  1.0.7: Fix donation URL
  *  1.0.8: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
+ *  2.0.1: Multiple Fixes, add 'Alarm' capability (status only)
+ *  2.0.2: Added 'Alarm' capability (status only)
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Sensor (YS8004-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -40,7 +42,8 @@ metadata {
     definition (name: "YoLink Temperature Sensor Device", namespace: "srbarcus", author: "Steven Barcus") {     	
 		capability "Polling"				
 		capability "Battery"
-        capability "TemperatureMeasurement"       
+        capability "TemperatureMeasurement"   
+        capability "Alarm" //ENUM ["strobe", "off", "both", "siren"]
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]  
         command "reset"                  
@@ -48,18 +51,18 @@ metadata {
         attribute "online", "String"
         attribute "firmware", "String"  
         attribute "reportAt", "String"
-        attribute "signal", "String"  
-        attribute "batteryType", "String" 
+        attribute "signal", "String"
         attribute "lastResponse", "String" 
         
         attribute "lowBattery", "String"  
         attribute "lowTemp", "String"  
-        attribute "highTemp", "String"        
-        attribute "temperatureScale", "String"   
-        attribute "state", "String"   
-        attribute "tempCorrection", "Number"   
-        attribute "tempLimitMax", "Number" 
-        attribute "tempLimitMin", "Number"                       
+        attribute "highTemp", "String"
+        attribute "temperatureScale", "String"
+        attribute "state", "String"
+        attribute "tempCorrection", "String"
+        attribute "tempLimitMax", "String"
+        attribute "tempLimitMin", "String"
+        attribute "alertInterval", "String"
         }
    }
 
@@ -126,10 +129,13 @@ def debug(value) {
    }    
 }
 
+def both() {log.error "'both' command is not supported"}
+def off() {log.error "'off' command is not supported"}
+def siren() {log.error "'siren' command is not supported"}
+def strobe() {log.error "'strobe' command is not supported"}
+
 def getDevicestate() {
     state.driver=clientVersion()
-    
-	logDebug("getDevicestate() obtaining device state")
     
 	boolean rc=false	//DEFAULT: Return Code = false
     
@@ -143,10 +149,10 @@ def getDevicestate() {
          
         if (object) {
             logDebug("getDevicestate()> pollAPI() response: ${object}")     
-            
+
             if (successful(object)) {                
                 parseDevice(object,"devicestate")                     
-                rc = true	 
+                rc = true
                 lastResponse("Success") 
             } else {  //Error
                pollError(object)                
@@ -172,12 +178,10 @@ def parseDevice(object, source) {
     logDebug("parseDevice() Source: ${source}")
     
     def online
-    def reportAt    
     def lowBattery
     def lowTemp
-    def highTemp    
-    def battery 
-    def batteryType
+    def highTemp
+    def battery
     def alertInterval
     def temperatureScale 
     def devstate
@@ -186,30 +190,31 @@ def parseDevice(object, source) {
     def tempLimitMin
     def temperature
     def firmware
-    def signal    
+    def signal
     
     switch(source) {
-		case "devicestate":      
-            online = object.data.online.toString()
-            devstate = object.data.state.state
-            lowBattery = object.data.state.alarm.lowBattery.toString()
-            lowTemp = object.data.state.alarm.lowTemp.toString()
-            highTemp = object.data.state.alarm.highTemp.toString()                         
-            battery = parent.batterylevel(object.data.state.battery) 
-            batteryType = object.data.state.batteryType
-            alertInterval = object.data.state.interval
-            temperatureScale = object.data.state.mode.toUpperCase()            
-            tempCorrection = object.data.state.tempCorrection
-            tempLimitMax = object.data.state.tempLimit.max
-            tempLimitMin = object.data.state.tempLimit.min 
-            temperature = object.data.state.temperature  
-            firmware = object.data.state.version   
-            reportAt = object.data.reportAt     
-        
-            temperature = parent.convertTemperature(temperature)
+		case "devicestate":
+            online           = object.data.online.toString()
+            devstate         = object.data.state.state
+            lowBattery       = object.data.state.alarm.lowBattery.toString()
+            lowTemp          = object.data.state.alarm.lowTemp.toString()
+            highTemp         = object.data.state.alarm.highTemp.toString()
+            battery          = parent.batterylevel(object.data.state.battery)
+            alertInterval    = object.data.state.interval
+            temperatureScale = object.data.state.mode.toUpperCase()
+            tempCorrection   = object.data.state.tempCorrection
+            tempLimitMax     = object.data.state.tempLimit.max
+            tempLimitMin     = object.data.state.tempLimit.min 
+            temperature      = object.data.state.temperature  
+            firmware         = object.data.state.version   
+
+            temperature =  parent.convertTemperature(temperature)
+            temperature = (temperature.toDouble() + tempCorrection.toDouble()).round(1)
             tempLimitMax = parent.convertTemperature(tempLimitMax)
             tempLimitMin = parent.convertTemperature(tempLimitMin)
-       
+
+            logDebug("Device State Adjusted: Temp Limit Max(${tempLimitMax}), Temp Limit Min(${tempLimitMin}), Temperature(${temperature})")
+
             rememberState("online",online)    
             
             rememberState("reportAt",reportAt)                   
@@ -218,111 +223,107 @@ def parseDevice(object, source) {
             alarmState(temperature,tempLimitMin,tempLimitMax)
 
             rememberState("battery",battery)    
-            rememberState("batteryType",batteryType)    
             rememberState("alertInterval",alertInterval)
             rememberState("temperatureScale",temperatureScale)            
             rememberState("tempCorrection",tempCorrection)
             rememberState("tempLimitMax",tempLimitMax)
             rememberState("tempLimitMin",tempLimitMin)
-            rememberState("temperature",temperature) 
-            rememberState("firmware",firmware)     
-         
+            rememberState("temperature",temperature,temperatureScale)
+            rememberState("firmware",firmware)
+
             logDebug("Device State: online(${online}), " +
                      "State(${devstate}), " + 
-                     "Report At(${reportAt}), " +
                      "Firmware(${firmware}), " +
                      "Low Battery(${lowBattery}), " +
                      "Low Temp:(${lowTemp}), " +
-                     "Hight Temp(${highTemp}), " +                        
+                     "Hight Temp(${highTemp}), " +
                      "Battery(${battery}), " +
-                     "Battery Type(${batteryType}), " + 
                      "Alert Interval(${alertInterval}), " + 
-                     "Temperature Scale(${temperatureScale}), " +                      
+                     "Temperature Scale(${temperatureScale}), " +
                      "Temp Correction(${tempCorrection}), " + 
                      "Temp Limit Max(${tempLimitMax}), " + 
                      "Temp Limit Min(${tempLimitMin}), " +   
                      "Temperature(${temperature})")
         	break;	
          
-        case "report":                 
-            online = "true"        
-            devstate = "normal"     
-            lowBattery = object.data.alarm.lowBattery.toString()                             
+        case "report":
+            online = "true"
+            devstate = object.data.state
+            lowBattery = object.data.alarm.lowBattery.toString()                            
             lowTemp = object.data.alarm.lowTemp.toString()
             highTemp = object.data.alarm.highTemp.toString()
             battery = parent.batterylevel(object.data.battery) 
-            batteryType = object.data.batteryType
             alertInterval = object.data.interval
             temperatureScale = object.data.mode.toUpperCase()
-            
             tempCorrection = object.data.tempCorrection
+            temperature = object.data.temperature
             tempLimitMax = object.data.tempLimit.max
-            tempLimitMin = object.data.tempLimit.min 
-            temperature = object.data.temperature  
+            tempLimitMin = object.data.tempLimit.min
             firmware = object.data.version   
             signal = object.data.loraInfo.signal
-        
-            temperature = parent.convertTemperature(temperature)   
+
+            temperature = parent.convertTemperature(temperature)
+            temperature = (temperature.toDouble() + tempCorrection.toDouble()).round(1)
             tempLimitMax = parent.convertTemperature(tempLimitMax)
             tempLimitMin = parent.convertTemperature(tempLimitMin)
-       
-            rememberState("online",online)       
-            rememberState("signal",signal)    
-            rememberState("lowBattery",lowBattery)  
-        
-            alarmState(temperature,tempLimitMin,tempLimitMax)
-                    
+
+            rememberState("online",online)
+            rememberState("signal",signal)
+            rememberState("lowBattery",lowBattery)
             rememberState("battery",battery)    
-            rememberState("batteryType",batteryType)    
             rememberState("alertInterval",alertInterval)
             rememberState("temperatureScale",temperatureScale)
             rememberState("state",devstate)
             rememberState("tempCorrection",tempCorrection)
             rememberState("tempLimitMax",tempLimitMax)
             rememberState("tempLimitMin",tempLimitMin)
-            rememberState("temperature",temperature) 
-            rememberState("firmware",firmware)     
+            rememberState("temperature",temperature,temperatureScale)
+            rememberState("firmware",firmware)
+            rememberState("signal",signal)
+
+            alarmState(temperature,tempLimitMin,tempLimitMax)
          
             logDebug("Device State: online(${online}), " +
                      "Firmware(${firmware}), " +
+                     "Signal(${signal}), " +
                      "Low Battery(${lowBattery}), " +
                      "Low Temp:(${lowTemp}), " +
-                     "Hight Temp(${highTemp}), " +                        
+                     "Hight Temp(${highTemp}), " +
                      "Battery(${battery}), " +
-                     "Battery Type(${batteryType}), " + 
-                     "Alert Interval(${alertInterval}), " + 
                      "Temperature Scale(${temperatureScale}), " + 
+                     "Alert Interval(${alertInterval}), " +
                      "State(${devstate}), " + 
                      "Temp Correction(${tempCorrection}), " + 
+                     "Temperature(${temperature}), " +
                      "Temp Limit Max(${tempLimitMax}), " + 
-                     "Temp Limit Min(${tempLimitMin}), " +   
-                     "Temperature(${temperature})")
-    
+                     "Temp Limit Min(${tempLimitMin})")
             break;	 
                 
 		case "alert":
-            devstate = object.data.state                      
+            devstate = object.data.state
             lowBattery = object.data.alarm.lowBattery.toString()                             
             lowTemp = object.data.alarm.lowTemp.toString()
-            highTemp = object.data.alarm.highTemp.toString()                    
+            highTemp = object.data.alarm.highTemp.toString()
             battery = parent.batterylevel(object.data.battery) 
             temperatureScale = object.data.mode.toUpperCase()
-            alertInterval = object.data.interval 
-            temperature = parent.convertTemperature(object.data.temperature)
+            temperature = object.data.temperature
             firmware = object.data.version           
             signal = object.data.loraInfo.signal    
-          
+        
+            temperature = parent.convertTemperature(temperature)
+            temperature = (temperature.toDouble() + state.tempCorrection.toDouble()).round(1)
+        
+            alarmState(temperature,state.tempLimitMin,state.tempLimitMax)
+
             rememberState("online","true")   
-            rememberState("state",devstate)               
             rememberState("lowBattery",lowBattery)  
             rememberState("lowTemp",lowTemp)        
             rememberState("highTemp",highTemp)            
             rememberState("battery",battery)    
-            rememberState("temperatureScale",temperatureScale)            
-            rememberState("alertInterval",alertInterval)
-            rememberState("temperature",temperature)                     
+            rememberState("temperatureScale",temperatureScale)
+            rememberState("temperature",temperature,temperatureScale)  
             rememberState("firmware",firmware)        
-            rememberState("signal",signal)        
+            rememberState("signal",signal)
                
             logDebug("State(${devstate}), " +
                      "Firmware(${firmware}), " +
@@ -332,11 +333,8 @@ def parseDevice(object, source) {
                      "Hight Temp(${highTemp}), " +   
                      "Battery(${battery}), " + 
                      "Temperature Scale(${temperatureScale}), " + 
-                     "Alert Interval(${alertInterval}), " +             
-                     "Temperature(${temperature}), " + 
-                     "Humidity(${humidity})")                          
-			break;	
-                
+                     "Temperature(${temperature}")
+           break;
 		default:
             log.error "Undefined data source ($source)"            
 			break;
@@ -365,14 +363,11 @@ def void processStateData(payload) {
 		case "setAlarm":            
             def alertInterval = object.data.interval    
             def tempLimitMax = object.data.tempLimit.max
-            def tempLimitMin = object.data.tempLimit.min 
-    
-            def signal = object.data.loraInfo.signal            
-    
-            if (temperatureScale == "F") {      
-                tempLimitMax = parent.celsiustofahrenheit(tempLimitMax)
-                tempLimitMin = parent.celsiustofahrenheit(tempLimitMin)            
-            }   
+            def tempLimitMin = object.data.tempLimit.min
+            def signal = object.data.loraInfo.signal
+
+            tempLimitMax = parent.convertTemperature(tempLimitMax)
+            tempLimitMin = parent.convertTemperature(tempLimitMin)
           
             logDebug("setAlarm: Alert Interval(${alertInterval}), " +
                      "Temp Limit Max(${tempLimitMax}), " + 
@@ -383,13 +378,17 @@ def void processStateData(payload) {
             rememberState("tempLimitMax",tempLimitMax)
             rememberState("tempLimitMin",tempLimitMin)
             rememberState("signal",signal)
-            
 			break;	
          
         case "Alert":                            
             parseDevice(object,"alert") 
             break;	 
-                
+
+        case "setCorrection":            
+            tempCorrection = object.data.tempCorrection
+            rememberState("tempCorrection",tempCorrection)
+			break;
+
 		case "Report":
             parseDevice(object,"report")
 			break;	
@@ -417,8 +416,14 @@ def alarmState(temperature,tempLimitMin,tempLimitMax) { // Override Alarms - not
     } else {
         rememberState("highTemp","false")
     }
+    
+    if (devstate == "alert") {        
+        rememberState("alarm", "both")
+    } else {
+        rememberState("alarm", "off")
+    }
          
-     rememberState("state",devstate)
+    rememberState("state",devstate)
 }
 
 def reset(){       
@@ -428,7 +433,6 @@ def reset(){
     state.remove("lowTemp")
     state.remove("highTemp")
     state.remove("battery")
-    state.remove("batteryType")
     state.remove("temperatureScale")
     state.remove("state")
     state.remove("tempCorrection")
@@ -436,7 +440,9 @@ def reset(){
     state.remove("tempLimitMin")
     state.remove("temperature")
     state.remove("online")
-    state.remove("mode")       
+    state.remove("mode")
+    state.remove("alertInterval")
+    state.remove("alarm")
       
     poll(true)    
     

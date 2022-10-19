@@ -27,11 +27,13 @@
  *  1.0.7: Fix donation URL
  *  1.0.8: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
+ *  2.0.1: Multiple Fixes, add 'Alarm' capability (status only)
+ *  2.0.2: Added 'Alarm' capability (status only)
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Humidity Sensor (YS8003-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -44,27 +46,31 @@ metadata {
 		capability "Battery"
         capability "TemperatureMeasurement"
         capability "RelativeHumidityMeasurement"
-                                      
+        capability "Alarm" //ENUM ["strobe", "off", "both", "siren"]
+        
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]  
         command "reset"                  
               
         attribute "online", "String"
         attribute "firmware", "String"  
         attribute "reportAt", "String"
-        attribute "signal", "String" 
+        attribute "signal", "String"
         attribute "lastResponse", "String" 
         
         attribute "lowBattery", "String"  
         attribute "lowTemp", "String"  
-        attribute "highTemp", "String"  
-        attribute "humidityCorrection", "Number" 
-        attribute "humidityLimitMax", "Number"   
-        attribute "humidityLimitMin", "Number"   
-        attribute "temperatureScale", "String"   
-        attribute "state", "String"   
-        attribute "tempCorrection", "Number"   
-        attribute "tempLimitMax", "Number" 
-        attribute "tempLimitMin", "Number" 
+        attribute "highTemp", "String"
+        attribute "lowHumidity", "String"
+        attribute "highHumidity", "String" 
+        attribute "humidityCorrection", "String" 
+        attribute "humidityLimitMax", "String"   
+        attribute "humidityLimitMin", "String"   
+        attribute "temperatureScale", "String"
+        attribute "state", "String"
+        attribute "tempCorrection", "String"
+        attribute "tempLimitMax", "String"
+        attribute "tempLimitMin", "String"
+        attribute "alertInterval", "String"
         }
    }
 
@@ -131,10 +137,13 @@ def debug(value) {
    }    
 }
 
+def both() {log.error "'both' command is not supported"}
+def off() {log.error "'off' command is not supported"}
+def siren() {log.error "'siren' command is not supported"}
+def strobe() {log.error "'strobe' command is not supported"}
+
 def getDevicestate() {
     state.driver=clientVersion()
-    
-	logDebug("getDevicestate() obtaining device state")
     
 	boolean rc=false	//DEFAULT: Return Code = false
     
@@ -148,10 +157,10 @@ def getDevicestate() {
          
         if (object) {
             logDebug("getDevicestate()> pollAPI() response: ${object}")     
- 
+
             if (successful(object)) {                
                 parseDevice(object,"devicestate")                     
-                rc = true	
+                rc = true
                 lastResponse("Success") 
             } else {  //Error
                pollError(object)                
@@ -176,17 +185,11 @@ def getDevicestate() {
 def parseDevice(object, source) {
     logDebug("parseDevice() Source: ${source}")
     
-    def online   
+    def online
     def lowBattery
     def lowTemp
     def highTemp
-    def lowHumidity
-    def highHumidity
     def battery
-    def humidity
-    def humidityCorrection
-    def humidityLimitMax
-    def humidityLimitMin
     def alertInterval
     def temperatureScale 
     def devstate
@@ -194,182 +197,196 @@ def parseDevice(object, source) {
     def tempLimitMax 
     def tempLimitMin
     def temperature
-    def firmware   
-    def reportAt
+    def firmware
     def signal
+    def humidity
+    def lowHumidity
+    def highHumidity
+    def humidityCorrection
+    def humidityLimitMax
+    def humidityLimitMin
+
     
     switch(source) {
-   		case "devicestate":    
-            online             = object.data.online.toString()                                  
-            lowBattery         = object.data.state.alarm.lowBattery.toString()                             
-            lowTemp            = object.data.state.alarm.lowTemp.toString()
-            highTemp           = object.data.state.alarm.highTemp.toString() 
-            lowHumidity        = object.data.state.alarm.lowHumidity.toString()       
-            highHumidity       = object.data.state.alarm.highHumidity.toString()               
-            battery            = object.data.state.battery 
+		case "devicestate":
+            online           = object.data.online.toString()
+            devstate         = object.data.state.state
+            lowBattery       = object.data.state.alarm.lowBattery.toString()
+            lowTemp          = object.data.state.alarm.lowTemp.toString()
+            highTemp         = object.data.state.alarm.highTemp.toString()
+            battery          = parent.batterylevel(object.data.state.battery)
+            alertInterval    = object.data.state.interval
+            temperatureScale = object.data.state.mode.toUpperCase()
+            tempCorrection   = object.data.state.tempCorrection
+            tempLimitMax     = object.data.state.tempLimit.max
+            tempLimitMin     = object.data.state.tempLimit.min 
+            temperature      = object.data.state.temperature  
+            firmware         = object.data.state.version   
+
             humidity           = object.data.state.humidity 
             humidityCorrection = object.data.state.humidityCorrection
             humidityLimitMax   = object.data.state.humidityLimit.max
             humidityLimitMin   = object.data.state.humidityLimit.min
-            alertInterval      = object.data.state.interval
-            temperatureScale   = object.data.state.mode.toUpperCase()
-            devstate           = object.data.state.state
-            tempCorrection     = object.data.state.tempCorrection
-            tempLimitMax       = object.data.state.tempLimit.max
-            tempLimitMin       = object.data.state.tempLimit.min 
-            temperature        = object.data.state.temperature  
-            firmware           = object.data.state.version   
-            reportAt           = object.data.reportAt    
-        
-            logDebug("Device State: online(${online}), " +
-                     "State(${devstate}), " + 
-                     "Report At(${reportAt}), " +
-                     "Firmware(${firmware}), " +
-                     "Low Battery(${lowBattery}), " +
-                     "Low Temp:(${lowTemp}), " +
-                     "Hight Temp(${highTemp}), " +   
-                     "Low Humidity(${lowHumidity}), " +
-                     "High Humidity(${highHumidity}), " +
-                     "Battery(${battery}), " + 
-                     "Humidity(${humidity}), " + 
-                     "Humidity Correction(${humidityCorrection}), " + 
-                     "Humidity Limit Max(${humidityLimitMax}), " + 
-                     "Humidity Limit Min(${humidityLimitMin}), " + 
-                     "Alert Interval(${alertInterval}), " + 
-                     "Temperature Scale(${temperatureScale}), " +     
-                     "Temp Correction(${tempCorrection}), " + 
-                     "Temp Limit Max(${tempLimitMax}), " + 
-                     "Temp Limit Min(${tempLimitMin}), " +   
-                     "Temperature(${temperature})")       
-        
-            battery = parent.batterylevel(battery) 
-          
+            lowHumidity        = object.data.state.alarm.lowHumidity.toString()
+            highHumidity       = object.data.state.alarm.highHumidity.toString()
             humidity = (humidity.toDouble() + humidityCorrection.toDouble()).round(1)
                   
             temperature =  parent.convertTemperature(temperature)
+            temperature = (temperature.toDouble() + tempCorrection.toDouble()).round(1)
             tempLimitMax = parent.convertTemperature(tempLimitMax)
             tempLimitMin = parent.convertTemperature(tempLimitMin)
-                               
+
             logDebug("Device State Adjusted: Temp Limit Max(${tempLimitMax}), Temp Limit Min(${tempLimitMin}), Temperature(${temperature})")
-        
+
             rememberState("online",online)    
             
             rememberState("reportAt",reportAt)                   
             rememberState("lowBattery",lowBattery)  
         
             alarmState(temperature,tempLimitMin,tempLimitMax,humidity,humidityLimitMin,humidityLimitMax)
-        
-            rememberState("battery",battery)    
-            rememberState("batteryType",batteryType)    
-            rememberState("alertInterval",alertInterval)
-            rememberState("temperatureScale",temperatureScale)            
-            rememberState("tempCorrection",tempCorrection)
-            rememberState("tempLimitMax",tempLimitMax)
-            rememberState("tempLimitMin",tempLimitMin)        
-            rememberState("temperature",temperature,temperatureScale)         
-            rememberState("humidity",humidity)
-            rememberState("humidityCorrection",humidityCorrection)
-            rememberState("humidityLimitMax",humidityLimitMax)
-            rememberState("humidityLimitMin",humidityLimitMin)
-            rememberState("firmware",firmware) 
-               
-        	break;	
-         
-        case "report":                 
-            devstate = object.data.state                            //1.0.4
-            lowBattery = object.data.alarm.lowBattery.toString()                            
-            lowTemp = object.data.alarm.lowTemp.toString()
-            highTemp = object.data.alarm.highTemp.toString() 
-            lowHumidity = object.data.alarm.lowHumidity.toString()       
-            highHumidity = object.data.alarm.highHumidity.toString()   
-            battery = parent.batterylevel(object.data.battery) 
-            temperatureScale = object.data.mode.toUpperCase()
-            alertInterval = object.data.interval 
-            temperature = object.data.temperature           
-            humidity = object.data.humidity
-            tempLimitMax = object.data.tempLimit.max
-            tempLimitMin = object.data.tempLimit.min 
-            humidityLimitMax = object.data.humidityLimit.max
-            humidityLimitMin = object.data.humidityLimit.min
-            tempCorrection = object.data.tempCorrection
-            humidityCorrection = object.data.humidityCorrection
-            firmware = object.data.version   
-            signal = object.data.loraInfo.signal    
-        
-            temperature =  parent.convertTemperature(temperature)
-            tempLimitMax = parent.convertTemperature(tempLimitMax)
-            tempLimitMin = parent.convertTemperature(tempLimitMin)
-        
-            rememberState("online","true")    
-            
-            rememberState("lowBattery",lowBattery)  
-        
-            alarmState(temperature,tempLimitMin,tempLimitMax,humidity,humidityLimitMin,humidityLimitMax)
-        
+
             rememberState("battery",battery)    
             rememberState("alertInterval",alertInterval)
             rememberState("temperatureScale",temperatureScale)            
             rememberState("tempCorrection",tempCorrection)
             rememberState("tempLimitMax",tempLimitMax)
-            rememberState("tempLimitMin",tempLimitMin)        
-            rememberState("temperature",temperature,temperatureScale)         
+            rememberState("tempLimitMin",tempLimitMin)
+            rememberState("temperature",temperature,temperatureScale)
+            rememberState("firmware",firmware)
+
             rememberState("humidity",humidity)
             rememberState("humidityCorrection",humidityCorrection)
             rememberState("humidityLimitMax",humidityLimitMax)
             rememberState("humidityLimitMin",humidityLimitMin)
-            rememberState("firmware",firmware) 
-            rememberState("signal",firmware) 
-         
-            logDebug("State(${devstate}), " +
+             
+            logDebug("Device State: online(${online}), " +
+                     "State(${devstate}), " + 
                      "Firmware(${firmware}), " +
-                     "Signal(${signal}), " +            
                      "Low Battery(${lowBattery}), " +
                      "Low Temp:(${lowTemp}), " +
-                     "Hight Temp(${highTemp}), " +   
-                     "Low Humidity(${lowHumidity}), " +
-                     "High Humidity(${highHumidity}), " +
-                     "Battery(${battery}), " + 
-                     "Temperature Scale(${temperatureScale}), " + 
-                     "Alert Interval(${alertInterval}), " +             
-                     "Temperature(${temperature}), " + 
-                     "Humidity(${humidity}), " + 
+                     "Hight Temp(${highTemp}), " +
+                     "Battery(${battery}), " +
+                     "Alert Interval(${alertInterval}), " + 
+                     "Temperature Scale(${temperatureScale}), " +
+                     "Temp Correction(${tempCorrection}), " + 
                      "Temp Limit Max(${tempLimitMax}), " + 
                      "Temp Limit Min(${tempLimitMin}), " +   
+                     "Temperature(${temperature}), " +
+                     "Low Humidity(${lowHumidity}), " +
+                     "High Humidity(${highHumidity}), " +                     
+                     "Humidity(${humidity}), " + 
+                     "Humidity Correction(${humidityCorrection}), " + 
                      "Humidity Limit Max(${humidityLimitMax}), " + 
-                     "Humidity Limit Min(${humidityLimitMin}), " + 
-                     "Temp Correction(${tempCorrection}), " +         
-                     "Humidity Correction(${humidityCorrection})")         
+                     "Humidity Limit Min(${humidityLimitMin})")
+        	break;	
+         
+        case "report":
+            online = "true"
+            devstate = object.data.state
+            lowBattery = object.data.alarm.lowBattery.toString()                            
+            lowTemp = object.data.alarm.lowTemp.toString()
+            highTemp = object.data.alarm.highTemp.toString()
+            battery = parent.batterylevel(object.data.battery) 
+            alertInterval = object.data.interval
+            temperatureScale = object.data.mode.toUpperCase()
+            tempCorrection = object.data.tempCorrection
+            temperature = object.data.temperature
+            tempLimitMax = object.data.tempLimit.max
+            tempLimitMin = object.data.tempLimit.min
+            firmware = object.data.version   
+            signal = object.data.loraInfo.signal
+
+            humidity = object.data.humidity
+            lowHumidity = object.data.alarm.lowHumidity.toString()       
+            highHumidity = object.data.alarm.highHumidity.toString() 
+            humidityLimitMax = object.data.humidityLimit.max
+            humidityLimitMin = object.data.humidityLimit.min
+            humidityCorrection = object.data.humidityCorrection
+            humidity = (humidity.toDouble() + humidityCorrection.toDouble()).round(1)
+
+            temperature = parent.convertTemperature(temperature)
+            temperature = (temperature.toDouble() + tempCorrection.toDouble()).round(1)
+            tempLimitMax = parent.convertTemperature(tempLimitMax)
+            tempLimitMin = parent.convertTemperature(tempLimitMin)
+
+            rememberState("online",online)
+            rememberState("signal",signal)
+            rememberState("lowBattery",lowBattery)
+            rememberState("battery",battery)    
+            rememberState("alertInterval",alertInterval)
+            rememberState("temperatureScale",temperatureScale)
+            rememberState("state",devstate)
+            rememberState("tempCorrection",tempCorrection)
+            rememberState("tempLimitMax",tempLimitMax)
+            rememberState("tempLimitMin",tempLimitMin)
+            rememberState("temperature",temperature,temperatureScale)
+            rememberState("firmware",firmware)
+            rememberState("signal",signal)
+            
+            rememberState("humidity",humidity)
+            rememberState("humidityCorrection",humidityCorrection)
+            rememberState("humidityLimitMax",humidityLimitMax)
+            rememberState("humidityLimitMin",humidityLimitMin)
+
+            alarmState(temperature,tempLimitMin,tempLimitMax,humidity,humidityLimitMin,humidityLimitMax)
+         
+            logDebug("Device State: online(${online}), " +
+                     "Firmware(${firmware}), " +
+                     "Signal(${signal}), " +
+                     "Low Battery(${lowBattery}), " +
+                     "Low Temp:(${lowTemp}), " +
+                     "Hight Temp(${highTemp}), " +
+                     "Battery(${battery}), " +
+                     "Temperature Scale(${temperatureScale}), " + 
+                     "Alert Interval(${alertInterval}), " +
+                     "State(${devstate}), " + 
+                     "Temp Correction(${tempCorrection}), " + 
+                     "Temperature(${temperature}), " +
+                     "Temp Limit Max(${tempLimitMax}), " + 
+                     "Temp Limit Min(${tempLimitMin}), " +
+                     "Humidity(${humidity}), " +
+                     "Low Humidity(${lowHumidity}), " +
+                     "High Humidity(${highHumidity}), " +
+                     "Humidity Limit Max(${humidityLimitMax}), " +
+                     "Humidity Limit Min(${humidityLimitMin}), " +
+                     "Humidity Correction(${humidityCorrection})")  
             break;	 
                 
 		case "alert":
-            devstate = object.data.state                      //1.0.4
+            devstate = object.data.state
             lowBattery = object.data.alarm.lowBattery.toString()                             
             lowTemp = object.data.alarm.lowTemp.toString()
-            highTemp = object.data.alarm.highTemp.toString() 
-            lowHumidity = object.data.alarm.lowHumidity.toString()       
-            highHumidity = object.data.alarm.highHumidity.toString()               
+            highTemp = object.data.alarm.highTemp.toString()
             battery = parent.batterylevel(object.data.battery) 
             temperatureScale = object.data.mode.toUpperCase()
-            alertInterval = object.data.interval 
-            temperature = parent.convertTemperature(temperature)
-            humidity = object.data.humidity
+            temperature = object.data.temperature
             firmware = object.data.version           
             signal = object.data.loraInfo.signal    
-          
+        
+            temperature = parent.convertTemperature(temperature)
+            temperature = (temperature.toDouble() + state.tempCorrection.toDouble()).round(1)
+            
+            lowHumidity = object.data.alarm.lowHumidity.toString()       
+            highHumidity = object.data.alarm.highHumidity.toString()
+            humidity = object.data.humidity        
+            humidity = (humidity.toDouble() + state.humidityCorrection.toDouble()).round(1)
+
+        
+            alarmState(temperature,state.tempLimitMin,state.tempLimitMax,humidity,state.humidityLimitMin,state.humidityLimitMax)
+
             rememberState("online","true")   
-            rememberState("state",devstate)               
             rememberState("lowBattery",lowBattery)  
             rememberState("lowTemp",lowTemp)        
-            rememberState("highTemp",highTemp)
+            rememberState("highTemp",highTemp)            
+            rememberState("battery",battery)    
+            rememberState("temperatureScale",temperatureScale)
+            rememberState("temperature",temperature,temperatureScale)  
+            rememberState("firmware",firmware)        
+            rememberState("signal",signal)
+        
             rememberState("lowHumidity",lowHumidity)
             rememberState("highHumidity", highHumidity)
-            rememberState("battery",battery)    
-            rememberState("temperatureScale",temperatureScale)            
-            rememberState("alertInterval",alertInterval)
-            rememberState("temperature",temperature,temperatureScale)         
             rememberState("humidity",humidity)
-            rememberState("firmware",firmware)        
-            rememberState("signal",signal)        
                
             logDebug("State(${devstate}), " +
                      "Firmware(${firmware}), " +
@@ -377,14 +394,13 @@ def parseDevice(object, source) {
                      "Low Battery(${lowBattery}), " +
                      "Low Temp:(${lowTemp}), " +
                      "Hight Temp(${highTemp}), " +   
-                     "Low Humidity(${lowHumidity}), " +
-                     "High Humidity(${highHumidity}), " +
                      "Battery(${battery}), " + 
                      "Temperature Scale(${temperatureScale}), " + 
-                     "Alert Interval(${alertInterval}), " +             
-                     "Temperature(${temperature}), " + 
-                     "Humidity(${humidity})")                             
-			break;	
+                     "Temperature(${temperature}), " +
+                     "Low Humidity(${lowHumidity}), " +
+                     "High Humidity(${highHumidity}), " +
+                     "Humidity(${humidity})")      
+            break;
                 
 		default:
             log.error "Undefined data source ($source)"            
@@ -414,15 +430,14 @@ def void processStateData(payload) {
 		case "setAlarm":            
             def alertInterval = object.data.interval    
             def tempLimitMax = object.data.tempLimit.max
-            def tempLimitMin = object.data.tempLimit.min 
+            def tempLimitMin = object.data.tempLimit.min
+            def signal = object.data.loraInfo.signal
+
+            tempLimitMax = parent.convertTemperature(tempLimitMax)
+            tempLimitMin = parent.convertTemperature(tempLimitMin)
+
             def humidityLimitMax = object.data.humidityLimit.max
-            def humidityLimitMin = object.data.humidityLimit.min    
-            def signal = object.data.loraInfo.signal            
-    
-            if (temperatureScale == "F") {      
-                tempLimitMax = parent.celsiustofahrenheit(tempLimitMax)
-                tempLimitMin = parent.celsiustofahrenheit(tempLimitMin)            
-            }   
+            def humidityLimitMin = object.data.humidityLimit.min 
           
             logDebug("setAlarm: Alert Interval(${alertInterval}), " +
                      "Temp Limit Max(${tempLimitMax}), " + 
@@ -443,7 +458,14 @@ def void processStateData(payload) {
         case "Alert":                            
             parseDevice(object,"alert") 
             break;	 
-                
+
+        case "setCorrection":            
+            tempCorrection = object.data.tempCorrection
+            rememberState("tempCorrection",tempCorrection)
+            humidityCorrection = object.data.humidityCorrection
+            rememberState("humidityCorrection",humidityCorrection)
+			break;
+
 		case "Report":
             parseDevice(object,"report")
 			break;	
@@ -486,6 +508,12 @@ def alarmState(temperature,tempLimitMin,tempLimitMax,humidity,humidityLimitMin,h
         rememberState("highHumidity", "false")
     }
     
+    if (devstate == "alert") {        
+        rememberState("alarm", "both")
+    } else {
+        rememberState("alarm", "off")
+    }
+    
     rememberState("state",devstate)
 }
 
@@ -495,15 +523,7 @@ def reset(){
     state.remove("lowBattery")
     state.remove("lowTemp")
     state.remove("highTemp")
-    state.remove("lowHumidity")
-    state.remove("highHumidity")
-    state.remove("period")        //Remove, no longer supporting - was never defined in API
-    state.remove("code")          //Remove, no longer supporting - was never defined in API 
     state.remove("battery")
-    state.remove("humidity")
-    state.remove("humidityCorrection")
-    state.remove("humidityLimitMax")
-    state.remove("humidityLimitMin")
     state.remove("temperatureScale")
     state.remove("state")
     state.remove("tempCorrection")
@@ -511,7 +531,16 @@ def reset(){
     state.remove("tempLimitMin")
     state.remove("temperature")
     state.remove("online")
-    state.remove("mode")       
+    state.remove("mode")
+    state.remove("alertInterval")
+    state.remove("alarm")
+    
+    state.remove("humidity")
+    state.remove("lowHumidity")
+    state.remove("highHumidity")
+    state.remove("humidityCorrection")
+    state.remove("humidityLimitMax")
+    state.remove("humidityLimitMin")   
       
     poll(true)    
     
