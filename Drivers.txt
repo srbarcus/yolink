@@ -1,5 +1,5 @@
-CURRENTLY SUPPORTED
--------------------
+CURRENTLY TESTED AND SUPPORTED*
+------------------------------
 Hub 				(YS1603-UC)
 Speaker Hub 			(YS1604-UC)
 Fob 				(YS3604-UC)
@@ -26,7 +26,7 @@ Vibration Sensor		(YS7201-UC) - 09-18-2022
 Smart Outdoor Plug 		(YS6802-UC) - 09-27-2022
 Finger Device 			(YS4908-UC) - 09-29-2022
 
-
+* Other devices of the same "type" may work with these drivers, they just haven't been verified.
 
 NOT SUPPORTED
 -------------
