@@ -26,6 +26,7 @@
  *         - Update API return code translations  
  *  
  *  2.1.0: Add support for Smart Outdoor Plug (YS6802-UC/SH-18A)
+ *  2.1.1: Speed up execution
  */
 import groovy.json.JsonSlurper
 
@@ -42,7 +43,7 @@ definition(
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
-private def get_APP_VERSION() {return "2.1.0"}
+private def get_APP_VERSION() {return "2.1.1"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
@@ -113,7 +114,7 @@ def deviceList() {
 		    	input(name: "exposed", title:"", type: "enum", required:true,  description: "Click to choose", options:devices, multiple:true)
                 paragraph boldTitle ("")                
                 paragraph boldTitle ("")
-                paragraph boldTitle ("Note: Clicking 'Next' will create the selected devices and/or delete the deselected devices. This could take awhile if many selections are changed, please be patient.") 
+                paragraph boldTitle ("Note: Clicking 'Next' will create the selected devices and/or delete the deselected devices. This will take awhile if you have many devices, please be patient.") 
 		    }
 	    }
     }
@@ -171,24 +172,30 @@ def otherSettings() {
 			input "pollInterval", "enum", title:boldTitle("Select Polling Interval"), required: true, options:[1,2,5,10,15,30],defaultValue: 5
 		}        
         section(smallTitle("Remove associated Hubitat devices when this app is removed")) {
-			input "removeDevices", "enum", title:boldTitle("Remove Devices"), required: true, options:["True","False"],defaultValue: "True"             
+			input "removeDevices", "enum", title:boldTitle("Remove Devices"), required: true, options:["True","False"],defaultValue: "True" 
+            paragraph boldTitle ("")                
+            paragraph boldTitle ("")
+            paragraph boldRedTitle ("Click 'Next' to complete device setup and exit the app. Exiting this page any other way may cause devices to work improperly or not at all.") 
        	}
+        
 	}
 }
 
 def installed() {
-    log.info "${get_APP_NAME()} app installed."
-    syncTempScale()
-   	pollDevices()   
-    schedulePolling()
+    log.info "${get_APP_NAME()} app installed."    
+    runIn(2, refresh)
 }
 
 def updated() {
 	log.info "${get_APP_NAME()} app updated."    
-    syncTempScale()
-    pollDevices()   
-    schedulePolling()
+    runIn(2, refresh)
 }
+
+def refresh() {
+    syncTempScale()
+   	pollDevices()   
+    schedulePolling()
+}        
 
 def uninstalled() {    
     unschedule()
