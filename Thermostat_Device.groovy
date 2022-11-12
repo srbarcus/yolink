@@ -232,7 +232,7 @@ def internalPoll() {
  }
 
 def poll(force=null, internalPoll=null) {
-    if ((internalPoll == true) || (state.pollingOverride == "None")) {
+    if ((force == true) || (internalPoll == true) || (state.pollingOverride == "None")) {
         if (internalPoll == null) { logDebug("Running external poll") }
         if (force == null) {
           def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
