@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.1.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "Updated drivers for 'Temperature Sensor (YS8004-UC)' and Temperature Humidity Sensor (YS8003-UC):\n  - Add 'Alarm' capabilities (Any alert condition will set 'alarm' attribute to 'both', otherwise it'll be 'off'.\n  - Fix error where temperature is set to 'null' on an alert.\n  - Fix numerous alert processing errors.\n",
+    "releaseNotes": "Add drivers for 'Lock (YS7606-UC)', 'Thermostat (YS4002-UC)' and 'Sprinkler (YS4102-UC)\n  - Reduce wait time for completion of 'YoLink Service App'.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.0.1"
+            "version": "2.0.2"
         }
     ],
     "drivers": [
@@ -178,6 +178,30 @@
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
             "version": "1.0.0"
-        }
+        },
+	{
+	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",
+	    "name": "YoLink Lock Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Lock_Device.groovy",
+	    "required": false,
+	    "version": "2.0.0"
+	},
+	{
+	    "id": "b38aa0bd-37e7-460c-9504-eb4e33d45f9f",
+	    "name": "YoLink Sprinkler Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Sprinkler_Device.groovy",
+	    "required": false,
+	    "version": "2.0.0"
+	},
+	{
+	    "id": "880b2a87-8211-4639-8ccc-7116c32b7eba",
+	    "name": "YoLink Thermostat Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Thermostat_Device.groovy",
+	    "required": false,
+	    "version": "2.0.0"
+	 }
     ]
 }
