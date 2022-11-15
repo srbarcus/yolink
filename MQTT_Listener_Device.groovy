@@ -16,11 +16,12 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  * 
  *  2.0.1: Added temperatureScale(value) for service app compatabilty
+ *  2.0.2: Correct MQTT message error reporting
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
 
 metadata {
     definition (name: "YoLink MQTT Listener Device", namespace: "srbarcus", author: "Steven Barcus") {     	
@@ -148,8 +149,8 @@ def mqttClientStatus(String message) {
         try {
             log.info "Disconnecting from MQTT"    
             interfaces.mqtt.disconnect() // Guarantee we're disconnected            
-            if (state.API != "disconnected") {sendEvent(name:"API", value: "disconnected", isStateChange:true)}   
-            state.API = "disconnected"
+            if (state.MQTT != "disconnected") {sendEvent(name:"MQTT", value: "disconnected", isStateChange:true)}   
+            state.MQTT = "disconnected"
         }
         catch (e) {
         } 

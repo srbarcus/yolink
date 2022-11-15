@@ -27,6 +27,7 @@
  *  
  *  2.1.0: Add support for Smart Outdoor Plug (YS6802-UC/SH-18A)
  *  2.1.1: Speed up execution
+ *  2.1.2: Allow device driver to override temperation conversion scale
  */
 import groovy.json.JsonSlurper
 
@@ -43,7 +44,7 @@ definition(
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
-private def get_APP_VERSION() {return "2.1.1"}
+private def get_APP_VERSION() {return "2.1.2"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
@@ -303,15 +304,12 @@ def passMQTT(topic) {
     }    
 }
 
-def schedulePolling() {		
-    //Integer interval = (pollInterval) ? pollInterval.toInteger(): 5 // Default: Poll every 5 minutes    
+def schedulePolling() {		 
     def interval = (pollInterval) ? pollInterval.toString(): "5" // Default: Poll every 5 minutes    
         
     log.trace "Scheduling device polling for every ${interval} minutes"  
     
-    //def seconds = 60 * interval
     unschedule()
-    //runIn(seconds, pollDevices)  
     
     def pollIntervalCmd = interval.plus("Minutes")
     
@@ -670,11 +668,18 @@ def relayState(value) {
     }
 }  
 
-def convertTemperature(temperature) {
-    if (settings.temperatureScale == "F") {
+def convertTemperature(temperature, scale=null) {
+    def temperatureScale = scale ?: settings.temperatureScale
+    
+    if (temperatureScale == "F") {
         return celsiustofahrenheit(temperature).toDouble().round(1)        
-    } else {    
-        return temperature
+    } else { 
+        if (temperatureScale == "C") {
+            return temperature
+        } else {    
+            log.error "convertTemperature(): Temperature scale (${temperatureScale}) is invalid"
+            return "error"
+        }      
     }    
 }
 

@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.1.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "Add drivers for 'Lock (YS7606-UC)', 'Thermostat (YS4002-UC)' and 'Sprinkler (YS4102-UC)\n  - Reduce wait time for completion of 'YoLink Service App'.\n",
+    "releaseNotes": "- Add driver for 'Dimmer (YS5707-UC)'\n- Fix problem with incorrect temperature and/or humidity values when calibration is used\n- Fix with MQTT status reporting\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.0.2"
+            "version": "2.1.2"
         }
     ],
     "drivers": [
@@ -113,7 +113,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Temperature_Sensor_Device.groovy",
             "required": false,
-            "version": "2.0.2"
+            "version": "2.0.3"
         },
         {
             "id": "936452da-8a76-40e9-a1b1-b39579c08f03",
@@ -121,7 +121,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
             "required": false,
-            "version": "2.0.2"
+            "version": "2.0.3"
         },
         {
             "id": "379a9757-a79d-4584-9f64-61b0c32166f7",
@@ -153,7 +153,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MQTT_Listener_Device.groovy",
             "required": true,
-            "version": "2.0.1"
+            "version": "2.0.2"
         },
         {
             "id": "47acf80a-7244-410f-bdb1-0dbcfcdec984",
@@ -202,6 +202,14 @@
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Thermostat_Device.groovy",
 	    "required": false,
 	    "version": "2.0.0"
-	 }
+	 },
+	  {
+	    "id": "61ada6dd-d14e-48d9-a3ac-260930815745",
+	    "name": "YoLink Dimmer Device",
+            "namespace": "srbarcus",
+            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Dimmer_Device.groovy",
+            "required": false,
+            "version": "2.0.0"
+    }
     ]
 }
