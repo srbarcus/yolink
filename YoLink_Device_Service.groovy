@@ -29,7 +29,7 @@
  *  2.1.1: Speed up execution
  *  2.1.2: Allow device driver to override temperation conversion scale
  *  2.1.3: - Initialize MQTT listener whenever app is run
- *         - Correct problem with scheduling under minutes 
+ *         - Correct problem with scheduling under 5 minutes 
  */
 import groovy.json.JsonSlurper
 
@@ -287,8 +287,6 @@ def schedulePolling() {
     def seconds = interval.toInteger() * 60
         
     log.trace "Scheduling device polling for ${interval} minutes (${seconds} seconds)"  
-    
-    unschedule()
     
     runIn(seconds, pollDevices)     
 }
