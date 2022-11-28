@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.1.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Add driver for 'Dimmer (YS5707-UC)'\n- Fix problem with incorrect temperature and/or humidity values when calibration is used\n- Fix with MQTT status reporting\n",
+    "releaseNotes": "- Correct problem with YoLink Device Service not polling devices if the Poll Interval is set to less than 5 minutes.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.2"
+            "version": "2.1.3"
         }
     ],
     "drivers": [

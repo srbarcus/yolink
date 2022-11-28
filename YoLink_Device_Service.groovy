@@ -28,6 +28,8 @@
  *  2.1.0: Add support for Smart Outdoor Plug (YS6802-UC/SH-18A)
  *  2.1.1: Speed up execution
  *  2.1.2: Allow device driver to override temperation conversion scale
+ *  2.1.3: - Initialize MQTT listener whenever app is run
+ *         - Correct problem with scheduling under minutes 
  */
 import groovy.json.JsonSlurper
 
@@ -44,7 +46,7 @@ definition(
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
 
-private def get_APP_VERSION() {return "2.1.2"}
+private def get_APP_VERSION() {return "2.1.3"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
@@ -170,7 +172,7 @@ def otherSettings() {
 			input "temperatureScale", "enum", title:boldTitle("Select Temperature Scale"), required: true, options:["C","F"],defaultValue: "F"
 		}
 		section(smallTitle("Device polling interval in minutes")) {
-			input "pollInterval", "enum", title:boldTitle("Select Polling Interval"), required: true, options:[1,2,5,10,15,30],defaultValue: 5
+			input "pollInterval", "enum", title:boldTitle("Select Polling Interval"), required: true, options:[1,2,3,4,5,10,15,30],defaultValue: 5
 		}        
         section(smallTitle("Remove associated Hubitat devices when this app is removed")) {
 			input "removeDevices", "enum", title:boldTitle("Remove Devices"), required: true, options:["True","False"],defaultValue: "True" 
@@ -224,7 +226,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
     
     def failed = false
 
-	if(!dev) {
+	if (!dev) {
         def labelName = "YoLink $devtype - ${devname}"
             
 		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken")
@@ -272,15 +274,33 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
         }  
 	}
     
+    if ((dev) && (devtype == "MQTT Listener")) {
+           log.info "Initializing MQTT Listener Device"
+           dev.initialize()
+    }    
+    
     return newdni
 }
 
+def schedulePolling() {		 
+    def interval = (pollInterval) ? pollInterval.toString(): "5" // Default: Poll every 5 minutes 
+    def seconds = interval.toInteger() * 60
+        
+    log.trace "Scheduling device polling for ${interval} minutes (${seconds} seconds)"  
+    
+    unschedule()
+    
+    runIn(seconds, pollDevices)     
+}
+
 def pollDevices() {
+    schedulePolling()
+    
     def children= getChildDevices()
     children.each { 
        logDebug("Polling device ${it} (${it.deviceNetworkId})")
        it.poll()
-    }             
+    }  
 }
 
 def passMQTT(topic) {
@@ -302,18 +322,6 @@ def passMQTT(topic) {
     } else {             
         return false   
     }    
-}
-
-def schedulePolling() {		 
-    def interval = (pollInterval) ? pollInterval.toString(): "5" // Default: Poll every 5 minutes    
-        
-    log.trace "Scheduling device polling for every ${interval} minutes"  
-    
-    unschedule()
-    
-    def pollIntervalCmd = interval.plus("Minutes")
-    
-    "runEvery${pollIntervalCmd}"(pollDevices)       
 }
 
 private SpeakerHub() {    
