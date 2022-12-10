@@ -13,7 +13,7 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Fixed errors in poll()
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
@@ -21,11 +21,14 @@
  *  1.0.4: Fix donation URL
  *  1.0.5: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
+ *  2.0.1: - Fix problem with multiple actions on same button being ignored: Added Double-Tap and Tap Delay attributes
+ *         - Clean up code
+ *         - Remove temperature as it never changed
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Fob (YS3604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -33,24 +36,29 @@ preferences {
 }
 
 metadata {
+  //definition (name: "YoLink SmartRemoter Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {  // Implement in V2.0.2   
     definition (name: "YoLink SmartRemoter Device", namespace: "srbarcus", author: "Steven Barcus") {   
         capability "Polling"	
         capability "Battery"
-        capability "Temperature Measurement"
         capability "HoldableButton"
         capability "PushableButton"
         
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
+        command "hold", [[name:"Button",type:'ENUM', description:"Remote button to 'hold'", constraints:[1, 2, 3, 4]]]
+        command "push", [[name:"Button",type:'ENUM', description:"Remote button to 'push'", constraints:[1, 2, 3, 4]]]            
+        command "doubleTap", [[name:"Enable double-tapping",type:"ENUM", description:"Allow pressing or holding of the same button without using a different button first)", constraints:[true, false]]]  
+        command "tapDelay", [[name:"Minimum seconds between double-taps",type:"ENUM", description:"Minimum number of seconds between button pressing or holding same button if double-tapping is enabled", constraints:[0, 0.5, 1, 2, 5]]]  
+        command "debug", [[name:"Enable debugging",type:"ENUM", description:"Display debugging messages", constraints:[true, false]]] 
         command "reset"            
-        command "hold", ['integer']
-        command "push", ['integer']            
                  
         attribute "online", "String"
+        attribute "driver", "String"
         attribute "firmware", "String"  
         attribute "signal", "String" 
         attribute "lastResponse", "String" 
         attribute "remoteType", "String"         
         attribute "reportAt", "String"            
+        attribute "doubleTap", "String"  
+        attribute "tapDelay", "String" 
         }
    }
 
@@ -86,6 +94,8 @@ def installed() {
  }
 
 def updated() {
+    log.info "Driver updated - reseting device"
+    reset()
  }
 
 def uninstalled() {
@@ -93,54 +103,60 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
-    }    
-    
-    getDevicestate() 
-    state.lastPoll = now()    
+    logDebug("poll(${force})")
+
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+
+    if (force != null) {
+       logDebug("Forcing poll")
+       state.lastPoll = cur_time - min_interval
+    }
+
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else {
+       logDebug("Getting device state")
+       runIn(1,getDevicestate)
+       state.lastPoll = now()
+    }  
+ }
+
+def doubleTap(value) {    
+   logDebug("doubleTap(${value})")  
+   rememberState("doubleTap",value)                
+ }
+
+def tapDelay(value) {    
+   logDebug("tapDelay(${value})")  
+   rememberState("tapDelay",value)                
  }
 
 def push(button) {    
-   if (button.isNumber()) {
-      button = button.toInteger() 
-      if ((button >= 1) && (button <= 4)) { 
-          rememberState("pushed",button)                    
-          rememberState("action","pushed")
-      } else {
-          log.error "Specified button (${button}) is outside of allowable range of 1 to 4"
-      } 
-    } else {
-       log.error "Specified button (${button}) is non-numeric"
-    }    
+   def allow=honorTap() 
+   logDebug("Pushed(${button}), Allowed=$allow")
+   rememberState("pushed",button,null,allow)              
+   rememberState("action","pushed",null,allow)
  }
 
 def hold(button) {   
-   if (button.isNumber()) {
-      button = button.toInteger()  
-      if ((button >= 1) && (button <= 4)) { 
-          rememberState("held",button)
-          rememberState("action","held")
-      } else {
-          log.error "Specified button (${button}) is outside of allowable range of 1 to 4"
-      } 
-    } else {
-       log.error "Specified button (${button}) is non-numeric"
-    }     
+   def allow=honorTap() 
+   logDebug("Held(${button}), Allowed=$allow") 
+   rememberState("held",button,null,allow)           
+   rememberState("action","held",null,allow)
  }
 
 def connect() {
     establish_MQTT_connection(state.my_dni)
  }
 
-def temperatureScale(value) {
-    state.temperatureScale = value
- }
+def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
@@ -200,17 +216,13 @@ def parseDevice(object) {
    def online = object.data.online
     
    def battery = parent.batterylevel(object.data.state.battery)            
-   def temperature = object.data.state.devTemperature
-   def firmware = object.data.state.version   
-      
-   temperature = parent.convertTemperature(temperature)   
+   def firmware = object.data.state.version.toUpperCase()   
     
-   logDebug("Parsed: DeviceId=$devId, Battery=$battery, Temperature=$temperature, Report At=$reportAt, Firmware=$firmware, Online=$online")      
+   logDebug("Parsed: DeviceId=$devId, Battery=$battery, Report At=$reportAt, Firmware=$firmware, Online=$online")   
                 
    rememberState("online", "true")
    rememberState("battery", battery)
    rememberState("reportAt", reportAt)  
-   rememberState("temperature", temperature)   
    rememberState("firmware", firmware)   
 }   
 
@@ -237,13 +249,10 @@ def void processStateData(payload) {
             def button = object.data.event.keyMask 
             def action = object.data.event.type 
             def battery = parent.batterylevel(object.data.battery)
-            def firmware = object.data.version            
-            def temperature = object.data.devTemperature
+            def firmware = object.data.version.toUpperCase()            
             def signal = object.data.loraInfo.signal  
     
-            temperature = parent.convertTemperature(temperature)            
-               
-            logDebug("Parsed: DeviceId=$devId, Button=$button, Action=$action, Battery=$battery, Firmware=$firmware, Temperature=$temperature, Signal=$signal")
+            logDebug("Parsed: DeviceId=$devId, Button=$button, Action=$action, Battery=$battery, Firmware=$firmware, Signal=$signal")
             
             switch(button) {
 		        case "4":                      
@@ -256,19 +265,16 @@ def void processStateData(payload) {
             
             switch(action) {
                 case "Press":   
-                    rememberState("pushed",button)  
-                    rememberState("action","pushed")  
+                    push(button)
                     break;
-                case "LongPress":          
-                    rememberState("held",button)               
-                    rememberState("action","held")  
+                case "LongPress":    
+                    hold(button)
                     break;                  
 	        }
             
             rememberState("battery",battery)
             rememberState("firmware",firmware)  
-            rememberState("signal",signal)                                
-            rememberState("temperature",temperature)                                    
+            rememberState("signal",signal)                                                               
 		    break;           
 		                
 		default:
@@ -279,72 +285,30 @@ def void processStateData(payload) {
     }      
 }
 
-
-def setSwitch(setState) {
-   def params = [:] 
-   params.put("state", setState)    
-    
-   def request = [:] 
-   request.put("method", "Switch.setState")                
-   request.put("targetDevice", "${state.devId}") 
-   request.put("token", "${state.token}")     
-   request.put("params", params)       
- 
-   try {         
-        def object = parent.pollAPI(request, state.name, state.type)
-        def swState
-         
-        if (object) {
-            logDebug("setSwitch(): pollAPI() response: ${object}")  
-                              
-            if (successful(object)) {               
-                swState = parent.relayState(object.data.state)   
-                def signal = object.data.loraInfo.signal       
-                logDebug("Parsed: Switch=$swState, Signal=$signal")
-                rememberState("switch",swState)
-                rememberState("signal",signal)  
-                lastResponse("Switch ${swState}")     
-                               
-            } else {
-                swState = "unknown"
-                if (object.code == "000201") {  //Cannot connect to Device" 
-                   rememberState("switch","unknown")  
-                   rememberState("online","false")                    
-                   log.warn "Device '${state.name}' (Type=${state.type}) is offline"  
-                   lastResponse("Device is offline")     
-               }
-            }                     
-                                        
-            return swState							
-                
-	    } else { 			               
-            logDebug("setSwitch() failed")	
-            state.swState = "unknown"
-            sendEvent(name:"switch", value: state.swState, isStateChange:true)
-            lastResponse("setSwitch() failed")     
-        }     		
-	} catch (e) {	
-        log.error "setSwitch() exception: $e"
-        lastResponse("Error ${e}")     
-        state.swState = "unknown"
-        sendEvent(name:"switch", value: state.swState, isStateChange:true)  
-	} 
-} 
+def honorTap() {
+    def secsPassed = ((now()/1000) - (state.lastTap/1000))
+    def secsDelay = state.tapDelay
+    logDebug("Seconds between last press = $secsPassed, Delay=$secsDelay") 
+    if (((secsPassed.toBigDecimal() > secsDelay.toBigDecimal()) || (secsDelay==0)) && (state.doubleTap == "true")) {        
+      state.lastTap = now()    
+      return "true" 
+    } else {
+      return "false"
+    }
+}   
 
 def reset(){          
     state.debug = false
     state.remove("firmware")
-    state.remove("switch")
-    state.remove("delay_ch")
-    state.remove("delay_on")
-    state.remove("delay_off")    
-    state.remove("power")
-    state.remove("watt")   
-    state.remove("time")  
-    state.remove("tzone")   
-    state.remove("signal")    
-    state.remove("PowerOnState")
-    state.remove("online")      
+    state.remove("online")     
+    state.remove("battery")  
+    state.remove("doubleTap")       
+    state.remove("tapDelay")      
+    
+    doubleTap("true")
+    rememberState("tapDelay",1)
+    
+    state.lastTap = now()
         
     poll(true)    
         
@@ -355,8 +319,8 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value,unit=null) {   
-   if (state."$name" != value) {
+def rememberState(name, value, unit=null, force=false) {
+   if ((state."$name" != value) || (force=="true")) {
      state."$name" = value   
      value=value.toString()
      if (unit==null) {  

@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.1.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Correct problem with YoLink Device Service not polling devices if the Poll Interval is set to less than 5 minutes.\n",
+    "releaseNotes": "Updates to Fob Driver:\n- Correct problem with multiple presses of same button not working.\n- Added 'Double Tap' setting to allow pressing or holding of the same button without using a different button first\n- Added 'Tap Delay' setting to allow specification of minimum number of seconds between button pressing or holding of same button if double-tapping is enabled\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -81,7 +81,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SmartRemoter_Device.groovy",
             "required": false,
-            "version": "2.0.0"
+            "version": "2.0.1"
         },
         {
             "id": "b015e789-7c86-46fc-bb0f-a85989f2166f",
