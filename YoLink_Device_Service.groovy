@@ -750,7 +750,7 @@ def pollAPI(body, name=null, type=null){
             log.error "pollAPI() HTTP request timed out"
             log.error "Request: $Params"
             retry = retry - 1
-	    } catch(Exception ex) {
+	    } catch(Exception e) {
             log.error "pollAPI() Exception: $e"
             log.error "Request: $Params"
             retry = -1 // Don't retry
