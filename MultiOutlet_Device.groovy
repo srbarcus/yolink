@@ -13,7 +13,7 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *  1.0.2: Set switch state to "unknown" if unable to connect to device and remove "error" message in log.
@@ -24,11 +24,12 @@
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
  *  2.1.0: Add child devices for each outlet and USB ports
  *  2.1.1: Add preference "AllowMixed" to allow 'Mixed' state if some outlets are on and some are off (original behavior). Default is "false": If one or more outlets "on", then switch = "on", else switch = "off"  
+ *  2.1.2: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.1.1"}
+def clientVersion() {return "2.1.2"}
 
 preferences {
     input title: "Allow 'Mixed' switch state if some outlets are on and some are off", name: "AllowMixed", type: "bool", required: true, defaultValue: "false" 
@@ -37,12 +38,12 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink MultiOutlet Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink MultiOutlet Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"	
         capability "Outlet"
         capability "Switch"
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:[true, false]]] 
         command "reset" 
         
         command "usbPorts",[[name:"On or Off", type:"ENUM", description:"Desired state of USB ports", constraints:["on", "off"]]]
@@ -66,6 +67,8 @@ metadata {
         command "outlet4Delays", ["String"]                   
         
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"
         attribute "firmware", "String"  
         attribute "signal", "String"
         attribute "lastResponse", "String"         
@@ -121,7 +124,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
     
@@ -139,11 +142,19 @@ public def getSetup() {
     return setup
 }
 
-def installed() {    
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
+def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated"  
    logDebug("Allow Mixed: ${settings.AllowMixed}")
+   rememberState("driver", clientVersion())  
    setSwitchState()    
  }
 
@@ -152,24 +163,38 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
-    }    
+    logDebug("poll(${force})") 
     
-    getDevicestate() 
-    state.lastPoll = now()    
+    rememberState("driver", clientVersion())
+    
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+    
+    if (force != null) {
+       logDebug("Forcing poll")  
+       state.lastPoll = cur_time - min_interval
+    }
+    
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else { 
+       logDebug("Getting device state")  
+       runIn(1,getDevicestate)           
+       state.lastPoll = now() 
+    }    
  }
 
 def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value==true) {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -428,7 +453,7 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) {
-   def firmware = object.data.version
+   def firmware = object.data.version.toUpperCase()
    def signal = object.data.loraInfo.signal          
    
    def USB      = outletSwitch(object.data.state[0])
@@ -497,6 +522,8 @@ def setSwitchState() {
     def outlet3 = state.outlet3
     def outlet4 = state.outlet4
     
+    logDebug("Setting switch state: USB(${USB}), Outlet1(${outlet1}), Outlet2(${outlet2}), Outlet3(${outlet3}), Outlet4(${outlet4})")
+    
     if (settings.AllowMixed) { 
       if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
          rememberState("switch","off")
@@ -514,6 +541,8 @@ def setSwitchState() {
          rememberState("switch","on")
       }           
     }    
+    
+    logDebug("Switch state: ${state.switch}")
 }    
 
 def outletSwitch(state) {
@@ -611,9 +640,9 @@ def void processStateData(payload) {
                     
                   def weekdays = parent.scheduledDays(weekhex)
                     
-                  log.trace "Days of week: ${weekdays}"    
+                  logDebug("Days of week: ${weekdays}")
                   
-                  log.trace "schedule ${schedule}"                        
+                  logDebug("schedule ${schedule}")
                                                    
                   schedule = schedule.replaceAll(" week=${weekhex},"," days=[${weekdays}],")                                          
                   schedule = schedule.replaceAll(" index=${schedNum},","")                       
@@ -622,7 +651,7 @@ def void processStateData(payload) {
                   schedule = schedule.replaceAll("ch=","outlet=")  
                   
                   scheds++  
-                  log.trace "Schedule ${scheds}: ${schedule}"
+                  logDebug("Schedule ${scheds}: ${schedule}")
                   rememberState("schedule${scheds}",schedule)
                 } 
                 schedNum++
@@ -775,7 +804,10 @@ def setDelay(outlet, minuteson, minutesoff) {
 	} 
 }    
 
-def reset(){          
+def reset(){    
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware")
     state.remove("switch")
     state.remove("delay_ch")
@@ -787,7 +819,7 @@ def reset(){
     state.remove("tzone")   
     state.remove("signal")    
     state.remove("powerOnState")
-    state.remove("online")  
+    
     state.remove("LastResponse")      
     state.remove("USBports")
     state.remove("outlet1")
@@ -826,7 +858,7 @@ def reset(){
               
     poll(true)
    
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {
@@ -868,7 +900,7 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+   if (state.debug==true) {log.debug msg}
 }
 
 def removeSchedules() {

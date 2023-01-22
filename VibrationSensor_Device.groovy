@@ -13,17 +13,18 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Fix donation URL
  *  1.0.2: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
  *  2.0.1: Added "ShockSensor" capability: State "shock" - ENUM ["clear", "detected"] 
+ *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ VibrationSensor Device (YS7201-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -31,7 +32,7 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink VibrationSensor Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink VibrationSensor Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"				
 		capability "Battery"
         capability "Temperature Measurement"
@@ -43,6 +44,8 @@ metadata {
         
         attribute "API", "String" 
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "reportAt", "String"
         attribute "signal", "String" 
@@ -61,7 +64,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     	
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
 	    
@@ -79,10 +82,18 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def uninstalled() {
@@ -90,17 +101,33 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
-    }    
+    logDebug("poll(${force})")
     
-    getDevicestate() 
-    state.lastPoll = now()    
+    rememberState("driver", clientVersion())
+    
+    log.trace isSetup()
+
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+
+    if (force != null) {
+       logDebug("Forcing poll")
+       state.lastPoll = cur_time - min_interval
+    }
+
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else {
+       logDebug("Getting device state")
+       runIn(1,getDevicestate)
+       state.lastPoll = now()
+    }    
  }
 
 def temperatureScale(value) {
@@ -149,7 +176,7 @@ def getDevicestate() {
                noVibrationDelay = noVibrationDelay * 60    
                def sensitivity = object.data.state.sensitivity
                def devstate = object.data.state.state    
-               def firmware = object.data.state.version        
+               def firmware = object.data.state.version.toUpperCase()        
                     
                def motion = "active"                                 //ENUM ["inactive", "active"]
                if (devstate == "normal"){motion="inactive"} 
@@ -257,7 +284,7 @@ def void processStateData(payload) {
         case "Report":
 			def devstate = object.data.state                     
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version               
+            def firmware = object.data.version.toUpperCase()               
             def alertInterval = object.data.alertInterval    
             def noVibrationDelay = object.data.noVibrationDelay 
             noVibrationDelay = noVibrationDelay * 60  
@@ -311,11 +338,12 @@ def void processStateData(payload) {
 }
 
 def reset(){      
-    state.debug = false  
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware")     
     state.remove("battery")     
     state.remove("signal")  
-    state.remove("online")
     state.remove("reportAt")
     state.remove("motion")
     state.remove("shock")
@@ -326,7 +354,7 @@ def reset(){
     
     poll(true)
     
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {

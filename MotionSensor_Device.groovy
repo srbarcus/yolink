@@ -13,7 +13,7 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Fixed debug messages appearing when debug is off. Fixed poll()
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
@@ -24,11 +24,12 @@
  *  1.0.5: Fix donation URL
  *  1.0.6: Added getSetup()
  *  2.0.0: - Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
+ *  2.0.1: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -36,7 +37,7 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink MotionSensor Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink MotionSensor Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"				
 		capability "Battery"
         capability "Temperature Measurement"
@@ -46,6 +47,8 @@ metadata {
         command "reset" 
         
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "reportAt", "String"
         attribute "signal", "String" 
@@ -64,7 +67,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     	
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
 	    
@@ -82,10 +85,18 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def uninstalled() { 
@@ -93,17 +104,31 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
-    }    
+    logDebug("poll(${force})")
     
-    getDevicestate() 
-    state.lastPoll = now()    
+    rememberState("driver", clientVersion())
+
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+
+    if (force != null) {
+       logDebug("Forcing poll")
+       state.lastPoll = cur_time - min_interval
+    }
+
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else {
+       logDebug("Getting device state")
+       runIn(1,getDevicestate)
+       state.lastPoll = now()
+    }  
  }
 
 def temperatureScale(value) {
@@ -151,7 +176,7 @@ def getDevicestate() {
                def nomotionDelay = object.data.state.nomotionDelay               
                def sensitivity = object.data.state.sensitivity
                def devstate = object.data.state.state    
-               def firmware = object.data.state.version        
+               def firmware = object.data.state.version.toUpperCase()        
                     
                def motion = "active"                                 //ENUM ["inactive", "active"]
                if (devstate == "normal"){motion="inactive"} 
@@ -223,7 +248,7 @@ def void processStateData(payload) {
 		case "Alert": case "StatusChange":                           
 			def devstate = object.data.state                     
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version    
+            def firmware = object.data.version.toUpperCase()    
             def ledAlarm = object.data.ledAlarm    
             def alertInterval = object.data.alertInterval    
             def nomotionDelay = object.data.nomotionDelay    
@@ -249,7 +274,7 @@ def void processStateData(payload) {
         case "Report":
 			def devstate = object.data.state                     
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version    
+            def firmware = object.data.version.toUpperCase()    
             def ledAlarm = object.data.ledAlarm    
             def alertInterval = object.data.alertInterval    
             def nomotionDelay = object.data.nomotionDelay    
@@ -284,15 +309,16 @@ def void processStateData(payload) {
     }
 }
 
-def reset(){      
-    state.debug = false  
+def reset(){
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware") 
     state.remove("swState")
     state.remove("door")
     state.remove("alertType")  
     state.remove("battery")     
     state.remove("signal")  
-    state.remove("online")
     state.remove("reportAt")
     state.remove("alertInterval")
     state.remove("delay")             //Undocumented response   
@@ -301,7 +327,7 @@ def reset(){
     
     poll(true)
     
-    log.info "Device reset to default values"
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {

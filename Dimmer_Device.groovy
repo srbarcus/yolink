@@ -13,14 +13,18 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  2.0.0: Initial Release
+ *  2.0.1: - Eliminate non-essential getSchedules() call
+ *         - Correct unnecessary polling logic
+ *         - Improve error logging
+ *         - Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Dimmer (YS5707-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -28,13 +32,13 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink Dimmer Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink Dimmer Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"	
         capability "Switch"
         capability "SignalStrength"  //rssi 
         capability "SwitchLevel"
                                       
-        command "debug", [[name:"Debug Driver",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
+        command "debug", [[name:"Debug Driver",type:"ENUM", description:"Display debugging messages", constraints:[true, false]]]
         command "setLevel", [[name:"Brightness Level",type:"NUMBER", description:"Brightness level (0-100)"]]
         command "reset"   
         command "setTimer", [
@@ -44,6 +48,8 @@ metadata {
         command "cancelTimer"
         
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "rssi", "String"      
         attribute "lastResponse", "String" 
@@ -77,7 +83,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
     
@@ -95,10 +101,18 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def uninstalled() {
@@ -106,19 +120,33 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
+    logDebug("poll(${force})") 
+    
+    rememberState("driver", clientVersion())
+    
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+    
+    if (force != null) {
+       logDebug("Forcing poll")  
+       state.lastPoll = cur_time - min_interval
+    }
+    
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else { 
+       logDebug("Getting device state")  
+       if (getDevicestate()) {
+         runIn(1,getSchedules)           
+       }    
+       state.lastPoll = now() 
     }    
-    
-    getDevicestate() 
-    state.lastPoll = now()    
-    
-    runIn(1,getSchedules)
  }
 
 def temperatureScale(value) {}
@@ -257,12 +285,15 @@ def getDevicestate() {
 	} catch (groovyx.net.http.HttpResponseException e) {	
             rc = false                        
 			if (e?.statusCode == UNAUTHORIZED_CODE) { 
+                log.error "'Unauthorized' response from API request"
                 lastResponse("Unauthorized")                
             } else {
-                    lastResponse("Exception $e")                
-					logDebug("getDevices() Exception $e")
+				log.error "getDevicestate() Exception $e"
+                lastResponse("Exception $e")                
 			}            
 	}
+    
+    logDebug("getDevicestate() = ${rc}")
     
 	return rc
 }    
@@ -553,7 +584,10 @@ def parseSchedules(object) {
             }     
 }    
 
-def reset(){          
+def reset(){      
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware")
     state.remove("switch")    
     state.remove("timerOn")
@@ -561,7 +595,6 @@ def reset(){
     state.remove("timerBrightness")
     state.remove("rssi")    
     state.remove("powerOnState")
-    state.remove("online")  
     state.remove("LastResponse")  
     state.remove("schedules") 
     state.remove("schedule1")
@@ -574,7 +607,7 @@ def reset(){
 
     poll(true)
    
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {
@@ -616,5 +649,5 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+   if (state.debug==true) {log.debug msg}
 }

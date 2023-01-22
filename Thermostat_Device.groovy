@@ -13,14 +13,15 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  2.0.0: First Release
+ *  2.0.1: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Thermostat (YS4002-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -28,7 +29,7 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink Thermostat Device", namespace: "srbarcus", author: "Steven Barcus") {   
+    definition (name: "YoLink Thermostat Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {   
         capability "Initialize"
 		capability "Polling"	
         capability "Thermostat"
@@ -47,6 +48,8 @@ metadata {
         command "pollingOverride", [[name:"pollingOverride",type:"ENUM", description: "Device polling interval", constraints: ["None", "1 Minute", "2 Minutes", "3 Minutes", "4 Minutes", "5 Minutes", "10 Minutes", "15 Minutes", "30 Minutes"]]] 
         
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
         attribute "lastResponse", "String" 
@@ -177,7 +180,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
     
@@ -195,10 +198,18 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def initialize() {
@@ -232,23 +243,36 @@ def internalPoll() {
  }
 
 def poll(force=null, internalPoll=null) {
+    rememberState("driver", clientVersion())
+    
     if ((force == true) || (internalPoll == true) || (state.pollingOverride == "None")) {
-        if (internalPoll == null) { logDebug("Running external poll") }
-        if (force == null) {
-          def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	      def min_time = (now()-(min_interval * 1000))
-	      if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-             log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-             return     
-           } 
-        }    
+    logDebug("poll(${force})") 
+    if (internalPoll == null) { logDebug("Running external poll") }    
     
-        getDevicestate() 
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
     
-        runIn(2, getSchedules)    
+    if (force != null) {
+       logDebug("Forcing poll")  
+       state.lastPoll = cur_time - min_interval
+    }
     
-        state.lastPoll = now()    
-    }       
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else { 
+       logDebug("Getting device state")  
+       if (getDevicestate()) {
+         runIn(1,getSchedules)           
+       }    
+       state.lastPoll = now() 
+    }    
+    }
  }        
 
 def temperatureScale(value) {}
@@ -888,12 +912,13 @@ def convertTemp(temperature) {
 }
 
 def reset(){          
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware")
     state.remove("signal")    
-    state.remove("online")  
     state.remove("LastResponse")  
     state.remove("schedules") 
-
     state.remove("ecoMode")    
     
     state.remove("sundaywake")
@@ -1024,7 +1049,7 @@ def reset(){
     
     poll(true)
    
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {

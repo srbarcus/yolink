@@ -13,7 +13,7 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Fixed errors in poll()
  *  1.0.2: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
@@ -22,11 +22,15 @@
  *  1.0.4: Fix donation URL
  *  1.0.5: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
+ *  2.0.1: Define as SingleThreaded
+ *         - Removed delay_ch attribute - no useful since device on has a single channel
+           - Added delay_on attribute
+           - Change null delay_on or delay_off value to 0
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Valve (YS4909-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -34,23 +38,25 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink Manipulator Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink Manipulator Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"	
         capability "Valve"
         capability "Battery"   
                              
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]] 
         command "reset"
 
         command "open"                         
         command "close"  
         
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
         attribute "lastResponse", "String" 
   
-        attribute "delay_ch", "Number"     
+        attribute "delay_on", "Number"     
         attribute "delay_off", "Number"  
         attribute "openRemind", "Number"        
         attribute "time", "String"
@@ -73,7 +79,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)  
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
     
@@ -91,10 +97,18 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def uninstalled() {
@@ -102,24 +116,40 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
-    }    
+    logDebug("poll(${force})") 
     
-    getDevicestate() 
-    state.lastPoll = now()    
+    rememberState("driver", clientVersion())
+    
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+    
+    if (force != null) {
+       logDebug("Forcing poll")  
+       state.lastPoll = cur_time - min_interval
+    }
+    
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+    
+    logDebug("Last Poll:${lastPoll} Current Time:${cur_time} Run at:${min_time}")
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else { 
+       logDebug("Getting device state")  
+       runIn(1,getDevicestate)           
+       state.lastPoll = now() 
+    }      
  }
 
 def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -182,19 +212,20 @@ def getDevicestate() {
 def parseDevice(object) {
    def valve = object.data.state
    def battery = parent.batterylevel(object.data.battery)    
-   def delay_ch = object.data.delay.ch   
    def delay_on = object.data.delay.on  
    def delay_off = object.data.delay.off    
    def openRemind = object.data.openRemind   
-   def firmware = object.data.version
+   def firmware = object.data.version.toUpperCase()
    def time = object.data.time
    def tzone = object.data.tz
-   def signal = object.data.loraInfo.signal         
+   def signal = object.data.loraInfo.signal      
+   
+   if (delay_on == null) {delay_on = 0}
+   if (delay_off == null) {delay_off = 0}
                 
    rememberState("online", "true")
    rememberState("valve", valve)    
    rememberState("battery", battery) 
-   rememberState("delay_ch", delay_ch)
    rememberState("delay_on", delay_on) 
    rememberState("delay_off", delay_off)
    rememberState("openRemind", openRemind)   
@@ -234,13 +265,14 @@ def void processStateData(payload) {
 		    break;
             
 		case "setDelay":            
-            def delay_ch = object.data.delay.ch 
             def delay_on = object.data.delay.on   
             def delay_off = object.data.delay.off    
+            
+            if (delay_on == null) {delay_on = 0}
+            if (delay_off == null) {delay_off = 0}
        
-            logDebug("Parsed: Delay_ch=$delay_ch, Delay_on=$delay_on, Delay_off=$delay_off")      
+            logDebug("Parsed: Delay_on=$delay_on, Delay_off=$delay_off")      
                 
-            rememberState("delay_ch", delay_ch)
             rememberState("delay_on", delay_on)               
             rememberState("delay_off", delay_off)               
 			break;
@@ -352,13 +384,13 @@ def setValve(setState) {
 	} 
 }   
 
-def reset(){        
-    state.debug = false
-    state.remove("online")  
+def reset(){
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("LastResponse") 
     state.remove("firmware") 
     state.remove("battery")
-    state.remove("delay_ch")
     state.remove("delay_on")
     state.remove("delay_off")
     state.remove("openRemind")   
@@ -375,7 +407,7 @@ def reset(){
  
     poll(true)
    
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {
@@ -417,5 +449,5 @@ def pollError(object) {
 } 
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+   if (state.debug == "true") {log.debug msg}
 }

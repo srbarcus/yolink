@@ -13,16 +13,17 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Remove MQTT Connection to this device - device has no callbacks defined
  *  2.0.0: Sync version with reengineered app
  *  2.0.1: Added 'GarageDoorControl' capability to 'GarageDoor Device' driver. For this capabilityto work properly, the controller must be bound to the garage door sensor!
+ *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ GarageDoor Device (YS4906-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -31,7 +32,8 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink GarageDoor Device", namespace: "srbarcus", author: "Steven Barcus") {     
+    definition (name: "YoLink GarageDoor Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) { 
+        capability "Initialize"
 		capability "Polling"        
         capability "Momentary"
         capability "ContactSensor"
@@ -46,6 +48,9 @@ metadata {
         
         attribute "API", "String"
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
+        attribute "firmware", "String"
         attribute "signal", "String"
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String"         
@@ -60,7 +65,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
     
@@ -78,11 +83,22 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   rememberState("driver", clientVersion())  
  }
 
 def updated() {
+   rememberState("driver", clientVersion()) 
  }
+
+def initialize() {
+   rememberState("driver", clientVersion()) 
+   connect()
+}
 
 def uninstalled() {
    interfaces.mqtt.disconnect() // Guarantee we're disconnected
@@ -90,11 +106,13 @@ def uninstalled() {
  }
 
 def poll(force=null) { 
-   if (state.bound_devId != null) {check_MQTT_Connection()}
+   rememberState("driver", clientVersion()) 
+   if (state.bound_devId != null) {
+     runIn(1,check_MQTT_Connection) 
+   }
 }    
 
 def connect() {
- //establish_MQTT_connection(state.my_dni, state.homeID, state.devId)                                            //Establish MQTT connection to YoLink API for this device Removed v1.0.1
    if (state.bound_devId != null) {establish_MQTT_connection(bound_dni, state.bound_homeID, state.bound_devId)}  //Establish MQTT connection to YoLink API for bound device
  }
 
@@ -300,7 +318,7 @@ def mqttClientStatus(String message) {
     logDebug("mqttClientStatus(${message})")
 
     if (message.startsWith("Error:")) {
-        log.error "MQTT Error: ${message}"
+        log.error "MQTT ${message}"
 
         try {
             log.warn "Disconnecting from MQTT"    
@@ -308,6 +326,7 @@ def mqttClientStatus(String message) {
             rememberState("API","disconnected") 
         }
         catch (e) {
+            log.error ("mqttClientStatus() Exception: $e")	
         } 
     }
 }
@@ -338,7 +357,7 @@ def void processStateData(payload) {
 		case "Alert":            
 			def devstate = object.data.state           
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version    
+            def firmware = object.data.version.toUpperCase()    
             def signal = object.data.loraInfo.signal  
             
             def stateChangedAt = object.data.stateChangedAt
@@ -360,7 +379,7 @@ def void processStateData(payload) {
       case "Report":
             def devstate = object.data.state          
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version    
+            def firmware = object.data.version.toUpperCase()    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
             def signal = object.data.loraInfo.signal  
@@ -478,10 +497,12 @@ def formatTimestamp(timestamp){
     }    
 }
 
-def reset(){          
-    state.debug = false
+def reset(){   
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("API")
-    state.remove("online")  
+    state.remove("firmware")
     state.remove("signal")     
     state.remove("contact")
     rememberState("door","unknown") 
@@ -491,11 +512,15 @@ def reset(){
     
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     
+    rememberState("driver", clientVersion())
+    
     unbind()
         
     scan()
     
-    logDebug("Device reset to default values")
+    poll()
+    
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {

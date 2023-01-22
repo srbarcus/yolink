@@ -13,7 +13,7 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Removed undocumented parameters, "Period" and "Code"
  *         - Corrected event parsing causing "null" signal 
@@ -31,11 +31,12 @@
  *  2.0.2: Added 'Alarm' capability (status only)
  *  2.0.3: Added 'temperatureScale' command
  *         - Corrected incorrect values if calibrations were specified
+ *  2.0.4: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.4"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Temperature Humidity Sensor (YS8003-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -43,7 +44,7 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink THSensor Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink THSensor Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"				
 		capability "Battery"
         capability "TemperatureMeasurement"
@@ -55,6 +56,8 @@ metadata {
         command "reset"                  
               
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
         attribute "lastResponse", "String" 
@@ -85,7 +88,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId) 
     	
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
 	    
@@ -103,10 +106,18 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def uninstalled() {
@@ -114,17 +125,31 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
-    }    
+    logDebug("poll(${force})") 
     
-    getDevicestate() 
-    state.lastPoll = now()    
+    rememberState("driver", clientVersion())
+    
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+    
+    if (force != null) {
+       logDebug("Forcing poll")  
+       state.lastPoll = cur_time - min_interval
+    }
+    
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else { 
+       logDebug("Getting device state")  
+       runIn(1,getDevicestate)           
+       state.lastPoll = now() 
+    }    
  }
 
 def temperatureScale(value) {
@@ -222,7 +247,7 @@ def parseDevice(object, source) {
             tempLimitMax     = object.data.state.tempLimit.max
             tempLimitMin     = object.data.state.tempLimit.min 
             temperature      = object.data.state.temperature  
-            firmware         = object.data.state.version   
+            firmware         = object.data.state.version.toUpperCase()   
 
             humidity           = object.data.state.humidity 
             humidityCorrection = object.data.state.humidityCorrection
@@ -290,7 +315,7 @@ def parseDevice(object, source) {
             temperature = object.data.temperature
             tempLimitMax = object.data.tempLimit.max
             tempLimitMin = object.data.tempLimit.min
-            firmware = object.data.version   
+            firmware = object.data.version.toUpperCase()   
             signal = object.data.loraInfo.signal
 
             humidity = object.data.humidity
@@ -356,7 +381,7 @@ def parseDevice(object, source) {
             highTemp = object.data.alarm.highTemp.toString()
             battery = parent.batterylevel(object.data.battery) 
             temperature = object.data.temperature
-            firmware = object.data.version           
+            firmware = object.data.version.toUpperCase()           
             signal = object.data.loraInfo.signal    
         
             temperature = parent.convertTemperature(temperature,state.temperatureScale)
@@ -509,6 +534,9 @@ def alarmState(temperature,tempLimitMin,tempLimitMax,humidity,humidityLimitMin,h
 }
 
 def reset(){       
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware")
     state.remove("lowBattery")
     state.remove("lowTemp")
@@ -519,24 +547,22 @@ def reset(){
     state.remove("tempLimitMax")
     state.remove("tempLimitMin")
     state.remove("temperature")
-    state.remove("online")
     state.remove("mode")
     state.remove("alertInterval")
     state.remove("alarm")
 
-    rememberState(temperatureScale, parent.temperatureScale)
+    rememberState("temperatureScale", parent.temperatureScale)
     
     state.remove("humidity")
     state.remove("lowHumidity")
     state.remove("highHumidity")
     state.remove("humidityCorrection")
     state.remove("humidityLimitMax")
-    state.remove("humidityLimitMin")   
-    
+    state.remove("humidityLimitMin")    
       
     poll(true)    
     
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {

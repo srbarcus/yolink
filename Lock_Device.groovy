@@ -11,13 +11,16 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  *  
+ *  2.0.1: Added "driver" attribute and isSetup() for diagnostics
+ *         - Define as singleThreaded
+ *         - Added "PushableButton" capability for doorbell
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Lock Device (YS7606-UC,YUF-02BN) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -26,16 +29,20 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink Lock Device", namespace: "srbarcus", author: "Steven Barcus") {     
+    definition (name: "YoLink Lock Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     
 		capability "Polling"        
         capability "Lock"
         capability "Battery"
+        capability "PushableButton"
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
-        command "reset"        
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
+        command "reset"    
+        command "push"    
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
     
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
         attribute "lastResponse", "String"  
@@ -43,6 +50,7 @@ metadata {
         attribute "source", "String"
         attribute "user", "String"        
         attribute "doorbell", "String"
+        attribute "pushed", "String"
         attribute "passwordError", "String"
         }
  }
@@ -55,7 +63,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
     
@@ -73,10 +81,18 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def uninstalled() {
@@ -84,20 +100,32 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
+    logDebug("poll(${force})") 
+    
+    rememberState("driver", clientVersion())
+    
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+    
+    if (force != null) {
+       logDebug("Forcing poll")  
+       state.lastPoll = cur_time - min_interval
+    }
+    
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else { 
+       rememberState("passwordError", "false")  
+       logDebug("Getting device state")  
+       runIn(1,getDevicestate)           
+       state.lastPoll = now() 
     }    
-    
-    rememberState("doorbell", "false") 
-    rememberState("passwordError", "false") 
-    
-    getDevicestate() 
-    state.lastPoll = now()    
  }
 
 def temperatureScale(value) {}
@@ -121,7 +149,7 @@ def timestampFormat(value) {
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value=="true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -142,7 +170,19 @@ def lock () {
        }    
    }         
 }
-    
+
+def push() {
+   logDebug("Door bell rung")     
+   sendEvent(name:"doorbell", value: "true", isStateChange:true)                
+   sendEvent(name:"pushed", value: "1", isStateChange:true)
+   runIn(5,resetDoorbell) 
+}
+
+def resetDoorbell() {
+   logDebug("Door bell reset")     
+   sendEvent(name:"doorbell", value: "false", isStateChange:true)                
+}
+
 def unlock () {
   if (state.lock == "unlocked") { 
        lastResponse("Lock is already unlocked, request ignored")            
@@ -159,8 +199,6 @@ def unlock () {
 }      
 
 def getDevicestate() {
-    state.driver=clientVersion()
-    
 	logDebug("getDevicestate() obtaining device state")
     
 	boolean rc=false	//DEFAULT: Return Code = false   
@@ -254,6 +292,7 @@ def parseDevice(object) {
 }   
 
 def parseFetch(object) {
+   logDebug("parseFetch(${object})") 
    def online = object.data.online 
    def battery = object.data.state.battery        
    def lockset = object.data.state.rlSet   
@@ -277,11 +316,11 @@ def parseFetch(object) {
    rememberState("lockset", lockset)  
    rememberState("lock", lock)
    rememberState("timezone", timezone) 
-   rememberState("firmware", Firmware) 
-   rememberState("source", source)    
+   rememberState("firmware", firmware) 
+   rememberState("source", source)  
+   rememberState("alertType", alertType)  
    rememberState("user", user)   
 }  
-
 
 def parse(topic) {     
     logDebug("parse($topic)")    
@@ -290,7 +329,6 @@ def parse(topic) {
 
 def void processStateData(payload) {
     rememberState("online","true") 
-    rememberState("doorbell", "false") 
     rememberState("passwordError", "false") 
                    
     def object = new JsonSlurper().parseText(payload)    
@@ -360,8 +398,7 @@ def void processStateData(payload) {
             logDebug("Parsed: Battery=$battery, Lock=$lock, Source=$source, Alert Type=$alertType, User=$user, Signal=$signal")      
             
             if ((source == null) && (user == null) && (alertType=="bell")) {
-                logDebug("Door bell rung")     
-                sendEvent(name:"doorbell", value: "true", isStateChange:true)                
+                push()
             } else {    
                 rememberState("source", source) 
                 rememberState("user", user)   
@@ -463,12 +500,14 @@ def formatTimestamp(timestamp){
     }    
 }
 
-def reset(){          
-    state.debug = false
+def reset(){
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("lock")
     state.remove("eventTime")  
-    state.remove("signal")        
-    state.remove("online")  
+    state.remove("signal")  
+    state.remove("firmware") 
     state.remove("LastResponse")  
     state.remove("doorbell")
     state.remove("source")
@@ -481,7 +520,7 @@ def reset(){
 
     poll(true)
    
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {
@@ -523,5 +562,5 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+   if (state.debug == "true") {log.debug msg}
 }

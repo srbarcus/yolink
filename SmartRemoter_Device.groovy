@@ -24,11 +24,12 @@
  *  2.0.1: - Fix problem with multiple actions on same button being ignored: Added Double-Tap and Tap Delay attributes
  *         - Clean up code
  *         - Remove temperature as it never changed
+ *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Fob (YS3604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -51,7 +52,8 @@ metadata {
         command "reset"            
                  
         attribute "online", "String"
-        attribute "driver", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String" 
         attribute "lastResponse", "String" 
@@ -70,7 +72,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
     
@@ -88,12 +90,20 @@ public def getSetup() {
     return setup
 }
 
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
 def installed() {
+    log.info "Device Installed"
+    rememberState("driver", clientVersion())    
     rememberState("numberOfButtons",4)         
     rememberState("remoteType","FlexFob")  
  }
 
 def updated() {
+    log.info "Device Updated" 
+    rememberState("driver", clientVersion()) 
     log.info "Driver updated - reseting device"
     reset()
  }
@@ -104,6 +114,8 @@ def uninstalled() {
 
 def poll(force=null) {
     logDebug("poll(${force})")
+    
+    rememberState("driver", clientVersion())
 
     def lastPoll
     def cur_time = now()
@@ -298,9 +310,10 @@ def honorTap() {
 }   
 
 def reset(){          
-    state.debug = false
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware")
-    state.remove("online")     
     state.remove("battery")  
     state.remove("doubleTap")       
     state.remove("tapDelay")      
@@ -312,7 +325,7 @@ def reset(){
         
     poll(true)    
         
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {

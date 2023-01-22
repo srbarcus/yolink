@@ -13,25 +13,32 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  2.0.1: Added temperatureScale(value) for service app compatabilty
  *  2.0.2: Correct MQTT message error reporting
+ *  2.0.3: Reduce time returning from Poll()
+ *  2.0.4: Added "driver" attribute and isSetup() for diagnostics
+ *  2.0.5: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.5"}
 
 metadata {
-    definition (name: "YoLink MQTT Listener Device", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink MQTT Listener Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"				
         capability "Initialize"
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
         command "connect"                       // Attempt to establish MQTT connection 
         command "reset"
-
+        
+        attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"          
+        attribute "firmware", "String"
         attribute "MQTT", "String" 
         attribute "lastResponse", "String"
         }
@@ -46,7 +53,7 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {  //dev.Se
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId   
+    rememberState("devId", devId)   
     	
     log.debug "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
 	    
@@ -64,15 +71,23 @@ public def getSetup() {
     return setup
 }
 
-def installed() {   
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
+
+def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def initialize() {
    log.trace "Device initializing. Establishing MQTT connection to YoLink API" 
-   connect()      //Establish MQTT connection to YoLink API 
+   connect()           //Establish MQTT connection to YoLink API 
  }
 
 def uninstalled() {
@@ -81,12 +96,15 @@ def uninstalled() {
  }
 
 def poll() {
+  rememberState("driver", clientVersion())  
   def MQTT = interfaces.mqtt.isConnected()  
+  rememberState("online",MQTT) 
+  rememberState("driver", clientVersion())     
   logDebug("MQTT connection is ${MQTT}")  
   if (MQTT) {  
      rememberState("MQTT", "connected")     
-  } else {    
-     connect()      //Establish MQTT connection to YoLink API
+  } else {   
+     runIn(1,connect) //Establish MQTT connection to YoLink API
   }
  }
 
@@ -94,7 +112,7 @@ def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -103,7 +121,9 @@ def debug(value) {
 
 def connect() {
     interfaces.mqtt.disconnect()              // Guarantee we're disconnected  
-    establish_MQTT_connection(state.my_dni)
+    
+    def zigid = location.hub.zigbeeId
+    establish_MQTT_connection(zigid)
  }
 
 
@@ -137,6 +157,7 @@ def establish_MQTT_connection(mqtt_ID) {
     }
         
     rememberState("MQTT", MQTT)    
+    rememberState("online",interfaces.mqtt.isConnected())  
     lastResponse("API MQTT ${MQTT}")  
 }    
 
@@ -166,7 +187,7 @@ def parse(message) {  //CALLED BY MQTT
     if (parent.passMQTT(topic)) {
         logDebug("MQTT message passed successfully")
     } else {
-        log.error "MQTT message ${topic} - Failed to passing to device driver"
+        log.error "MQTT message ${topic} - Failed passing to device driver"
     }    
 }
 
@@ -182,15 +203,20 @@ def rememberState(name,value,unit=null) {
    }
 }   
 
-def reset(){      
-    state.debug = false  
+def reset(){    
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("message") 
     state.remove("MQTT")    
+    state.remove("firmware")
     state.remove("lastResponse")        
+    
+    rememberState("firmware","N/A")
     
     connect()
     
-    log.info "Device reset to default values"
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {
@@ -198,5 +224,5 @@ def lastResponse(value) {
 }
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+   if (state.debug == "true") {log.debug msg}
 }

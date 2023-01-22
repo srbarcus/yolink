@@ -13,18 +13,19 @@
  *  the Developer's written consent. Software Distribution is restricted and shall be done only with Developer's written approval.
  *
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  1.0.1: Fixed errors in poll()
  *  1.0.2: Add constraints to debug command
  *  1.0.3: def temperatureScale()
  *  1.0.4: Fix donation URL
  *  2.0.0: Sync version number with reengineered app due to new YoLink service restrictions
+ *  2.0.1: Support diagnostics, correct various errors, make singleThreaded
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Hub (YS1603-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -41,7 +42,7 @@ preferences {
 */
 
 metadata {
-    definition (name: "YoLink Hub Device", namespace: "srbarcus", author: "Steven Barcus") {     		
+    definition (name: "YoLink Hub Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     		
 		capability "Polling"						
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
@@ -50,6 +51,8 @@ metadata {
       //command "setWiFi"                       // As of 03-06-2022, was not supported by API    
         
         attribute "online", "String"
+        attribute "devId", "String"
+        attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String" 
         attribute "lastResponse", "String"
@@ -75,12 +78,16 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    state.devId = devId             
+    rememberState("devId", devId)            
     
 	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"
 	
     reset()       
  }
+
+public def isSetup() {
+    return (state.my_dni && state.homeID && state.name && state.type && state.token && state.devId)
+}
 
 public def getSetup() {
     def setup = [:]
@@ -94,28 +101,45 @@ public def getSetup() {
 }
 
 def installed() {
+   log.info "Device Installed"
+   rememberState("driver", clientVersion())    
  }
 
 def updated() {
+   log.info "Device Updated" 
+   rememberState("driver", clientVersion()) 
  }
 
 def uninstalled() {
- //interfaces.mqtt.disconnect() // Guarantee we're disconnected Removed v1.0.7
    log.warn "Device '${state.name}' (Type=${state.type}) has been uninstalled"     
  }
 
 def poll(force=null) {
-    if (force == null) {
-      def min_interval = 10                  // To avoid unecessary load on YoLink servers, limit rate of polling
-	  def min_time = (now()-(min_interval * 1000))
-	  if ((state?.lastPoll) && (state?.lastPoll > min_time)) {
-         log.warn "Polling interval of once every ${min_interval} seconds exceeded, device was not polled."	    
-         return     
-       } 
-    }    
+    logDebug("poll(${force})") 
     
-    getDevicestate() 
-    state.lastPoll = now()    
+    rememberState("driver", clientVersion())
+    
+    def lastPoll
+    def cur_time = now()
+    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+    def min_interval = min_seconds * 1000    // Convert to milliseconds
+    
+    if (force != null) {
+       logDebug("Forcing poll")  
+       state.lastPoll = cur_time - min_interval
+    }
+    
+    lastPoll = state.lastPoll
+
+    def min_time = lastPoll + min_interval
+
+    if (cur_time < min_time ) {
+       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+    } else { 
+       logDebug("Getting device state")  
+       runIn(1,getDevicestate)           
+       state.lastPoll = now() 
+    }       
  }
 
 def temperatureScale(value) {}
@@ -173,7 +197,7 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) {
-    def firmware = object.data.version
+    def firmware = object.data.version.toUpperCase()
     def wifi_ssid = object.data.wifi.ssid                    
     def wifi_enabled = object.data.wifi.enable                             
     def wifi_ip = object.data.wifi.ip  
@@ -239,15 +263,16 @@ void setWiFi() {
 }   
 */
 
-def reset(){          
-    state.debug = false  
+def reset(){
+    state.remove("driver")
+    rememberState("driver", clientVersion()) 
+    state.remove("online")
     state.remove("firmware") 
     state.remove("swState")
     state.remove("door")
     state.remove("alertType")  
     state.remove("battery")     
     state.remove("signal")  
-    state.remove("online")
     state.remove("reportAt")
     state.remove("alertInterval")
     state.remove("delay")           
@@ -255,7 +280,7 @@ def reset(){
 
     poll(true)    
     
-    logDebug("Device reset to default values")
+    log.warn "Device reset to default values"
 }
 
 def lastResponse(value) {
