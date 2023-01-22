@@ -104,8 +104,6 @@ def poll(force=null) {
     logDebug("poll(${force})")
     
     rememberState("driver", clientVersion())
-    
-    log.trace isSetup()
 
     def lastPoll
     def cur_time = now()
