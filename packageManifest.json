@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Corrects problem with devices no longer being polled after Hubitat reboot.\n- Adds Push Button functionality to Lock to support automation of doorbell button push.\n- Adds ability for user to use app to collect diagnostic information from drivers to help developer diagnose problems.\n- Numerous minor driver fixes.\n",
+    "releaseNotes": "- Suppresses numerous 'Request was unauthorized. ...' warning messages.\n- Adds a small delay between polling of individual devices to reduce load on Hubs.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.4"
+            "version": "2.1.5"
         }
     ],
     "drivers": [

@@ -32,11 +32,16 @@
  *         - Correct problem with scheduling under 5 minutes 
  *  2.1.4: Allow collection of diagnostic information
  *         - Correct problem with devices not being polled after hub reboot
+ *  2.1.5: Correct numerous 'Request was unauthorized. Attempting to refreshing access token and re-poll API.' messages
+ *         - Add 500ms delay between polling of next device to reduce load on Hubs
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
+
+private def get_APP_VERSION() {return "2.1.5"}
+private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
     name: "YoLink™ Device Service",
@@ -50,9 +55,6 @@ definition(
     iconX2Url: "${getImagePath()}yolink.png",
     importUrl: "https://github.com/srbarcus/yolink/edit/main/YoLink_Device_Service.groovy"
 )
-
-private def get_APP_VERSION() {return "2.1.4"}
-private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 preferences {
 	page(name: "about", title: "About", nextPage: "credentials") 
@@ -451,6 +453,7 @@ def pollDevices() {
     children.each { 
        logDebug("Polling device ${it} (${it.deviceNetworkId})")
        it.poll()
+       pauseExecution(500) 
     }  
 }
 
@@ -732,11 +735,11 @@ def pollAPI(body, name=null, type=null){
             if (e?.statusCode) { 
 			    if (e?.statusCode == UNAUTHORIZED()) { 
                     if (retry>0) {
-				      log.warn "Request was unauthorized. Attempting to refreshing access token and re-poll API."
-                      refreshAuthToken()                   
-                      retry = retry - 1
+                      retry = retry - 1  
+                      logDebug('Request was unauthorized. Attempting to refreshing access token and re-poll API, Retries=${retry}')  
+                      refreshAuthToken()                                         
                     } else {          
-                      log.error "Retry failed, final error status code: $e.statusCode"
+                      log.error "Request was unauthorized. Attempt to refreshing access token and re-poll API failed. Final error status code: $e.statusCode"
                       log.error "Request: $Params"  
                       retry = -1 // Don't retry
                     } 
