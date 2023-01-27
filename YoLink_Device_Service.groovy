@@ -34,13 +34,14 @@
  *         - Correct problem with devices not being polled after hub reboot
  *  2.1.5: Correct numerous 'Request was unauthorized. Attempting to refreshing access token and re-poll API.' messages
  *         - Add 500ms delay between polling of next device to reduce load on Hubs
+ *  2.1.6: Add support for Leak Sensor 3 (YS7904-UC)
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.5"}
+private def get_APP_VERSION() {return "2.1.6"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(

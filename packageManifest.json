@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.5"
+            "version": "2.1.6"
         }
     ],
     "drivers": [
@@ -129,7 +129,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor_Device.groovy",
             "required": false,
-            "version": "2.0.2"
+            "version": "2.0.3"
         },
         {
             "id": "4b9b002b-7319-4ba3-b14c-8d9096feeafe",
