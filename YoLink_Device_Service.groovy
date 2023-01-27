@@ -147,7 +147,7 @@ def deviceList() {
 	    dynamicPage(name: "deviceList", title: sectionTitle("$devicesCount devices found. Select the devices you want available to Hubitat"), uninstall: false) {
     		section(""){
 	    		paragraph "Click below to see the list of devices available in your YoLink home"
-		    	input(name: "exposed", title:"", type: "enum", required:true,  description: "Click to choose", options:devices, multiple:true)
+		    	input(name: "exposed", title:"", type: "enum",  description: "Click to choose", options:devices, multiple:true)
                 paragraph boldTitle ("")                
                 paragraph boldTitle ("")
                 paragraph boldTitle ("Note: Clicking 'Next' will create the selected devices and/or delete the deselected devices. This will take awhile if you have many devices, please be patient.") 
@@ -157,15 +157,17 @@ def deviceList() {
 }
 
 def diagnostics() {    
-    int devicesCount=exposed.size()  
-    log.info "$devicesCount devices were selected"
-        
     getGeneralInfo()	
     
-    def Keep_Hubitat_dni 
-    
+    def Keep_Hubitat_dni = ""
     int countNewChildDevices = 0   
+    int devicesCount= 0
     
+    if (exposed) {devicesCount=exposed.size()}
+        
+    log.info "$devicesCount devices were selected"
+    
+    if (devicesCount > 0 ) {
     exposed.each { dni ->                   
                     def devname = state.deviceName."${dni}"
                     def devtype = state.deviceType."${dni}"
@@ -188,6 +190,7 @@ def diagnostics() {
     def Hubitat_dni = "yolink_${devtype}_${devId}"
     Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
     if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}  
+    }    
        
     def children= getChildDevices()
 	children.each { 
@@ -364,18 +367,25 @@ def uninstalled() {
 }
 
 private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) { 	
+    def drivername = devtype
+        
     if (devtype == "THSensor") {
       log.info "$devname is a THSensor, determining device's capabilities..."  
-      devtype = getTHSensorDriver(devname,devtype,devtoken,devId) 	
-    }        
+      drivername = getTHSensorDriver(devname,devtype,devtoken,devId) 	
+    }   
+    
+    if (devtype == "LeakSensor") {
+      log.info "$devname is a LeakSensor, determining device's capabilities..."  
+      drivername = getLeakSensorDriver(devname,devtype,devtoken,devId) 	
+    }   
     
     if (devtype == "MultiOutlet") {
       log.info "$devname is a MultiOutlet, determining device's capabilities..."  
-      devtype = getMultiOutletDriver(devname,devtype,devtoken,devId) 	
+      drivername = getMultiOutletDriver(devname,devtype,devtoken,devId) 	
     }   
    
     def newdni = Hubitat_dni
-    def drivername = getYoLinkDriverName("$devtype")     
+    drivername = getYoLinkDriverName("$drivername")     
         
 	def dev = allChildDevices.find {it.deviceNetworkId.contains(newdni)}	
     
@@ -384,7 +394,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
 	if (!dev) {
         def labelName = "YoLink $devtype - ${devname}"
             
-		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken")
+		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken, Driver = $drivername")
         
         try {
            dev = addChildDevice("srbarcus", drivername, newdni, null, [label:"${labelName}"])
@@ -1007,7 +1017,48 @@ def getTHSensorDriver(name,type,token,devId) {
 	}
     
 	return driver
-}    
+}  
+
+// Devices YoLink™ LeakSensor (YS7903-UC) and YoLink™ LeakSensor3 (YS7904-UC) are both reported as "LeakSensor"
+// If the device doesn't support 'supportChangeMode' then it's a YS7903-UC
+def getLeakSensorDriver(name,type,token,devId) {
+    def driver = "LeakSensor"
+	try {  
+        def request = [:]
+            request.put("method", "LeakSensor.getState")                   
+            request.put("targetDevice", "${devId}") 
+            request.put("token", "${token}") 
+        
+        def object = pollAPI(request, name, type)
+         
+        if (object) {
+            logDebug("getLeakSensorDriver()> pollAPI() response: ${object}")     
+            
+            if (object.code == "000000") {             
+                def supportChangeMode = object.data.state.supportChangeMode                            
+                                
+                if (supportChangeMode == true) {  
+                    log.info "$name appears to be a LeakSensor3 (YS7904-UC) sensor."
+                    driver = "LeakSensor3"
+                } else {
+                    log.info "$name appears to be a LeakSensor (YS7903-UC) sensor."
+                }    
+            } else {  //Error
+                log.error "API polling returned error: $object.code - " + translateCode(object.code)               
+            }     
+        } else {
+            log.error "No response from API request"
+        } 
+	} catch (groovyx.net.http.HttpResponseException e) {	
+            if (e?.statusCode == UNAUTHORIZED_CODE) { 
+                log.error("getLeakSensorDriver() - Unauthorized Exception")
+            } else {
+				log.error("getLeakSensorDriver() - Exception $e")
+			}                 
+	}
+    
+	return driver
+}  
 
 // YoLink™ MultiOutlet (YS6801-UC) and Smart Outdoor Plug (YS6802-UC/SH-18A) are both reported as "MultiOutlet"
 // If device only returns delays on 2 channels (0 and 1), assume it's a Smart Outdoor Plug 

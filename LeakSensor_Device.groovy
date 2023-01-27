@@ -24,11 +24,14 @@
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
  *  2.0.1: Added correct state ('water') for WaterSensor capability - fixes dashboard errors. Remove unused setSwitch() routine.
  *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.3: - Support Switch capability via alerts and alertThreshold
+ *         - Clean up code
+ *         - Add SignalStrength capability (Replaces 'signal' attribute with standard 'rssi')
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ LeakSensor (YS7903-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -42,32 +45,27 @@ metadata {
         capability "WaterSensor"                //water - ENUM ["wet", "dry"]
         capability "TemperatureMeasurement"
         capability "Battery"
+        capability "Switch"                     //switch - ENUM ["on", "off"] 
+        capability "SignalStrength"             //rssi 
               
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]   
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]   
         command "reset"
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
-
-      //command "interval", ['integer']                                                                                                  // Not supported? Get device connection error
-      //command "beep", [[name:"beep",type:"ENUM", description:"Beep when device alerts", constraints:["True", "False"]]]                // Not supported
-      //command "mode", [[name:"mode",type:"ENUM", description:"Mode for leak sensor", constraints:["WaterPeak","WaterLeak"]]]           // Not supported
-      //command "sensitivity", [[name:"sensitivity",type:"ENUM", description:"Sensitivity of leak sensor", constraints:["low","high"]]]  // Not supported
+        command "alertThreshold", [[name:"alertThreshold",type:"NUMBER", description:"Number of successive alerts before switch state is set to 'on'"]]
                 
         attribute "online", "String"
         attribute "devId", "String"
         attribute "driver", "String"  
         attribute "firmware", "String"  
-        attribute "signal", "String"
+        attribute "rssi", "String"
         attribute "lastResponse", "String" 
         
         attribute "interval", "integer"
-      //attribute "beep", "String"              - Not supported
-      //attribute "mode", "String"              - Supported, but irrelevant since can't be changed
-      //attribute "sensitivity", "String"       - Not supported
-      //attribute "supportChangeMode", "String" - Not supported   
         attribute "state", "String"  
         attribute "stateChangedAt", "String"  
-     
-        attribute "reportAt", "String"        
+        
+        attribute "alerts", "integer"
+        attribute "alertThreshold", "integer"
         }
  }
 
@@ -143,6 +141,26 @@ def poll(force=null) {
     }  
  }
 
+def alertThreshold(alertThreshold) {
+   alertThreshold = alertThreshold.toInteger() 
+    
+   if (alertThreshold <= 0) {
+       alertThreshold = 1
+   } 
+    
+   rememberState("alertThreshold", alertThreshold)
+   
+   def alerts = state.alerts ?: 0
+      
+   if (alerts.toInteger() < alertThreshold) {
+       reqState = "off"
+   } else {
+       reqState = "on"
+   }   
+    
+  rememberState("switch", reqState)    
+ }
+
 def temperatureScale(value) {
     state.temperatureScale = value
  }
@@ -164,63 +182,19 @@ def timestampFormat(value) {
      } 
  }
 
+def on() {off()}
+def off() {log.info "Switch command is non-functional for this device type."}
+                     
 def debug(value) { 
-    def bool = parent.validBoolean("debug",value)
-    
-    if (bool != null) {
-        if (bool) {
-            state.debug = true
-            log.info "Debugging enabled"
-        } else {
-            state.debug = false
-            log.info "Debugging disabled"
-        }   
-    }        
+   rememberState("debug",value)
+   if (value=="true") {
+     log.info "Debugging enabled"
+   } else {
+     log.info "Debugging disabled"
+   }    
 }
-
-/* Setting of params through API appears to not be supported as always returns "Device offline" error
-def setParam(value) {
-   //params.interval	<Number,Optional>	Interval (in minutes) for continuous alarm.
-   //params.beep	<Boolean,Optional>	Weather to enable beep when device alerts
-   //params.sensorMode	<String,Optional>	Work mode for leak sensor,["WaterPeak":"WaterLeak"]
-   //params.sensitivity	<String,Optional>	Sensitivity for leak sensor,["low","high"]
-
-   def params = [:]   
-   //params.put("sensitivity", value.toInteger())   
-   params.put("sensitivity", value) 
-    
-   def request = [:] 
-   request.put("method", "LeakSensor.setSettings")                
-   request.put("targetDevice", "${state.devId}") 
-   request.put("token", "${state.token}")     
-   request.put("params", params)       
- 
-   try {         
-        def object = parent.pollAPI(request, state.name, state.type)
-        def swState
-         
-        if (object) {
-            logDebug("setOption(): pollAPI() response: ${object}")  
-                              
-            if (successful(object)) {                               
-                logDebug("setOption() was successful")               
-                
-            } else {
-                pollError(object)  
-            }                         						
-                
-	    } else { 			               
-            logDebug("setOption() failed")	            
-        }     		
-	} catch (e) {	
-        log.error "setOption() exception: $e" 
-	} 
-}
-*/
 
 def getDevicestate() {
-    state.driver=clientVersion()
-    
 	logDebug("getDevicestate() obtaining device state")
     
 	boolean rc=false	//DEFAULT: Return Code = false   
@@ -269,30 +243,23 @@ def parseDevice(object) {
    def battery = parent.batterylevel(object.data.state.battery)   
    def temperature = object.data.state.devTemperature      
    def interval = object.data.state.interval      
-   def mode = object.data.state.sensorMode                        //Supported, but irrelevant since can't be changed
    def swState = object.data.state.state
    def stateChangedAt = object.data.state.stateChangedAt
-   def supportChangeMode = object.data.state.supportChangeMode    //Supported, but irrelevant since always false
    def firmware = object.data.state.version.toUpperCase()
-   def reportAt = object.data.reportAt
        
    temperature = parent.convertTemperature(temperature) 
    stateChangedAt = formatTimestamp(stateChangedAt) 
-   swState = contactState(swState)    
      
-   logDebug("Parsed: Online=$online, State=$swState, Battery=$battery, Temperature=$temperature, Alert Interval=$interval, Mode=$mode, Firmware=$firmware, State Changed At=$stateChangedAt, Support Change Mode=$supportChangeMode, Reported at=$reportAt")      
+   logDebug("Parsed: Online=$online, State=$swState, Battery=$battery, Temperature=$temperature, Alert Interval=$interval, Firmware=$firmware, State Changed At=$stateChangedAt")      
                 
    rememberState("online", online)
    rememberState("state", swState)
-   rememberState("water", swState) 
+   rememberState("water", waterState(swState)) 
    rememberState("battery", battery)
    rememberState("temperature", temperature) 
    rememberState("interval", interval)
    rememberState("stateChangedAt", stateChangedAt) 
    rememberState("firmware", firmware)
-   rememberState("reportAt", reportAt)                        
- //rememberState("mode", mode)    
- //rememberState("supportChangeMode", supportChangeMode)      
 }   
 
 def parse(topic) {     
@@ -316,45 +283,44 @@ def void processStateData(payload) {
         switch(event) {
 		case "setInterval":
             def interval = object.data.interval      
-            def mode = object.data.sensorMode                        //Supported, but irrelevant since can't be changed   
-            def signal = object.data.loraInfo.signal             
+            def rssi = object.data.loraInfo.signal             
     
-            logDebug("Parsed: Interval=$interval, Mode=$mode, Signal=$signal")
+            logDebug("Parsed: Interval=$interval, RSSI=$rssi")
             
             rememberState("online", "true")
             rememberState("interval",interval)
-         // rememberState("mode",mode)
-            rememberState("signal",signal)                          
+            rememberState("rssi",rssi) 
  		    break;
             
         case "Report":     
-            def interval = object.data.interval 
-            rememberState("interval", "interval")
         case "StatusChange":     
   		case "Alert":
-            def mode = object.data.sensorMode                        //Supported, but irrelevant since can't be changed
+            if (event == "Report") {
+              def interval = object.data.interval 
+              rememberState("interval", interval)
+            }    
+            
             def swState = object.data.state
             def battery = parent.batterylevel(object.data.battery) 
             def firmware = object.data.version.toUpperCase()
             def temperature = object.data.devTemperature   
-            def signal = object.data.loraInfo.signal             
+            def rssi = object.data.loraInfo.signal  
             def stateChangedAt = object.data.stateChangedAt
        
             temperature = parent.convertTemperature(temperature) 
             stateChangedAt = formatTimestamp(stateChangedAt) 
-            swState = contactState(swState)
-            
-            logDebug("Parsed: Mode=$mode, State=$swState, Battery=$battery, Temperature=$temperature, Firmware=$firmware, State Changed At=$stateChangedAt, Signal=$signal")      
+                        
+            logDebug("Parsed: State=$swState, Battery=$battery, Temperature=$temperature, Firmware=$firmware, State Changed At=$stateChangedAt, RSSI=$rssi")      
                 
             rememberState("online", "true")
             rememberState("state", swState)
-            rememberState("water", swState)
+            if ((event == "Alert") || (event == "StatusChange"))  {rememberState("water", waterState(swState,"alert"))
+            } else {rememberState("water", waterState(swState))}
             rememberState("battery", battery)
             rememberState("firmware", firmware)
             rememberState("temperature", temperature) 
-            rememberState("signal", signal)
+            rememberState("rssi", rssi)
             rememberState("stateChangedAt", stateChangedAt)                     
-          //rememberState("mode", mode)    
           
 			break;
             
@@ -366,17 +332,51 @@ def void processStateData(payload) {
     }      
 }
 
-def contactState(value) {
-   if (value == "alert") {
-        return "wet"
-   } else {
-       if (value == "normal") {
-           return "dry"    
-       } else {    
-           return "unknown"    
-       }
-   }    
-}    
+def waterState(value,alert=null) {
+   switch(value) {
+		case "alert":
+             alertCount("on",alert)
+             return "wet"
+        case "normal":     
+             alertCount("off",alert)
+             return "dry"      
+        case "dry":        
+             alertCount("off",alert)
+             return "dry" 
+        case "wet":        
+             alertCount("on",alert)
+             return "wet" 
+		default:
+            log.error "Unknown water state received: $value"
+            return value 
+			break;
+	    }  
+  }   
+
+def alertCount(swState, alert) {     
+    def reqState = swState
+    
+    def alerts = state.alerts ?: 0
+    def alertThreshold = state.alertThreshold ?: 1
+    
+    alerts = alerts.toInteger()
+    alertThreshold = alertThreshold.toInteger()
+    
+    if (alert == "alert") {
+      if (swState == "on") {           
+         alerts = alerts + 1  
+         if (alerts < alertThreshold) {reqState = "off"}
+      } else {
+         alerts = 0
+      }
+    }   
+  
+  logDebug("alertCount($swState, $alert) $reqState, Alerts=$alerts, Threshold=$alertThreshold")  
+    
+  rememberState("alerts", alerts)
+  rememberState("alertThreshold", alertThreshold)     
+  rememberState("switch", reqState)   
+}       
 
 def formatTimestamp(timestamp){    
     if (state.timestampFormat != null) {
@@ -399,15 +399,15 @@ def reset(){
     state.remove("temperature")
     state.remove("interval")
     state.remove("firmware")
-    state.remove("reportAt")
+    state.remove("rssi")
     state.remove("stateChangedAt")
     
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     
-  //state.remove("beep")               - Not Supported
-  //state.remove("mode")               - Supported, but irrelevant since can't be changed
-  //state.remove("sensitivity")        - Not Supported 
-  //state.remove("supportChangeMode")  - Supported, but irrelevant since always false   
+    state.remove("alerts")
+    rememberState("alerts", 0) 
+    state.remove("alertThreshold")
+    rememberState("alertThreshold", 1) 
 
     poll(true)
    
@@ -432,7 +432,7 @@ def rememberState(name,value,unit=null) {
 }   
 
 def successful(object) {
-  return (object.code  == "000000")     
+  return (object.code == "000000")     
 }    
 
 def notConnected(object) {
@@ -454,5 +454,5 @@ def pollError(object) {
 } 
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+   if (state.debug == "true") {log.debug msg}
 } 

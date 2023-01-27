@@ -29,6 +29,7 @@ Lock Device                     (YS7606-UC) - 11-12-2022
 Thermostat                      (YS4002-UC) - 11-12-2022
 Sprinkler                       (YS4102-UC) - 11-12-2022
 Dimmer                          (YS5707-UC) - 11-14-2022
+Leak Sensor                     (YS7904-UC) - 01/26/2023
 
 
 * Other devices of the same "type" may work with these drivers, they just haven't been verified.

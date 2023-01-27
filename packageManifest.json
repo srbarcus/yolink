@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Suppresses numerous 'Request was unauthorized. ...' warning messages.\n- Adds a small delay between polling of individual devices to reduce load on Hubs.\n",
+    "releaseNotes": "- Update app and add new driver to support LeakSensor3 YS7904-UC\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -203,13 +203,21 @@
 	    "required": false,
 	    "version": "2.0.1"
 	 },
-	  {
+	 {
 	    "id": "61ada6dd-d14e-48d9-a3ac-260930815745",
 	    "name": "YoLink Dimmer Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Dimmer_Device.groovy",
             "required": false,
             "version": "2.0.1"
-    }
+	 },
+	 {
+	    "id": "68ca0b13-982e-4d46-8412-ad4ec1800df6",
+	    "name": "YoLink LeakSensor3 Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor3_Device.groovy",
+	    "required": false,
+	    "version": "2.0.0"
+	 }
     ]
 }
