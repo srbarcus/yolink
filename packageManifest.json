@@ -160,7 +160,7 @@
             "name": "YoLink MultiOutlet Outlet",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
-            "required": false,
+            "required": true,
             "version": "1.0.0"
         },
         {
