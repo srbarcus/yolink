@@ -90,15 +90,7 @@
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
             "required": false,
             "version": "2.0.1"
-        },
-        {
-            "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",
-            "name": "YoLink MultiOutlet Device",
-            "namespace": "srbarcus",
-            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
-            "required": false,
-            "version": "2.1.3"
-        },
+        },       
         {
             "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
             "name": "YoLink Siren Device",
@@ -218,6 +210,14 @@
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor3_Device.groovy",
 	    "required": false,
 	    "version": "2.0.0"
-	 }
+	 },
+	 {
+            "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",
+            "name": "YoLink MultiOutlet Device",
+            "namespace": "srbarcus",
+            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
+            "required": false,
+            "version": "2.1.3"
+         }
     ]
 }
