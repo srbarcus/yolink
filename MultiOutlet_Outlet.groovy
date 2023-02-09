@@ -1,4 +1,4 @@
-/***http://192.168.1.240/driver/downloadFull/1385
+/***
  *  YoLink™ MultiOutlet Outlet - Allows individual outlet control of a MultiOutlet Device via a Dashboard 
  *  © 2022 Steven Barcus 
  *   
