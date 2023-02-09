@@ -14,11 +14,15 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  *  
  *  1.0.1: Support diagnostics, correct various errors, make singleThreaded
+ *  1.0.2: - Corrented problem with parsing of device's MQTT vs bound device's MQTT
+ *         - Replaced "Signal" with "RSSI" per standards and added capability "SignalStrength"
+ *         - Added capability "Momentary"
+ *         - Added warnings for "open" and "close" if no bound device
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.1"}
+def clientVersion() {return "1.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Finger Device (YS4908-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -30,8 +34,10 @@ metadata {
     definition (name: "YoLink Finger Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) { 
         capability "Initialize"
 		capability "Polling"        
+        capability "Momentary"
         capability "ContactSensor"
         capability "GarageDoorControl"
+        capability "SignalStrength"        
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection
@@ -44,7 +50,8 @@ metadata {
         attribute "online", "String"
         attribute "devId", "String"
         attribute "driver", "String"  
-        attribute "signal", "String"
+        attribute "firmware", "String"
+        attribute "rssi", "String"
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String"         
         }
@@ -102,7 +109,7 @@ def uninstalled() {
 def poll(force=null) { 
    rememberState("driver", clientVersion())
     
-   if (state.bound_devId != null) {
+   if (boundToDevice()) {
      runIn(1,check_MQTT_Connection) 
    }
 }    
@@ -148,12 +155,11 @@ def scan() {
 
 def bind(sensorid) {
   if (!sensorid) {  
-      if (state.bound_devId == null) {
-          log.error "Device ID to be bound was not specified"
+      if (boundToDevice()) {
+        unbind()                          // Unbind current switch sensor
+        interfaces.mqtt.disconnect()      // Guarantee we're disconnected            
       } else {    
-          unbind()                          // Unbind current switch sensor
-          interfaces.mqtt.disconnect()      // Guarantee we're disconnected            
-        //connect()                         // Reconnect to API Cloud  Removed v1.0.1
+        log.error "Device ID to be bound was not specified"
       }    
     return  
   }     
@@ -234,7 +240,7 @@ def bind(sensorid) {
   if (state.API == "connected") {  
      msg = "Controller bound to device '$bound'"
      lastResponse(msg)
-     logDebug(msg) 
+     log.info msg 
   } else {
      def msg = "Controller failed to bind to device '$bound'" 
      lastResponse(msg)
@@ -268,8 +274,10 @@ def debug(value) {
    }    
 }
 
+def boundToDevice() {(state.bound_devId != null)}
+
 def check_MQTT_Connection() {
-  if (state.bound_devId != null) {  
+  if (boundToDevice()) {  
       def MQTT = interfaces.mqtt.isConnected()  
       logDebug("MQTT connection is ${MQTT}")  
       if (MQTT) {  
@@ -326,12 +334,53 @@ def mqttClientStatus(String message) {
     }
 }
 
-def parse(message) {  
-    def topic = interfaces.mqtt.parseMessage(message)
-    def payload = new JsonSlurper().parseText(topic.payload)
-    logDebug("parse(${payload})")
+def parse(message) {        // Internal MQTT parsing of bound device
+    logDebug("parse(Object) ${message}")
+    def topic
+    
+    try {     
+		  topic = interfaces.mqtt.parseMessage(message)
+          def payload = new JsonSlurper().parseText(topic.payload)
+          logDebug("Processing Bound Device MQTT message")
+          processStateData(topic.payload)
+        
+	    } catch (Exception e) {	
+          logDebug("Processing YoLink MQTT message")
+		  parseTopic(message)
+	    }  
+}
 
-    processStateData(topic.payload)
+def parseTopic(message) {     // Parent MQTT parsing of finger device
+    logDebug("parseTopic(${message})")
+    
+    rememberState("online","true") 
+    
+    def object = new JsonSlurper().parseText(message.payload)    
+    def event = object.event.replace("Finger.","")
+    logDebug("Received Message Type: ${event}")
+        
+    switch(event) {
+      case "Report":
+      case "setState":  
+            def devstate = object.data.state          
+            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
+            def firmware = object.data.version.toUpperCase()    
+            def rssi = object.data.loraInfo.signal  
+            
+            rememberState("contact",contact)
+            rememberState("battery",battery)
+            rememberState("firmware",firmware)
+            rememberState("rssi",rssi)      
+        
+            logDebug("Parse Status: State=${contact}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
+        
+		    break;              
+              
+		default:
+            log.error "Unknown event received: $event"
+            log.error "Message received: ${payload}"
+			break;
+	    }
 }
 
 def void processStateData(payload) {
@@ -353,7 +402,7 @@ def void processStateData(payload) {
 			def devstate = object.data.state           
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
-            def signal = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal  
             
             def stateChangedAt = object.data.stateChangedAt
                          
@@ -365,7 +414,7 @@ def void processStateData(payload) {
             rememberState("door",contact)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
-            rememberState("signal",signal)      
+            rememberState("rssi",rssi)      
             rememberState("stateChangedAt",stateChangedAt)
             
             lastResponse("Garage door is ${contact}")
@@ -377,7 +426,7 @@ def void processStateData(payload) {
             def firmware = object.data.version.toUpperCase()    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
-            def signal = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal  
                                         
             def contact = devstate 
             
@@ -388,17 +437,17 @@ def void processStateData(payload) {
             rememberState("firmware",firmware)
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("signal",signal)      
+            rememberState("rssi",rssi)      
 		    break;              
             
         case "setOpenRemind":    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
-            def signal = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal  
     
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("signal",signal)                  
+            rememberState("rssi",rssi)                  
             break;	    
             
 		default:
@@ -410,20 +459,44 @@ def void processStateData(payload) {
 }
 
 def close() {
-    if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
-      push()
-      rememberState("door","closing")    
+    if (boundToDevice()) {
+        if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
+          toggle()
+          rememberState("door","closing")    
+        }    
+    } else {
+        log.error "No bound device, use 'push' to toggle finger."         
     }    
 }
 
 def open() {    
-   if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
-      push()
-      rememberState("door","opening")  
-    }    
+   if (boundToDevice()) { 
+       if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
+         toggle()
+         rememberState("door","opening")  
+       }
+   } else {
+        log.error "No bound device, use 'push' to toggle finger."
+   } 
 }
 
-def push() {
+def push(button) {    
+    if (boundToDevice()) { 
+       if (state.door == "closed") {  
+         rememberState("door","opening")  
+       } else {
+           if (state.door == "open") {  
+             rememberState("door","closing")  
+           }    
+       }    
+   } else {
+       rememberState("door","unknown")
+   } 
+
+   toggle()
+}
+
+def toggle() {
    def request = [:]    
    request.put("method", "${state.type}.toggle")   
    request.put("targetDevice", "${state.devId}") 
@@ -437,13 +510,13 @@ def push() {
                               
             if (successful(object)) {        
                   def stateChangedAt = object.data.stateChangedAt
-                  def signal = object.data.loraInfo.signal       
+                  def rssi = object.data.loraInfo.signal       
                 
                   stateChangedAt = formatTimestamp(stateChangedAt)
                 
-                  logDebug("Parsed: stateChangedAt=$stateChangedAt, Signal=$signal")
+                  logDebug("Parsed: stateChangedAt=$stateChangedAt, RSSI=$rssi")
                   rememberState("stateChangedAt",stateChangedAt)
-                  rememberState("signal",signal)
+                  rememberState("rssi",rssi)
                   rememberState("online","true")                    
                   lastResponse("Success")     
                                
@@ -469,6 +542,8 @@ def push() {
 
 def unbind() {
     log.warn "Unbinding contact sensor: ${state.bound_name} "
+    lastResponse("Unbound from contact sensor: ${state.bound_name}") 
+    
     state.remove("bound_dni")  
     state.remove("bound_homeID")  
     state.remove("bound_name")  
@@ -476,6 +551,9 @@ def unbind() {
     state.remove("bound_token")  
     state.remove("bound_devId") 
     state.remove("contact")
+    
+    rememberState("door","unknown")
+    rememberState("contact","unknown") 
     
     interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
     rememberState("API", "not bound")  
@@ -497,7 +575,8 @@ def reset(){
     rememberState("driver", clientVersion()) 
     state.remove("online")
     state.remove("API")
-    state.remove("signal")     
+    state.remove("firmware")    
+    state.remove("rssi")     
     state.remove("contact")
     rememberState("door","unknown") 
     state.remove("stateChangedAt")

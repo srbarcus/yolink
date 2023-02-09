@@ -19,11 +19,14 @@
  *  2.0.0: Sync version with reengineered app
  *  2.0.1: Added 'GarageDoorControl' capability to 'GarageDoor Device' driver. For this capabilityto work properly, the controller must be bound to the garage door sensor!
  *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.3: - Corrented problem with parsing of device's MQTT vs bound device's MQTT
+ *         - Replaced "Signal" with "RSSI" per standards and added capability "SignalStrength"
+ *         - Added warnings for "open" and "close" if no bound device
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ GarageDoor Device (YS4906-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -38,6 +41,7 @@ metadata {
         capability "Momentary"
         capability "ContactSensor"
         capability "GarageDoorControl"
+        capability "SignalStrength"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         command "connect"                       // Attempt to establish MQTT connection
@@ -51,7 +55,7 @@ metadata {
         attribute "devId", "String"
         attribute "driver", "String"  
         attribute "firmware", "String"
-        attribute "signal", "String"
+        attribute "rssi", "String"
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String"         
         }
@@ -239,7 +243,7 @@ def bind(sensorid) {
   if (state.API == "connected") {  
      msg = "Controller bound to device '$bound'"
      lastResponse(msg)
-     logDebug(msg) 
+     log.info msg  
   } else {
      def msg = "Controller failed to bind to device '$bound'" 
      lastResponse(msg)
@@ -273,8 +277,10 @@ def debug(value) {
    }    
 }
 
+def boundToDevice() {(state.bound_devId != null)}
+
 def check_MQTT_Connection() {
-  if (state.bound_devId != null) {  
+  if (boundToDevice()) {  
       def MQTT = interfaces.mqtt.isConnected()  
       logDebug("MQTT connection is ${MQTT}")  
       if (MQTT) {  
@@ -331,12 +337,53 @@ def mqttClientStatus(String message) {
     }
 }
 
-def parse(message) {  
-    def topic = interfaces.mqtt.parseMessage(message)
-    def payload = new JsonSlurper().parseText(topic.payload)
-    logDebug("parse(${payload})")
+def parse(message) {        // Internal MQTT parsing of bound device
+    logDebug("parse(Object) ${message}")
+    def topic
+    
+    try {     
+		  topic = interfaces.mqtt.parseMessage(message)
+          def payload = new JsonSlurper().parseText(topic.payload)
+          logDebug("Processing Bound Device MQTT message")
+          processStateData(topic.payload)
+        
+	    } catch (Exception e) {	
+          logDebug("Processing YoLink MQTT message")
+		  parseTopic(message)
+	    }  
+}
 
-    processStateData(topic.payload)
+def parseTopic(message) {     // Parent MQTT parsing of GarageDoor device
+    logDebug("parseTopic(${message})")
+    
+    rememberState("online","true") 
+    
+    def object = new JsonSlurper().parseText(message.payload)    
+    def event = object.event.replace("GarageDoor.","")
+    logDebug("Received Message Type: ${event}")
+        
+    switch(event) {
+      case "Report":
+      case "setState":  
+            def devstate = object.data.state          
+            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
+            def firmware = object.data.version.toUpperCase()    
+            def rssi = object.data.loraInfo.signal  
+            
+            rememberState("contact",contact)
+            rememberState("battery",battery)
+            rememberState("firmware",firmware)
+            rememberState("rssi",rssi)      
+        
+            logDebug("Parsed Status: State=${contact}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
+        
+		    break;              
+              
+		default:
+            log.error "Unknown event received: $event"
+            log.error "Message received: ${payload}"
+			break;
+	    }
 }
 
 def void processStateData(payload) {
@@ -358,7 +405,7 @@ def void processStateData(payload) {
 			def devstate = object.data.state           
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
-            def signal = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal  
             
             def stateChangedAt = object.data.stateChangedAt
                          
@@ -370,7 +417,7 @@ def void processStateData(payload) {
             rememberState("door",contact)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
-            rememberState("signal",signal)      
+            rememberState("rssi",rssi)      
             rememberState("stateChangedAt",stateChangedAt)
             
             lastResponse("Garage door is ${contact}")
@@ -382,7 +429,7 @@ def void processStateData(payload) {
             def firmware = object.data.version.toUpperCase()    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
-            def signal = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal  
                                         
             def contact = devstate 
             
@@ -393,17 +440,17 @@ def void processStateData(payload) {
             rememberState("firmware",firmware)
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("signal",signal)      
+            rememberState("rssi",rssi)      
 		    break;              
             
         case "setOpenRemind":    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
-            def signal = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal  
     
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("signal",signal)                  
+            rememberState("rssi",rssi)                  
             break;	    
             
 		default:
@@ -415,20 +462,44 @@ def void processStateData(payload) {
 }
 
 def close() {
-    if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
-      push()
-      rememberState("door","closing")    
+    if (boundToDevice()) {
+        if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
+          toggle()
+          rememberState("door","closing")    
+        }    
+    } else {
+        log.error "No bound device, use 'push' to toggle garage door."         
     }    
 }
 
 def open() {    
-   if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
-      push()
-      rememberState("door","opening")  
-    }    
+   if (boundToDevice()) { 
+       if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
+         toggle()
+         rememberState("door","opening")  
+       }
+   } else {
+        log.error "No bound device, use 'push' to toggle garage door."
+   } 
 }
 
-def push() {
+def push(button) {    
+    if (boundToDevice()) { 
+       if (state.door == "closed") {  
+         rememberState("door","opening")  
+       } else {
+           if (state.door == "open") {  
+             rememberState("door","closing")  
+           }    
+       }    
+   } else {
+       rememberState("door","unknown")
+   } 
+
+   toggle()
+}
+
+def toggle() {
    def request = [:]    
    request.put("method", "${state.type}.toggle")   
    request.put("targetDevice", "${state.devId}") 
@@ -442,13 +513,13 @@ def push() {
                               
             if (successful(object)) {        
                   def stateChangedAt = object.data.stateChangedAt
-                  def signal = object.data.loraInfo.signal       
+                  def rssi = object.data.loraInfo.signal       
                 
                   stateChangedAt = formatTimestamp(stateChangedAt)
                 
-                  logDebug("Parsed: stateChangedAt=$stateChangedAt, Signal=$signal")
+                  logDebug("Parsed: stateChangedAt=$stateChangedAt, RSSI=$rssi")
                   rememberState("stateChangedAt",stateChangedAt)
-                  rememberState("signal",signal)
+                  rememberState("rssi",rssi)
                   rememberState("online","true")                    
                   lastResponse("Success")     
                                
@@ -503,7 +574,7 @@ def reset(){
     state.remove("online")
     state.remove("API")
     state.remove("firmware")
-    state.remove("signal")     
+    state.remove("rssi")     
     state.remove("contact")
     rememberState("door","unknown") 
     state.remove("stateChangedAt")

@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Update app and add new driver to support LeakSensor3 YS7904-UC\n",
+    "releaseNotes": "- Enhance behavior and status of Garage Door and Finger Devices.\n- Rename 'MultiOutlet Outlet Driver' to 'YoLink MultiOutlet Outlet Driver' for naming consistency.\n- Force installation of 'YoLink MultiOutlet Outlet Driver' to prevent problems with devices that depend on it.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -97,7 +97,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
             "required": false,
-            "version": "2.1.2"
+            "version": "2.1.3"
         },
         {
             "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
@@ -145,7 +145,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/GarageDoor_Device.groovy",
             "required": false,
-            "version": "2.0.2"
+            "version": "2.0.3"
         },
         {
             "id": "a5a51abf-a8d7-43f7-8bc2-3f674a2f66a5",
@@ -161,7 +161,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
             "required": true,
-            "version": "1.0.0"
+            "version": "1.0.1"
         },
         {
             "id": "a248278d-ec49-4cdc-a616-2cdebb8c203f",
@@ -169,7 +169,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Smart_Outdoor_Plug_Device.groovy",
             "required": false,
-            "version": "1.0.1"
+            "version": "1.0.2"
         },
         {
             "id": "dc9415dd-c81c-42dd-b42e-4962ac9aed1a",
@@ -177,7 +177,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
-            "version": "1.0.1"
+            "version": "1.0.2"
         },
 	{
 	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",
