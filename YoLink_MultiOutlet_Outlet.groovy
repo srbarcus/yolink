@@ -14,12 +14,12 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  *  
- *  1.0.1: Replaces "MultiOutlet Outlet" with "YoLink MultiOutlet Outlet" driver for naming consistency
+ *  1.0.0: Replaces "MultiOutlet Outlet" with "YoLink MultiOutlet Outlet" driver for naming consistency
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.1"}
+def clientVersion() {return "1.0.0"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ MultiOutlet Outlet v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"

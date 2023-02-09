@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Update app and add new driver to support LeakSensor3 YS7904-UC\n",
+    "releaseNotes": "- Enhance behavior and status of Garage Door and Finger Devices.\n- Rename 'MultiOutlet Outlet Driver' to 'YoLink MultiOutlet Outlet Driver' for naming consistency.\n- Force installation of 'YoLink MultiOutlet Outlet Driver' to prevent problems with devices that depend on it.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -90,15 +90,7 @@
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
             "required": false,
             "version": "2.0.1"
-        },
-        {
-            "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",
-            "name": "YoLink MultiOutlet Device",
-            "namespace": "srbarcus",
-            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
-            "required": false,
-            "version": "2.1.2"
-        },
+        },       
         {
             "id": "73e5f9ca-f760-47d8-93ea-e5899ac642b4",
             "name": "YoLink Siren Device",
@@ -145,7 +137,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/GarageDoor_Device.groovy",
             "required": false,
-            "version": "2.0.2"
+            "version": "2.0.3"
         },
         {
             "id": "a5a51abf-a8d7-43f7-8bc2-3f674a2f66a5",
@@ -156,28 +148,12 @@
             "version": "2.0.5"
         },
         {
-            "id": "47acf80a-7244-410f-bdb1-0dbcfcdec984",
-            "name": "YoLink MultiOutlet Outlet",
-            "namespace": "srbarcus",
-            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
-            "required": true,
-            "version": "1.0.0"
-        },
-        {
-            "id": "a248278d-ec49-4cdc-a616-2cdebb8c203f",
-            "name": "YoLink Smart Outdoor Plug Device",
-            "namespace": "srbarcus",
-            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Smart_Outdoor_Plug_Device.groovy",
-            "required": false,
-            "version": "1.0.1"
-        },
-        {
             "id": "dc9415dd-c81c-42dd-b42e-4962ac9aed1a",
             "name": "YoLink Finger Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
-            "version": "1.0.1"
+            "version": "1.0.2"
         },
 	{
 	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",
@@ -218,6 +194,38 @@
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor3_Device.groovy",
 	    "required": false,
 	    "version": "2.0.0"
+	 },
+	 {
+            "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",
+            "name": "YoLink MultiOutlet Device",
+            "namespace": "srbarcus",
+            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
+            "required": false,
+            "version": "2.1.3"
+         },
+	 {
+            "id": "a248278d-ec49-4cdc-a616-2cdebb8c203f",
+            "name": "YoLink Smart Outdoor Plug Device",
+            "namespace": "srbarcus",
+            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Smart_Outdoor_Plug_Device.groovy",
+            "required": false,
+            "version": "1.0.2"
+         },
+	 {
+            "id": "47acf80a-7244-410f-bdb1-0dbcfcdec984",
+            "name": "MultiOutlet Outlet",
+            "namespace": "srbarcus",
+            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Outlet.groovy",
+            "required": false,
+            "version": "1.0.0"
+         },
+	 {
+	    "id": "a8b21aa8-1fef-4964-974a-c99c219a34c1",
+	    "name": "YoLink MultiOutlet Outlet",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_MultiOutlet_Outlet.groovy",
+	    "required": true,
+	    "version": "1.0.0"
 	 }
     ]
 }
