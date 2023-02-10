@@ -14,11 +14,13 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  *  
+ *  2.0.0 = Defined as a required driver
+ *   
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.0"}
+def clientVersion() {return "2.0.0"}
 
 preferences {
     input title: "Driver Version", description: "MultiOutlet Outlet v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
