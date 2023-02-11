@@ -195,7 +195,7 @@ private create_child(devname, label) {
 		logDebug("Creating child device named ${labelName} with id $newdni")
         
         try {
-           dev = addChildDevice("srbarcus", "YoLink MultiOutlet Outlet", newdni, [label:"${labelName}",isComponent:false])              
+           dev = addChildDevice("srbarcus", "YoLink Outlet", newdni, [label:"${labelName}",isComponent:false])              
            dev.DeviceSetup(devname)            
             
 		} catch (IllegalArgumentException e) {
@@ -212,7 +212,7 @@ private create_child(devname, label) {
             failed = true
     		                                
             if (e.message.contains("not found")) {                
-                  log.error "Unable to create device '$devname' because driver 'YoLink MultiOutlet Outlet' is not installed. You need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
+                  log.error "Unable to create device '$devname' because driver 'YoLink Outlet' is not installed. You need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
             } else {    
                   log.error "Exception: '$e'"
                   throw new IllegalArgumentException(e.message)  

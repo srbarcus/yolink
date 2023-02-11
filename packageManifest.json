@@ -221,7 +221,7 @@
          },
 	 {
 	    "id": "a8b21aa8-1fef-4964-974a-c99c219a34c1",
-	    "name": "YoLink MultiOutlet Outlet",
+	    "name": "YoLink Outlet",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_MultiOutlet_Outlet.groovy",
 	    "required": true,
