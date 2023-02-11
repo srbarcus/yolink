@@ -225,7 +225,7 @@
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_Outlet.groovy",
 	    "required": true,
-	    "version": "2.0.0"
+	    "version": "2.0.1"
 	 }
     ]
 }
