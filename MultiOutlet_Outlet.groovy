@@ -18,7 +18,7 @@
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.0"}
+def clientVersion() {return "2.0.0"}
 
 preferences {
     input title: "Driver Version", description: "MultiOutlet Outlet v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
