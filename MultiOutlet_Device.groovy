@@ -1,5 +1,5 @@
 /***
- *  YoLink™ MultiOutlet (YS6801-UC)
+ *  YoLink MultiOutlet (YS6801-UC)
  *  © 2022 Steven Barcus
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -25,11 +25,12 @@
  *  2.1.0: Add child devices for each outlet and USB ports
  *  2.1.1: Add preference "AllowMixed" to allow 'Mixed' state if some outlets are on and some are off (original behavior). Default is "false": If one or more outlets "on", then switch = "on", else switch = "off"  
  *  2.1.2: Support diagnostics, correct various errors, make singleThreaded
+ *  2.1.3: Replaces "MultiOutlet Outlet" with "YoLink MultiOutlet Outlet" driver for naming consistency
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.1.2"}
+def clientVersion() {return "2.1.3"}
 
 preferences {
     input title: "Allow 'Mixed' switch state if some outlets are on and some are off", name: "AllowMixed", type: "bool", required: true, defaultValue: "false" 
@@ -233,7 +234,7 @@ private create_child(devname, label) {
 		logDebug("Creating child device named ${labelName} with id $newdni")
         
         try {
-           dev = addChildDevice("srbarcus", "MultiOutlet Outlet", newdni, [label:"${labelName}",isComponent:false])              
+           dev = addChildDevice("srbarcus", "YoLink MultiOutlet Outlet", newdni, [label:"${labelName}",isComponent:false])              
            dev.DeviceSetup(devname)            
             
 		} catch (IllegalArgumentException e) {
@@ -250,7 +251,7 @@ private create_child(devname, label) {
             failed = true
     		                                
             if (e.message.contains("not found")) {                
-                  log.error "Unable to create device '$devname' because driver 'MultiOutlet Outlet' is not installed. You need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
+                  log.error "Unable to create device '$devname' because driver 'YoLink MultiOutlet Outlet' is not installed. You need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
             } else {    
                   log.error "Exception: '$e'"
                   throw new IllegalArgumentException(e.message)  
