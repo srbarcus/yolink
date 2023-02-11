@@ -1,5 +1,5 @@
 /***
- *  MultiOutlet Outlet - Allows individual outlet control of a MultiOutlet Device via a Dashboard 
+ *  YoLink MultiOutlet Outlet - Allows individual outlet control of a MultiOutlet Device via a Dashboard 
  *  © 2022 Steven Barcus 
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
@@ -22,12 +22,12 @@ import groovy.json.JsonSlurper
 def clientVersion() {return "2.0.0"}
 
 preferences {
-    input title: "Driver Version", description: "MultiOutlet Outlet v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Driver Version", description: "YoLink MultiOutlet Outlet v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
-    definition (name: "MultiOutlet Outlet", namespace: "srbarcus", author: "Steven Barcus") {     	
+    definition (name: "YoLink MultiOutlet Outlet", namespace: "srbarcus", author: "Steven Barcus") {     	
         capability "Switch"
                                      
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]

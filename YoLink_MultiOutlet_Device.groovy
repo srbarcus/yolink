@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Smart Outdoor Plug (YS6802-UC/SH-18A)
+ *  YoLink MultiOutlet (YS6801-UC)
  *  © 2022 Steven Barcus
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -15,43 +15,61 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
- *  1.0.1: Support diagnostics, correct various errors, make singleThreaded
- *  1.0.2: Replaces "MultiOutlet Outlet" with "YoLink MultiOutlet Outlet" driver for naming consistency
+ *  1.0.1: Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
+ *  1.0.2: Set switch state to "unknown" if unable to connect to device and remove "error" message in log.
+ *  1.0.3: Added "Switch" capability
+ *  1.0.4: def temperatureScale()
+ *  1.0.5: Fix donation URL
+ *  1.0.6: Added getSetup()
+ *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
+ *  2.1.0: Add child devices for each outlet and USB ports
+ *  2.1.1: Add preference "AllowMixed" to allow 'Mixed' state if some outlets are on and some are off (original behavior). Default is "false": If one or more outlets "on", then switch = "on", else switch = "off"  
+ *  2.1.2: Support diagnostics, correct various errors, make singleThreaded
+ *  2.1.3: Replaces "MultiOutlet Outlet" with "YoLink MultiOutlet Outlet" driver for naming consistency
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "2.1.3"}
 
 preferences {
     input title: "Allow 'Mixed' switch state if some outlets are on and some are off", name: "AllowMixed", type: "bool", required: true, defaultValue: "false" 
-    input title: "Driver Version", description: "YoLink™ Smart Outdoor Plug (YS6802-UC/SH-18A) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: "Driver Version", description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
-    definition (name: "YoLink Smart Outdoor Plug Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
+    definition (name: "YoLink MultiOutlet Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"	
         capability "Outlet"
         capability "Switch"
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:[true, false]]] 
         command "reset" 
         
+        command "usbPorts",[[name:"On or Off", type:"ENUM", description:"Desired state of USB ports", constraints:["on", "off"]]]
         command "outlet1", [[name:"On or Off", type:"ENUM", description:"Desired state of outlet 1", constraints:["on", "off"]]]
         command "outlet2", [[name:"On or Off", type:"ENUM", description:"Desired state of outlet 2", constraints:["on", "off"]]]
-         
+        command "outlet3", [[name:"On or Off", type:"ENUM", description:"Desired state of outlet 3", constraints:["on", "off"]]]
+        command "outlet4", [[name:"On or Off", type:"ENUM", description:"Desired state of outlet 4", constraints:["on", "off"]]]    
+        
         command "outlet1TimerOn", ["integer"]  
         command "outlet1TimerOff", ["integer"]  
         command "outlet2TimerOn", ["integer"]   
         command "outlet2TimerOff", ["integer"]  
+        command "outlet3TimerOn", ["integer"]   
+        command "outlet3TimerOff", ["integer"]  
+        command "outlet4TimerOn", ["integer"]   
+        command "outlet4TimerOff", ["integer"]  
         
         command "outlet1Delays", ["String"]    
         command "outlet2Delays", ["String"]   
+        command "outlet3Delays", ["String"]   
+        command "outlet4Delays", ["String"]                   
         
         attribute "online", "String"
         attribute "devId", "String"
-        attribute "driver", "String"  
+        attribute "driver", "String"
         attribute "firmware", "String"  
         attribute "signal", "String"
         attribute "lastResponse", "String"         
@@ -72,18 +90,30 @@ metadata {
         attribute "schedule8", "String"
         attribute "schedule9", "String"
         
+        attribute "USBports", "String"    
         attribute "outlet1", "String" 
         attribute "outlet2", "String" 
-         
+        attribute "outlet3", "String" 
+        attribute "outlet4", "String" 
+
+        
         attribute "timer1on", "integer"
         attribute "timer1off", "integer"
         attribute "timer2on", "integer"
         attribute "timer2off", "integer"
-         
+        attribute "timer3on", "integer"
+        attribute "timer3off", "integer"
+        attribute "timer4on", "integer"
+        attribute "timer4off", "integer"
+        
         attribute "timer1onHM", "String"
         attribute "timer1offHM", "String"
         attribute "timer2onHM", "String"
-        attribute "timer2offHM", "String"  
+        attribute "timer2offHM", "String" 
+        attribute "timer3onHM", "String"
+        attribute "timer3offHM", "String"
+        attribute "timer4onHM", "String"
+        attribute "timer4offHM", "String"     
     }
 }
 
@@ -134,38 +164,38 @@ def uninstalled() {
  }
 
 def poll(force=null) {
-    logDebug("poll(${force})")
+    logDebug("poll(${force})") 
     
     rememberState("driver", clientVersion())
-
+    
     def lastPoll
     def cur_time = now()
     def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
     def min_interval = min_seconds * 1000    // Convert to milliseconds
-
+    
     if (force != null) {
-       logDebug("Forcing poll")
+       logDebug("Forcing poll")  
        state.lastPoll = cur_time - min_interval
     }
-
+    
     lastPoll = state.lastPoll
 
     def min_time = lastPoll + min_interval
 
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
-    } else {
-       logDebug("Getting device state")
-       runIn(1,getDevicestate)
-       state.lastPoll = now()
-    }   
+    } else { 
+       logDebug("Getting device state")  
+       runIn(1,getDevicestate)           
+       state.lastPoll = now() 
+    }    
  }
 
 def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value==true) {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -178,6 +208,15 @@ private create_children() {
     
    dev = create_child("outlet2","Outlet2") 
    if (dev) {state.outlet2DNI = dev.deviceNetworkId}
+    
+   dev = create_child("outlet3","Outlet3") 
+   if (dev) {state.outlet3DNI = dev.deviceNetworkId}
+    
+   dev = create_child("outlet4","Outlet4") 
+   if (dev) {state.outlet4DNI = dev.deviceNetworkId}
+    
+   dev = create_child("usbPorts","USBports")  
+   if (dev) {state.USBportsDNI = dev.deviceNetworkId} 
     
    syncOutlets()         
 }    
@@ -236,7 +275,7 @@ def off () {
    setSwitch(255,"close")  
 }    
 
-def outlet1 (state) {
+def usbPorts (state) {
     if (state == "on") { 
        setSwitch(1,"open")  
     } else {    
@@ -244,11 +283,35 @@ def outlet1 (state) {
     }     
 }
 
-def outlet2 (state) {
+def outlet1 (state) {
     if (state == "on") { 
-       setSwitch(2,"open") 
+       setSwitch(2,"open")  
     } else {    
        setSwitch(2,"close")      
+    }     
+}
+
+def outlet2 (state) {
+    if (state == "on") { 
+       setSwitch(4,"open") 
+    } else {    
+       setSwitch(4,"close")      
+    }     
+}
+
+def outlet3 (state) {
+    if (state == "on") { 
+       setSwitch(8,"open")  
+    } else {    
+       setSwitch(8,"close")      
+    }     
+}
+
+def outlet4 (state) {
+    if (state == "on") { 
+       setSwitch(16,"open") 
+    } else {    
+       setSwitch(16,"close")      
     }     
 }
 
@@ -268,12 +331,36 @@ def outlet2TimerOff(minutes) {
   setDelay(2, state.timer2on,minutes)
 } 
 
+def outlet3TimerOn(minutes) {
+  setDelay(3, minutes,state.timer3off)
+} 
+
+def outlet3TimerOff(minutes) {
+  setDelay(3, state.timer3on,minutes)
+} 
+
+def outlet4TimerOn(minutes) {
+  setDelay(4, minutes,state.timer4off)
+} 
+
+def outlet4TimerOff(minutes) {
+  setDelay(4, state.timer4on,minutes)
+} 
+
 def outlet1Delays(onoff) {
   outletDelays(1,onoff)
 }
 
 def outlet2Delays(onoff) {
   outletDelays(2,onoff)
+}
+
+def outlet3Delays(onoff) {
+  outletDelays(3,onoff)
+}
+
+def outlet4Delays(onoff) {
+  outletDelays(4,onoff)
 }
 
 def outletDelays(outlet,onoff) {
@@ -330,11 +417,11 @@ def getDevicestate() {
     
 	try {  
         def request = [:]
-            request.put("method", "MultiOutlet.getState")                 
+            request.put("method", "${state.type}.getState")                 
             request.put("targetDevice", "${state.devId}") 
             request.put("token", "${state.token}") 
         
-        def object = parent.pollAPI(request,state.name,"MultiOutlet")
+        def object = parent.pollAPI(request,state.name,state.type)
               
         if (object) {
             logDebug("getDevicestate()> pollAPI() response: ${object}")     
@@ -370,8 +457,11 @@ def parseDevice(object) {
    def firmware = object.data.version.toUpperCase()
    def signal = object.data.loraInfo.signal          
    
-   def outlet1  = outletSwitch(object.data.state[0])
-   def outlet2  = outletSwitch(object.data.state[1])
+   def USB      = outletSwitch(object.data.state[0])
+   def outlet1  = outletSwitch(object.data.state[1])
+   def outlet2  = outletSwitch(object.data.state[2])
+   def outlet3  = outletSwitch(object.data.state[3])
+   def outlet4  = outletSwitch(object.data.state[4])
     
    syncOutlets() 
       
@@ -379,20 +469,33 @@ def parseDevice(object) {
    def timer1off  = object.data.delays[0].off  
    def timer2on   = object.data.delays[1].on 
    def timer2off  = object.data.delays[1].off
+   def timer3on   = object.data.delays[2].on 
+   def timer3off  = object.data.delays[2].off  
+   def timer4on   = object.data.delays[3].on 
+   def timer4off  = object.data.delays[3].off   
     
    def timer1onHM  = (timer1on/60).toInteger() + ":" +  (timer1on-((timer1on/60).toInteger()*60)) 
    def timer1offHM = (timer1off/60).toInteger() + ":" + (timer1off-((timer1off/60).toInteger()*60))     
    def timer2onHM  = (timer2on/60).toInteger() + ":" +  (timer2on-((timer2on/60).toInteger()*60)) 
    def timer2offHM = (timer2off/60).toInteger() + ":" + (timer2off-((timer2off/60).toInteger()*60))     
+   def timer3onHM  = (timer3on/60).toInteger() + ":" +  (timer3on-((timer3on/60).toInteger()*60)) 
+   def timer3offHM = (timer3off/60).toInteger() + ":" + (timer3off-((timer3off/60).toInteger()*60))     
+   def timer4onHM  = (timer4on/60).toInteger() + ":" +  (timer4on-((timer4on/60).toInteger()*60)) 
+   def timer4offHM = (timer4off/60).toInteger() + ":" + (timer4off-((timer4off/60).toInteger()*60))      
           
-   logDebug("Outlet1=$outlet1, Outlet2=$outlet2, Firmware=$firmware, Signal=$signal")  
+   logDebug("USB=$USB, Outlet1=$outlet1, Outlet2=$outlet2, Outlet3=$outlet3, Outlet4=$outlet4, Firmware=$firmware, Signal=$signal")  
+   logDebug("Timer4 on=$timer4on($timer4onHM), Timer4 off=$timer4off($timer4offHM)")   
+   logDebug("Timer3 on=$timer3on($timer3onHM), Timer3 off=$timer3off($timer3offHM)")   
    logDebug("Timer2 on=$timer2on($timer2onHM), Timer2 off=$timer2off($timer2offHM)")   
    logDebug("Timer1 on=$timer1on($timer1onHM), Timer1 off=$timer1off($timer1offHM)")       
     
    rememberState("firmware",firmware)
    rememberState("signal",signal)
+   rememberState("USBports",USB)
    rememberState("outlet1",outlet1)
    rememberState("outlet2",outlet2)
+   rememberState("outlet3",outlet3)
+   rememberState("outlet4",outlet4)
    rememberState("timer1on",timer1on)
    rememberState("timer1onHM",timer1onHM) 
    rememberState("timer1off",timer1off) 
@@ -401,28 +504,39 @@ def parseDevice(object) {
    rememberState("timer2onHM",timer2onHM) 
    rememberState("timer2off",timer2off) 
    rememberState("timer2offHM",timer2offHM)   
+   rememberState("timer3on",timer3on)
+   rememberState("timer3onHM",timer3onHM) 
+   rememberState("timer3off",timer3off) 
+   rememberState("timer3offHM",timer3offHM)   
+   rememberState("timer4on",timer4on)
+   rememberState("timer4onHM",timer4onHM)     
+   rememberState("timer4off",timer4off) 
+   rememberState("timer4offHM",timer4offHM) 
     
    setSwitchState()   
 }   
 
 def setSwitchState() {
+    def USB = state.USBports
     def outlet1 = state.outlet1
     def outlet2 = state.outlet2
+    def outlet3 = state.outlet3
+    def outlet4 = state.outlet4
     
-    logDebug("Setting switch state: Outlet1(${outlet1}), Outlet2(${outlet2})")
+    logDebug("Setting switch state: USB(${USB}), Outlet1(${outlet1}), Outlet2(${outlet2}), Outlet3(${outlet3}), Outlet4(${outlet4})")
     
     if (settings.AllowMixed) { 
-      if (outlet1 == "off" && outlet2 == "off") {
+      if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
          rememberState("switch","off")
       } else {
-           if (outlet1 == "on" && outlet2 == "on") {
+           if (USB == "on" && outlet1 == "on" && outlet2 == "on" && outlet3 == "on" && outlet4 == "on") {
                 rememberState("switch","on")
            } else {
                rememberState("switch","mixed")
            }    
       }       
     } else {
-      if (outlet1 == "off" && outlet2 == "off") {
+      if (USB == "off" && outlet1 == "off" && outlet2 == "off" && outlet3 == "off" && outlet4 == "off") {
          rememberState("switch","off")
       } else {
          rememberState("switch","on")
@@ -461,7 +575,7 @@ def void processStateData(payload) {
         
         def child = parent.getChildDevice(state.my_dni)
         def name = child.getLabel()                
-        def event = object.event.replace("MultiOutlet.","")
+        def event = object.event.replace("${state.type}.","")
         logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
@@ -482,19 +596,25 @@ def void processStateData(payload) {
             
         case "setState":
         case "StatusChange":
-            def signal = object.data.loraInfo.signal                      
-            def outlet1  = outletSwitch(object.data.state[0])
-            def outlet2  = outletSwitch(object.data.state[1])            
+            def signal = object.data.loraInfo.signal          
+            def USB      = outletSwitch(object.data.state[0])
+            def outlet1  = outletSwitch(object.data.state[1])
+            def outlet2  = outletSwitch(object.data.state[2])
+            def outlet3  = outletSwitch(object.data.state[3])
+            def outlet4  = outletSwitch(object.data.state[4])
             
             rememberState("signal",signal)
+            rememberState("USBports",USB)
             rememberState("outlet1",outlet1)
             rememberState("outlet2",outlet2)
+            rememberState("outlet3",outlet3)
+            rememberState("outlet4",outlet4)
             
             setSwitchState() 
             
             syncOutlets()
             
-            logDebug("$event: Outlet1=$outlet1, Outlet2=$outlet2, Signal=$signal") 
+            logDebug("$event: USBports=$USB, Outlet1=$outlet1, Outlet2=$outlet2, Outlet3=$outlet3, Outlet4=$outlet4, Signal=$signal") 
    
 			break;       
             
@@ -521,19 +641,18 @@ def void processStateData(payload) {
                     
                   def weekdays = parent.scheduledDays(weekhex)
                     
-                  log.trace "Days of week: ${weekdays}"    
+                  logDebug("Days of week: ${weekdays}")
                   
-                  log.trace "schedule ${schedule}"                        
+                  logDebug("schedule ${schedule}")
                                                    
                   schedule = schedule.replaceAll(" week=${weekhex},"," days=[${weekdays}],")                                          
                   schedule = schedule.replaceAll(" index=${schedNum},","")                       
                   schedule = schedule.replaceAll("isValid=","enabled=")  
                   schedule = schedule.replaceAll("=25:0","=never") 
-                  schedule = schedule.replaceAll("ch=0","outlet=1") 
-                  schedule = schedule.replaceAll("ch=1","outlet=2")   
-
+                  schedule = schedule.replaceAll("ch=","outlet=")  
+                  
                   scheds++  
-                  log.trace "Schedule ${scheds}: ${schedule}"
+                  logDebug("Schedule ${scheds}: ${schedule}")
                   rememberState("schedule${scheds}",schedule)
                 } 
                 schedNum++
@@ -565,25 +684,31 @@ def setSwitch(mask,SWstate) {
    params.put("state", SWstate)    
     
    def request = [:] 
-   request.put("method", "MultiOutlet.setState")                  
+   request.put("method", "${state.type}.setState")                  
    request.put("targetDevice", "${state.devId}") 
    request.put("token", "${state.token}")     
    request.put("params", params)       
  
    try {         
-        def object = parent.pollAPI(request, state.name, "MultiOutlet")
+        def object = parent.pollAPI(request, state.name, state.type)
          
         if (object) {
             logDebug("setSwitch(): pollAPI() response: ${object}")  
                               
             if (successful(object)) {                               
                 def signal   = object.data.loraInfo.signal       
-                def outlet1  = outletSwitch(object.data.state[0])
-                def outlet2  = outletSwitch(object.data.state[1])                
+                def USB      = outletSwitch(object.data.state[0])
+                def outlet1  = outletSwitch(object.data.state[1])
+                def outlet2  = outletSwitch(object.data.state[2])
+                def outlet3  = outletSwitch(object.data.state[3])
+                def outlet4  = outletSwitch(object.data.state[4])
                             
                 rememberState("signal",signal)  
+                rememberState("USBports",USB)
                 rememberState("outlet1",outlet1)
                 rememberState("outlet2",outlet2)
+                rememberState("outlet3",outlet3)
+                rememberState("outlet4",outlet4)
                 
                 setSwitchState() 
                 
@@ -615,6 +740,12 @@ def syncOutlets() {
      if (state.outlet1 == "on") {dev.on(false)} else {dev.off(false)}   
      dev = getChildDevice(state.outlet2DNI)
      if (state.outlet2 == "on") {dev.on(false)} else {dev.off(false)}  
+     dev = getChildDevice(state.outlet3DNI)
+     if (state.outlet3 == "on") {dev.on(false)} else {dev.off(false)}  
+     dev = getChildDevice(state.outlet4DNI)
+     if (state.outlet4 == "on") {dev.on(false)} else {dev.off(false)}  
+     dev = getChildDevice(state.USBportsDNI)
+     if (state.USBports == "on") {dev.on(false)} else {dev.off(false)}  
 }
 
 def setDelay(outlet, minuteson, minutesoff) {
@@ -646,13 +777,13 @@ def setDelay(outlet, minuteson, minutesoff) {
    params.put("state", delays)            
     
    def request = [:] 
-   request.put("method", "MultiOutlet.setDelay")                  
+   request.put("method", "${state.type}.setDelay")                  
    request.put("targetDevice", "${state.devId}") 
    request.put("token", "${state.token}")     
    request.put("params", params)       
  
    try {         
-        def object = parent.pollAPI(request, state.name, "MultiOutlet")
+        def object = parent.pollAPI(request, state.name, state.type)
          
         if (object) {
             logDebug("setDelay(): pollAPI() response: ${object}")  
@@ -674,7 +805,7 @@ def setDelay(outlet, minuteson, minutesoff) {
 	} 
 }    
 
-def reset(){          
+def reset(){    
     state.remove("driver")
     rememberState("driver", clientVersion()) 
     state.remove("online")
@@ -689,21 +820,36 @@ def reset(){
     state.remove("tzone")   
     state.remove("signal")    
     state.remove("powerOnState")
+    
     state.remove("LastResponse")      
+    state.remove("USBports")
     state.remove("outlet1")
     state.remove("outlet2")
+    state.remove("outlet3")
+    state.remove("outlet4")
     
     state.remove("outlet1DNI")
     state.remove("outlet2DNI")
+    state.remove("outlet3DNI")
+    state.remove("outlet4DNI")
+    state.remove("USBportsDNI")
       
     state.remove("timer1on")
     state.remove("timer1off")
     state.remove("timer2on")
     state.remove("timer2off")
+    state.remove("timer3on")
+    state.remove("timer3off")
+    state.remove("timer4on")
+    state.remove("timer4off")
     state.remove("timer1onHM")
     state.remove("timer1offHM")
     state.remove("timer2onHM")
     state.remove("timer2offHM")
+    state.remove("timer3onHM")
+    state.remove("timer3offHM")
+    state.remove("timer4onHM")
+    state.remove("timer4offHM")
     
     def children= getChildDevices()
 	children.each {deleteChildDevice(it.deviceNetworkId)}    
@@ -744,7 +890,7 @@ def pollError(object) {
     def nc = false               //Assume not a connection error
     if (notConnected(object)) {  //Cannot connect to Device
        rememberState("online", "false")                                                                
-       log.warn "Device '${state.name}' (Type=MultiOutlet) is offline"  
+       log.warn "Device '${state.name}' (Type=${state.type}) is offline"  
        nc = true 
     } else {
        log.error "API polling returned error: $object.code - " + parent.translateCode(object.code)
@@ -755,7 +901,7 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+   if (state.debug==true) {log.debug msg}
 }
 
 def removeSchedules() {
