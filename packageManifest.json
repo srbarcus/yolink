@@ -224,7 +224,7 @@
 	    "name": "YoLink Outlet",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/main/YoLink_Outlet.groovy",
-	    "required": false,x
+	    "required": false,
 	    "version": "2.0.0"
 	 }
     ]
