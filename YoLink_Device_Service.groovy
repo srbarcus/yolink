@@ -35,13 +35,14 @@
  *  2.1.5: Correct numerous 'Request was unauthorized. Attempting to refreshing access token and re-poll API.' messages
  *         - Add 500ms delay between polling of next device to reduce load on Hubs
  *  2.1.6: Add support for Leak Sensor 3 (YS7904-UC)
+ *  2.1.7: Add link to Hubitat Community, update copyright date, clean up UI, performance improvements
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.6"}
+private def get_APP_VERSION() {return "2.1.7"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
@@ -73,13 +74,16 @@ def about() {
  	dynamicPage(name: "about", title: pageTitle("About"), uninstall: true) {
  		section("") {	
 			paragraph image:"${getImagePath()}yolink.png", boldTitle("${get_APP_NAME()} - Version ${get_APP_VERSION()}")
-			paragraph boldTitle("This app connects your YoLink™ devices to Hubitat via the cloud.")   
-            paragraph blueTitle("The app is neither developed, endorsed, or associated with YoLink™ or YoSmart, Inc.") 
-	        paragraph blueTitle("Provided 'AS IS', without warranties or conditions of any kind, either expressed or implied.") 		
+			paragraph boldTitle("This app connects your YoLink™ devices to Hubitat via the cloud.")  
+            paragraph blueTitle(
+            "The app is neither developed, endorsed, or associated with YoLink™ or YoSmart, Inc." + 
+	        "</br>Provided 'AS IS', without warranties or conditions of any kind, either expressed or implied.") 		
             paragraph boldTitle ("")
-			paragraph "Please donate and support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. Please donate via PayPal by clicking on this Paypal button:"
-                href url:"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD", title:"Paypal donation..."
-			paragraph boldTitle ("© 2022 Steven Barcus. All rights reserved.")	 
+            paragraph "Refer to the <a href=https://community.hubitat.com/t/release-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432>Hubitat Community Discussion</a> for the latest information and installation help."
+            paragraph boldTitle ("")
+			paragraph "Please donate and support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development:"
+                href url:"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD", title:"Make a Paypal donation..."
+			paragraph boldTitle ("© 2022, 2023 Steven Barcus. All rights reserved.")	 
             //https://community.hubitat.com/t/release-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432
             paragraph boldTitle ("")
             paragraph boldTitle ("")
@@ -87,7 +91,8 @@ def about() {
               paragraph boldRedTitle ("WARNING: Removing this application will delete all Hubitat devices created by the app! (This option can be disabled in the additional settings before removal)")
             }    
 		}
-      section(smallTitle("Debug")) {
+      //ction(smallTitle("Debug")) {
+      section("") {          
 			input "debugging", "enum", title:boldTitle("Enable Debugging"), required: true, options:["True","False"],defaultValue: "False"  
 		}  
 	}        
@@ -214,7 +219,7 @@ def diagnostics() {
 }
 
 def finish() {    
-if (reset == "True") {
+  if (reset == "True") {
         def children= getChildDevices()                
 	    children.each { 
           it.reset()          
@@ -333,14 +338,14 @@ if (reset == "True") {
 def installed() {
     log.info "${get_APP_NAME()} app installed."  
     subscribe(location, "systemStart", initialize)
-    initialize()
+    runIn(5, initialize)
 }
 
 def updated() {
 	log.info "${get_APP_NAME()} app updated."  
     unsubscribe()
     subscribe(location, "systemStart", systemStart)    
-    initialize()
+    runIn(5, initialize)
 }
 
 void systemStart(evt){	
