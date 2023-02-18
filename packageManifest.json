@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "Misc App Updates: Add link to Hubitat Community, update copyright date, clean up UI, performance improvements.\n",
+    "releaseNotes": "Misc App Updates:\n- Correct problem with temperature scale being overridden on defined devices\n- Support syncing of application device name changes\n- Add description to settings\n- Improve diagnostics collection performance\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.7"
+            "version": "2.1.8"
         }
     ],
     "drivers": [

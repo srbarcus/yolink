@@ -28,7 +28,7 @@
  *  2.1.0: Add support for Smart Outdoor Plug (YS6802-UC/SH-18A)
  *  2.1.1: Speed up execution
  *  2.1.2: Allow device driver to override temperation conversion scale
- *  2.1.3: - Initialize MQTT listener whenever app is run
+ *  2.1.3: Initialize MQTT listener whenever app is run
  *         - Correct problem with scheduling under 5 minutes 
  *  2.1.4: Allow collection of diagnostic information
  *         - Correct problem with devices not being polled after hub reboot
@@ -36,13 +36,17 @@
  *         - Add 500ms delay between polling of next device to reduce load on Hubs
  *  2.1.6: Add support for Leak Sensor 3 (YS7904-UC)
  *  2.1.7: Add link to Hubitat Community, update copyright date, clean up UI, performance improvements
+ *  2.1.8: Correct problem with temperature scale being overridden on defined devices 
+ *         - Support syncing of application name changes
+ *         - Add description to settings
+ *         - Improve diagnostics collection performance
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.7"}
+private def get_APP_VERSION() {return "2.1.8"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
@@ -64,11 +68,12 @@ preferences {
     page(name: "otherSettings", title: "Other Settings", content:"otherSettings", nextPage: "deviceList")
     page(name: "deviceList",title: "YoLink™ Devices", content:"deviceList",nextPage: "diagnostics")  	
     page(name: "diagnostics", title: "YoLink™  Device Service and Driver Diagnostics", content:"diagnostics", nextPage: "finish")
-//  page(name: "doDiags", title: "View Diagnostics File", content:"doDiags", nextPage: "finish")
     page(name: "finish", title: "Installation Complete", content:"finish", uninstall: false)
 }
 
+@Field static diagFile = "YoLink_Service_Diagnostics.txt"
 @Field static String diagsep = "------------------------------------------------------------------------------------------"
+String diagData 
 
 def about() {
  	dynamicPage(name: "about", title: pageTitle("About"), uninstall: true) {
@@ -84,15 +89,13 @@ def about() {
 			paragraph "Please donate and support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development:"
                 href url:"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD", title:"Make a Paypal donation..."
 			paragraph boldTitle ("© 2022, 2023 Steven Barcus. All rights reserved.")	 
-            //https://community.hubitat.com/t/release-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432
             paragraph boldTitle ("")
             paragraph boldTitle ("")
             if (removeDevices != "False"){
               paragraph boldRedTitle ("WARNING: Removing this application will delete all Hubitat devices created by the app! (This option can be disabled in the additional settings before removal)")
             }    
 		}
-      //ction(smallTitle("Debug")) {
-      section("") {          
+        section("") {          
 			input "debugging", "enum", title:boldTitle("Enable Debugging"), required: true, options:["True","False"],defaultValue: "False"  
 		}  
 	}        
@@ -116,21 +119,15 @@ def credentials() {
 }
 
 def otherSettings() {    
-    if (!pollInterval){pollInterval = 2}
+    if (!pollInterval){pollInterval = 5}
+    if (!syncNames){syncNames = True}
     if (!removeDevices){removeDevices = True}
-    
-	dynamicPage(name: "otherSettings", title: pageTitle("Other Settings"), uninstall: false) {
-        section(smallTitle("Temperature Scale (Celsius or Fahrenheit)")) {
-			input "temperatureScale", "enum", title:boldTitle("Select Temperature Scale"), required: true, options:["C","F"],defaultValue: "F"
-		}
-		section(smallTitle("Device polling interval in minutes")) {
-			input "pollInterval", "enum", title:boldTitle("Select Polling Interval"), required: true, options:[1,2,3,4,5,10,15,30],defaultValue: 5
-		}          
-        section(smallTitle("Remove associated Hubitat devices when this app is removed")) {
-			input "removeDevices", "enum", title:boldTitle("Remove Devices"), required: true, options:["True","False"],defaultValue: "True" 
-            //paragraph boldTitle ("")                
-            //paragraph boldTitle ("")
-            //paragraph boldRedTitle ("Click 'Next' to continue. Exiting this page any other way may cause devices to work improperly or not at all.") 
+    dynamicPage(name: "otherSettings", title: pageTitle("Other Settings"), uninstall: false) {
+        section() {
+			input "temperatureScale", "enum", title:boldTitle("Temperature Scale (Celsius or Fahrenheit)") + "</br>Scale used to report temperatures on newly defined devices. Can be overridden individually on each device definition.", required: true, options:["C","F"],defaultValue: "F"
+		    input "pollInterval", "enum", title:boldTitle("Device polling interval in minutes") + "</br>Interval at which devices are polled. Mostly used to determine if device is still online, but some devices may need to be polled to update their settings. 5 Minutes is the recommended interval.", required: true, options:[1,2,3,4,5,10,15,30], defaultValue: 5
+            input "syncNames", "enum", title:boldTitle("Synchronize device names with YoLink Mobile app") + "</br>Forces devices to be renamed to match their name in the YoLink Mobile application. To synchronize the names, simply rerun this app from start to finish after rename the device in the YoLink mobile app.", required: true, options:["True","False"], defaultValue: "True"
+			input "removeDevices", "enum", title:boldTitle("Remove associated Hubitat devices when this app is removed") + "</br>This is for advanced users only. Setting it to False will result in orphaned device definitions if the app is removed.", required: true, options:["True","False"], defaultValue: "True"
        	}
 	}
 }
@@ -226,25 +223,26 @@ def finish() {
         }   
   }  
     
-  if (diagnose == "True") {
-        body = JsonOutput.toJson(name:"YoLink_Service_Diagnostics.txt",type:"file")
-        params = [
+  body = JsonOutput.toJson(name:diagFile,type:"file")
+  params = [
             uri: "http://127.0.0.1:8080",
             path: "/hub/fileManager/delete",
             contentType:"text/plain",
             requestContentType:"application/json",
             body: body
             ]
-        httpPost(params) { resp ->
-            return resp.data.toString()
-        }
-      
+  httpPost(params) {resp}    
+    
+  if (diagnose == "True") {  
+        diagData = ""
+        
         def date = new Date(now() )    
         date = date.format("MM/dd/yyyy hh:mm:ss a" )
-        writeFile("YoLink Device Service Diagnostics - Collected $date")
+        
+        appendData("YoLink Device Service Diagnostics - Collected $date")
      
-        appendFile(" ")
-        appendFile("YoLink Device Service App Version ".plus(get_APP_VERSION())) 
+        appendData(" ")
+        appendData("YoLink Device Service App Version ".plus(get_APP_VERSION())) 
      
         def hubitat = location.hub
      
@@ -252,13 +250,13 @@ def finish() {
         def hubhw = hubitat.hardwareID
         def hubut = hubitat.uptime
         
-        appendFile(" ")
-        appendFile("Hubitat information: Hardware=$hubhw  Firmware=$hubfw  Uptime=$hubut")
+        appendData(" ")
+        appendData("Hubitat information: Hardware=$hubhw  Firmware=$hubfw  Uptime=$hubut")
           
         def devices=getDevices() 
         int deviceCount=devices.size()  
-        appendFile(" ")    
-        appendFile("YoLink Hub reported $deviceCount devices")
+        appendData(" ")    
+        appendData("YoLink Hub reported $deviceCount devices")
             
         def yodev = [] 
         def alldev = [] 
@@ -271,51 +269,40 @@ def finish() {
       
         def sortedlst = yodev.sort() 
         sortedlst.each { 
-          appendFile(it)
+          appendData(it)
         }   
         
         def children= getChildDevices()
         int childcount=children.size()  
  
-        appendFile(" ")
-        appendFile(diagsep)
-        appendFile("YoLink Device Service has $childcount devices defined")
+        appendData(" ")
+        appendData(diagsep)
+        appendData("YoLink Device Service has $childcount devices defined")
        
         def hubdev = []   
         children.each { 
-             def diag = "Device ${it.currentValue("devId", true)} = ${it} v${it.currentValue("driver", true)} (Setup:${it.isSetup()}, Online:${it.currentValue("online", true)}, Firmware:${it.currentValue("firmware", true)})"  
+             def diag = "Device ${it.currentValue("devId", true)}=${it} v${it.currentValue("driver", true)} (Setup:${it.isSetup()}, Online:${it.currentValue("online", true)}, Firmware:${it.currentValue("firmware", true)})"  
              hubdev.add(diag)
              alldev.add(diag)
         } 
       
         sortedlst = hubdev.sort() 
         sortedlst.each { 
-          appendFile(it)
+          appendData(it)
         }   
 
-        appendFile(" ")
-        appendFile(diagsep)
-        appendFile("YoLink and Hubitat Device Cross-Reference")
+        appendData(" ")
+        appendData(diagsep)
+        appendData("YoLink and Hubitat Device Cross-Reference")
       
         sortedlst = alldev.sort() 
         sortedlst.each { 
-          appendFile(it)
+          appendData(it)
         }   
      
-        appendFile(diagsep) 
-        
-    } else {
-         body = JsonOutput.toJson(name:"YoLink_Service_Diagnostics.txt",type:"file")
-         params = [
-            uri: "http://127.0.0.1:8080",
-            path: "/hub/fileManager/delete",
-            contentType:"text/plain",
-            requestContentType:"application/json",
-            body: body
-            ]
-        httpPost(params) { resp ->
-            return resp.data.toString()
-        }
+        appendData(diagsep) 
+        writeFile(diagData) 
+      
   }    
     
   if (diagnose == "True") {
@@ -359,7 +346,6 @@ def initialize() {
 }    
 
 def refresh() {
-    syncTempScale()
    	pollDevices()   
     schedulePolling()
 }        
@@ -396,10 +382,10 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
 	def dev = allChildDevices.find {it.deviceNetworkId.contains(newdni)}	
     
     def failed = false
+    
+    def labelName = "YoLink $devtype - ${devname}"
 
 	if (!dev) {
-        def labelName = "YoLink $devtype - ${devname}"
-            
 		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken, Driver = $drivername")
         
         try {
@@ -434,7 +420,13 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
         }    
             
         logDebug("Calling child device setup: $newdni, $state.homeID, $devname, $devtype, $devtoken, $devId")
-        dev.ServiceSetup(newdni,state.homeID,devname,devtype,devtoken,devId) 	// Initial setup of the Child Device             
+        dev.ServiceSetup(newdni,state.homeID,devname,devtype,devtoken,devId) 	// Initial setup of the Child Device   
+        logDebug("Syncing temperature scale on device ${dev}")
+        try {                                                //Not all devices support temperature
+            dev.temperatureScale(settings.temperatureScale)  
+	    } catch (Exception e) {                 
+            logDebug("Temperature scale not supported on device ${dev}")                  
+        }   
 		logDebug("Setup of ${dev.displayName} with id $newdni has been completed")            
 	   
 	} else {
@@ -443,6 +435,17 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
            log.trace "A speaker Hub named '$devname' has been located." 
            state.speakerhub = newdni
         }  
+        
+        def currentName = dev.getLabel()
+        
+        if (labelName != currentName) {
+            if (syncNames == "True") {
+              log.warn "Device '${currentName}' was renamed in the YoLink mobile app to '${labelName}'. Renaming Hubitat device."
+              dev.setLabel(labelName)
+            } else {
+              log.warn "Device '${currentName}' was renamed in the YoLink mobile app to '${labelName}', but name synchronizing is set to 'False'. Device was not renamed on Hubitat."
+            }
+        }
 	}
     
     if ((dev) && (devtype == "MQTT Listener")) {
@@ -868,18 +871,6 @@ def convertTemperature(temperature, scale=null) {
 def temperatureScale() {
     return settings.temperatureScale
 }
-
-def syncTempScale() {
-    def children= getChildDevices()
-    children.each { 
-       logDebug("Syncing temperature scale on device ${it}")
-       try {                                                //Not all devices support temperature
-            it.temperatureScale(settings.temperatureScale)  
-	   } catch (Exception e) {                 
-            log.warn ("Temperature scale not supported on device ${it}")                  
-       }             
-    }
-}
     
 def celsiustofahrenheit(celsius) {return ((celsius * 9 / 5) + 32)} 
 
@@ -1114,82 +1105,28 @@ def logDebug(msg) {
     }   
 }    
 
-/* FILE ROUTINES */
+def appendData(String data) {
+    if (diagData == null) {
+       diagData = data.plus("\r\n")
+    } else {
+       diagData = diagData.plus(data).plus("\r\n") 
+    }    
+}
+
 Boolean writeFile(String fData) {
-    byte[] fDataB = fData.getBytes("UTF-8")
-    return writeImageFile("YoLink_Service_Diagnostics.txt", fDataB, "text/html")   
-}
-
-Boolean appendFile(newData){
-    try {
-        fileData = (String) readFile("YoLink_Service_Diagnostics.txt")
-        if(fileData.length()>0) 
-            fileData = fileData.substring(0,fileData.length()-1)
-        else fileData = " "
-        return writeFile(fileData+newData)
-    } catch (exception){
-        if (exception.message == "Not Found"){
-            writeStatus =  writeFile(newData)
-            if(logResponses) log.info "Append Status: $writeStatus"
-            return writeStatus
-        } else {
-            log.error("Append 'YoLink_Service_Diagnostics.txt' Exception: ${exception}")
-            return false
-        }
-    }
-}
-
-String readFile(fName){
-    uri = "http://${location.hub.localIP}:8080/local/${fName}"
+    String encodedString = location.hub
+    encodedString = encodedString.bytes.encodeBase64().toString()
     
-    def params = [
-        uri: uri,
-        contentType: "text/html",
-        textParser: true,
-        headers: [
-				"Cookie": cookie,
-                "Accept": "application/octet-stream"
-            ]
-    ]
-
-    try {
-        httpGet(params) { resp ->
-            if(resp!= null) {       
-               int i = 0
-               String delim = ""
-               i = resp.data.read() 
-               while (i != -1){
-                   char c = (char) i
-                   delim+=c
-                   i = resp.data.read() 
-               }              
-               return delim
-            }
-            else {
-                log.error "Null Response"
-            }
-        }
-    } catch (exception) {
-        log.error "Read Error: ${exception.message}"
-        return null;
-    }
-}
-
-Boolean writeImageFile(String fName, byte[] fData, String imageType) {
-    now = new Date()
-    String encodedString = "thebearmay$now".bytes.encodeBase64().toString();
-    bDataTop = """--${encodedString}\r\nContent-Disposition: form-data; name="uploadFile"; filename="${fName}"\r\nContent-Type:${imageType}\r\n\r\n""" 
-    bDataBot = """\r\n\r\n--${encodedString}\r\nContent-Disposition: form-data; name="folder"\r\n\r\n--${encodedString}--"""
-    byte[] bDataTopArr = bDataTop.getBytes("UTF-8")
-    byte[] bDataBotArr = bDataBot.getBytes("UTF-8")
+    def String Top = """--${encodedString}\r\nContent-Disposition: form-data; name="uploadFile"; filename="${diagFile}"\r\nContent-Type:text/html\r\n\r\n"""
+    def String Bottom = """\r\n\r\n--${encodedString}\r\nContent-Disposition: form-data; name="folder"\r\n\r\n--${encodedString}--"""
     
-    ByteArrayOutputStream bDataOutputStream = new ByteArrayOutputStream();
+    ByteArrayOutputStream OutputStream = new ByteArrayOutputStream()
+    
+    OutputStream.write(Top.getBytes("UTF-8"))
+    OutputStream.write(fData.getBytes("UTF-8"))
+    OutputStream.write(Bottom.getBytes("UTF-8"))
 
-    bDataOutputStream.write(bDataTopArr);
-    bDataOutputStream.write(fData);
-    bDataOutputStream.write(bDataBotArr);
-
-    byte[] postBody = bDataOutputStream.toByteArray();  
+    byte[] Body = OutputStream.toByteArray();  
     try {
 		def params = [
 			uri: 'http://127.0.0.1:8080',
@@ -1201,18 +1138,16 @@ Boolean writeImageFile(String fName, byte[] fData, String imageType) {
 			headers: [
 				'Content-Type': "multipart/form-data; boundary=$encodedString"
 			], 
-            body: postBody,
+            body: Body,
 			timeout: 300,
 			ignoreSSLIssues: true
 		]
 		httpPost(params) { resp ->
-            if(debugEnabled) log.debug "writeImageFile: ${resp.properties}"
-            if(debugEnabled) log.debug "writeImageFile: ${resp.data.success} ${resp.data.status}"
             return resp.data.success == 'true' ? true:false
 		}
 	}
 	catch (e) {
-		log.error "Error writing file $fName: ${e}"
+		log.error "Error writing file $diagFile: ${e}"
 	}
 	return false
 }
