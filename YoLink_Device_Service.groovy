@@ -126,7 +126,7 @@ def otherSettings() {
         section() {
 			input "temperatureScale", "enum", title:boldTitle("Temperature Scale (Celsius or Fahrenheit)") + "</br>Scale used to report temperatures on newly defined devices. Can be overridden individually on each device definition.", required: true, options:["C","F"],defaultValue: "F"
 		    input "pollInterval", "enum", title:boldTitle("Device polling interval in minutes") + "</br>Interval at which devices are polled. Mostly used to determine if device is still online, but some devices may need to be polled to update their settings. 5 Minutes is the recommended interval.", required: true, options:[1,2,3,4,5,10,15,30], defaultValue: 5
-            input "syncNames", "enum", title:boldTitle("Synchronize device names with YoLink Mobile app") + "</br>Forces devices to be renamed to match their name in the YoLink Mobile application. To synchronize the names, simply rerun this app from start to finish after rename the device in the YoLink mobile app.", required: true, options:["True","False"], defaultValue: "True"
+            input "syncNames", "enum", title:boldTitle("Synchronize device names with YoLink Mobile app") + "</br>Forces devices to be renamed to match their name in the YoLink Mobile application. To synchronize the names, simply rerun this app from start to finish after renaming the device(s) in the YoLink mobile app.", required: true, options:["True","False"], defaultValue: "True"
 			input "removeDevices", "enum", title:boldTitle("Remove associated Hubitat devices when this app is removed") + "</br>This is for advanced users only. Setting it to False will result in orphaned device definitions if the app is removed.", required: true, options:["True","False"], defaultValue: "True"
        	}
 	}
