@@ -26,11 +26,12 @@
  *         - Removed delay_ch attribute - no useful since device on has a single channel
            - Added delay_on attribute
            - Change null delay_on or delay_off value to 0
+ *  2.0.2: Handle "Alert" event
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
 
 preferences {
     input title: "Driver Version", description: "YoLink™ Valve (YS4909-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
@@ -254,7 +255,8 @@ def void processStateData(payload) {
         logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
-		case "StatusChange":         
+		case "StatusChange":
+        case "Alert":     
             def valve = object.data.state
             def signal = object.data.loraInfo.signal             
     

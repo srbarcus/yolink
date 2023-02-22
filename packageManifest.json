@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "Misc App Updates:\n- Correct problem with temperature scale being overridden on defined devices\n- Support syncing of application device name changes\n- Add description to settings\n- Improve diagnostics collection performance\n",
+    "releaseNotes": "Update Manipulator Device driver to handle 'Alert' event\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -57,7 +57,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Manipulator_Device.groovy",
             "required": false,
-            "version": "2.0.1"
+            "version": "2.0.2"
         },
         {
             "id": "2fc8dba4-61b1-4cfb-9fc7-8862d5368d93",
