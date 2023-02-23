@@ -177,7 +177,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
-            "version": "1.0.1"
+            "version": "1.0.2"
         },
 	{
 	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",
