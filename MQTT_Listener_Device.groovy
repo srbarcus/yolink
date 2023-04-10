@@ -1,11 +1,9 @@
 /***
  *  YoLink™ MQTT Listener Device
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -20,11 +18,19 @@
  *  2.0.3: Reduce time returning from Poll()
  *  2.0.4: Added "driver" attribute and isSetup() for diagnostics
  *  2.0.5: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.6: Copyright update and UI formatting
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.5"}
+def clientVersion() {return "2.0.6"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
+
+preferences {
+    input title: bold("Driver Version"), description: "YoLink™ MQTT Listener v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+}
 
 metadata {
     definition (name: "YoLink MQTT Listener Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	

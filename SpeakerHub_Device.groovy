@@ -1,11 +1,9 @@
 /***
  *  YoLink™ SpeakerHub (YS1604-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -24,15 +22,18 @@
  *  1.0.7: Remove MQTT Connection - device has no callbacks defined
  *  2.0.0: Sync version number with reengineered app due to new YoLink service restrictions
  *  2.0.1: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.2: Copyright update and UI formatting
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ SpeakerHub (YS1604-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ SpeakerHub (YS1604-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 /* As of 03-06-2022, was not supported by API  
@@ -93,7 +94,7 @@ metadata {
                                                                                                          constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
 
 
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
         command "reset" 
         command "Repeat", [[name:"repeat",type:"ENUM", description:"Number of times to repeat audio", constraints:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]]
         command "EnableBeep"
@@ -108,7 +109,6 @@ metadata {
         attribute "devId", "String"
         attribute "driver", "String"  
         attribute "firmware", "String"  
-        attribute "signal", "String" 
         attribute "lastResponse", "String"
         attribute "lastTrack", "String"
         attribute "lastText", "String"
@@ -207,7 +207,7 @@ def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -686,5 +686,5 @@ def pollError(object) {
 } 
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+  if (state.debug == "true") {log.debug msg}
 }

@@ -1,6 +1,6 @@
 /**
  *  YoLink™ Device Service
- *  © 2022 Steven Barcus. All rights reserved.
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *
  *  Donations are greatly appreciated: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD 
@@ -41,13 +41,14 @@
  *         - Add description to settings
  *         - Improve diagnostics collection performance
  *  2.1.9: Return null battery level value as "0" 
+ *  2.1.10: Copyright update
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.9"}
+private def get_APP_VERSION() {return "2.1.10"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(

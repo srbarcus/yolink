@@ -1,12 +1,9 @@
 /***
- *  YoLink™ Door Sensor (YS7707-UC)
- *  YoLink™ Garage Door Sensor 2 (YS7706-UC)
- *  © 2022 Steven Barcus
+ *  YoLink™ Door Sensor (YS7707-UC) and YoLink™ Garage Door Sensor 2 (YS7706-UC)
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -23,16 +20,21 @@
  *  1.0.5: Support binding to Garage Door Controller, add attribute "stateChangedAt" and allow formatting of timestamp
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
  *  2.0.1: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.2: Added unit values to battery
+ *         - Add formatted "signal" attribute as rssi & " dBm"
+ *         - Add capability "SignalStrength"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Door Sensor (YS7707-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"    
+    input title: bold("Driver Version"), description: "YoLink™ Door Sensor (YS7707-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Date Format Template Specifications"), description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"    
 }
 
 metadata {
@@ -40,8 +42,9 @@ metadata {
 		capability "Polling"				
 		capability "Battery"				
         capability "ContactSensor"
+        capability "SignalStrength"  //rssi 
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]] 
         command "reset" 
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
          
@@ -55,7 +58,6 @@ metadata {
         
         attribute "switch", "String"   
         attribute "stateChangedAt", "String"
-        attribute "signal", "String"  
         attribute "alertInterval", "String"  
         attribute "openRemindDelay", "String"         
         }
@@ -147,14 +149,13 @@ def timestampFormat(value) {
        logDebug("Date format set to '${value}'")
        logDebug("Current date and time in requested format: '${stamp}'")  
      } catch(Exception e) {       
-       //log.error "dateFormat() exception: ${e}"
        log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
      } 
  }
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -231,7 +232,7 @@ def parseDevice(object) {
     rememberState("online",online)
     rememberState("reportAt",reportAt)
     rememberState("alertInterval",alertInterval)
-    rememberState("battery",battery)
+    rememberState("battery", battery, "%")
     rememberState("openRemindDelay",openRemindDelay) 
     rememberState("switch",swState)
     rememberState("contact",contact)
@@ -258,12 +259,11 @@ def void processStateData(payload) {
         
         switch(event) {
 		case "Alert":            
-			def devstate = object.data.state           
+			def contact = object.data.state           
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
-            def signal = object.data.loraInfo.signal           
-                
-            def contact = devstate 
+            def rssi = object.data.loraInfo.signal           
+
             def swState = "on"
             if (contact == "open"){swState = "off"}
             
@@ -272,43 +272,42 @@ def void processStateData(payload) {
             
             rememberState("switch",swState)
             rememberState("contact",contact)
-            rememberState("battery",battery)
+            rememberState("battery", battery, "%")
             rememberState("firmware",firmware)
-            rememberState("signal",signal)      
+            fmtSignal(rssi)     
             rememberState("stateChangedAt",stateChangedAt)
 		    break;           
 		
                 
 		case "Report":
-            def devstate = object.data.state          
+            def contact = object.data.state          
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
-            def signal = object.data.loraInfo.signal  
-                                        
-            def contact = devstate 
+            def rssi = object.data.loraInfo.signal  
+
             def swState = "on"
             if (contact == "open"){swState = "off"}
             
             rememberState("switch",swState)
             rememberState("contact",contact)
-            rememberState("battery",battery)
+            rememberState("battery", battery, "%")
             rememberState("delay",delay)               
             rememberState("firmware",firmware)
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("signal",signal)      
+            fmtSignal(rssi)        
 		    break;  
             
         case "setOpenRemind":    
             def openRemindDelay = object.data.openRemindDelay   
             def alertInterval = object.data.alertInterval                             
-            def signal = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal  
     
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("signal",signal)                  
+            fmtSignal(rssi)                  
             break;	
                 
 		default:
@@ -337,7 +336,8 @@ def reset(){
     state.remove("firmware") 
     state.remove("swState")
     state.remove("contact")
-    state.remove("battery")     
+    state.remove("battery")
+    state.remove("rssi")  
     state.remove("signal")  
     state.remove("reportAt")
     state.remove("alertInterval")
@@ -392,5 +392,10 @@ def pollError(object) {
 } 
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
-} 
+  if (state.debug == "true") {log.debug msg}
+}
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

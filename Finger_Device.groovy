@@ -1,6 +1,6 @@
 /***
  *  YoLink™ Finger Device (YS4908-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
@@ -18,16 +18,19 @@
  *         - Replaced "Signal" with "RSSI" per standards and added capability "SignalStrength"
  *         - Added capability "Momentary"
  *         - Added warnings for "open" and "close" if no bound device
+ *  1.0.3: Added formatted "signal" attribute as rssi & " dBm"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.2"}
+def clientVersion() {return "1.0.3"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Finger Device (YS4908-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"    
+    input title: bold("Driver Version"), description: "YoLink™ Finger Device (YS4908-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Date Format Template Specifications"), description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"    
 }
 
 metadata {
@@ -39,7 +42,7 @@ metadata {
         capability "GarageDoorControl"
         capability "SignalStrength"        
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
         command "connect"                       // Attempt to establish MQTT connection
         command "reset"     
         command "scan"    
@@ -51,7 +54,7 @@ metadata {
         attribute "devId", "String"
         attribute "driver", "String"  
         attribute "firmware", "String"
-        attribute "rssi", "String"
+        attribute "signal", "String"
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String"         
         }
@@ -208,7 +211,7 @@ def bind(sensorid) {
            token = setup.token
            devId = setup.devId
 
-           log.info "Device's Service Setup(Hubitat dni=${my_dni}, Home ID=${homeID}, Name=${name}, Type=${type}, Token=${token}, Device Id=${devId})"          
+           logDebug("Device's Service Setup(Hubitat dni=${my_dni}, Home ID=${homeID}, Name=${name}, Type=${type}, Token=${token}, Device Id=${devId})")
               
                           
         if (devId?.contains(sensorid)) {
@@ -260,14 +263,13 @@ def timestampFormat(value) {
        logDebug("Date format set to '${value}'")
        logDebug("Current date and time in requested format: '${stamp}'")  
      } catch(Exception e) {       
-       //log.error "dateFormat() exception: ${e}"
        log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
      } 
  }
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -370,7 +372,7 @@ def parseTopic(message) {     // Parent MQTT parsing of finger device
             rememberState("contact",contact)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
-            rememberState("rssi",rssi)      
+            fmtSignal(rssi)
         
             logDebug("Parse Status: State=${contact}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
         
@@ -402,7 +404,7 @@ def void processStateData(payload) {
 			def devstate = object.data.state           
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
-            def rssi = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal
             
             def stateChangedAt = object.data.stateChangedAt
                          
@@ -414,7 +416,7 @@ def void processStateData(payload) {
             rememberState("door",contact)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
-            rememberState("rssi",rssi)      
+            fmtSignal(rssi)
             rememberState("stateChangedAt",stateChangedAt)
             
             lastResponse("Garage door is ${contact}")
@@ -437,7 +439,7 @@ def void processStateData(payload) {
             rememberState("firmware",firmware)
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("rssi",rssi)      
+            fmtSignal(rssi)
 		    break;              
             
         case "setOpenRemind":    
@@ -447,7 +449,7 @@ def void processStateData(payload) {
     
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            rememberState("rssi",rssi)                  
+            fmtSignal(rssi)
             break;	    
             
 		default:
@@ -516,7 +518,7 @@ def toggle() {
                 
                   logDebug("Parsed: stateChangedAt=$stateChangedAt, RSSI=$rssi")
                   rememberState("stateChangedAt",stateChangedAt)
-                  rememberState("rssi",rssi)
+                  fmtSignal(rssi)
                   rememberState("online","true")                    
                   lastResponse("Success")     
                                
@@ -577,6 +579,7 @@ def reset(){
     state.remove("API")
     state.remove("firmware")    
     state.remove("rssi")     
+    state.remove("signal") 
     state.remove("contact")
     rememberState("door","unknown") 
     state.remove("stateChangedAt")
@@ -631,5 +634,10 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
-}
+  if (state.debug == "true") {log.debug msg}
+} 
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

@@ -1,11 +1,9 @@
 /***
  *  YoLink™ VibrationSensor Device (YS7201-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -20,15 +18,20 @@
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions 
  *  2.0.1: Added "ShockSensor" capability: State "shock" - ENUM ["clear", "detected"] 
  *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.3: Add unit to temperature and battery attributes
+ *         - Add formatted "signal" attribute as rssi & " dBm"
+ *         - Add capability "SignalStrength"  
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ VibrationSensor Device (YS7201-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ VibrationSensor Device (YS7201-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -38,8 +41,9 @@ metadata {
         capability "Temperature Measurement"
         capability "MotionSensor"
         capability "ShockSensor"
+        capability "SignalStrength"             //rssi 
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]] 
         command "reset" 
         
         attribute "API", "String" 
@@ -134,7 +138,7 @@ def temperatureScale(value) {
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -198,8 +202,8 @@ def getDevicestate() {
                rememberState("online",online) 
                rememberState("reportAt",reportAt) 
                rememberState("alertInterval",alertInterval) 
-               rememberState("battery",battery)
-               rememberState("temperature",temperature)
+               rememberState("battery", battery, "%")
+               rememberState("temperature", temperature, "°".plus(state.temperatureScale))
                rememberState("ledAlarm",ledAlarm)
                rememberState("noVibrationDelay",noVibrationDelay)
                rememberState("sensitivity",sensitivity)
@@ -258,7 +262,7 @@ def void processStateData(payload) {
             def temperature = object.data.devTemperature 
             temperature = parent.convertTemperature(temperature) 
 
-            def signal = object.data.loraInfo.signal           
+            def rssi = object.data.loraInfo.signal           
             
             def motion = "active"                                 //ENUM ["inactive", "active"]
             if (devstate == "normal"){motion="inactive"}   
@@ -266,15 +270,15 @@ def void processStateData(payload) {
             def shock = "detected"                                //ENUM ["clear", "detected"] 
             if (devstate == "normal"){shock="clear"} 
     
-            logDebug("Parsed: State=$devstate, Battery=$battery, Alert Interval=$alertInterval, No Vibration Delay=$nomotionDelay, Sensitivity=$sensitivity, Temperature=$temperature, Signal=$signal, Motion=$motion, Shock=$shock")
+            logDebug("Parsed: State=$devstate, Battery=$battery, Alert Interval=$alertInterval, No Vibration Delay=$nomotionDelay, Sensitivity=$sensitivity, Temperature=$temperature, RSSI=$rssi, Motion=$motion, Shock=$shock")
             
             rememberState("state",devstate)
-            rememberState("battery",battery)                     
+            rememberState("battery", battery, "%")                     
             rememberState("alertInterval",alertInterval)
             rememberState("noVibrationDelay",noVibrationDelay)
             rememberState("sensitivity",sensitivity)  
-            rememberState("temperature",temperature) 
-            rememberState("signal",signal)  
+            rememberState("temperature", temperature, "°".plus(state.temperatureScale)) 
+            fmtSignal(rssi)
             rememberState("motion",motion)
             rememberState("shock",shock)
  		    break;      
@@ -287,7 +291,7 @@ def void processStateData(payload) {
             def noVibrationDelay = object.data.noVibrationDelay 
             noVibrationDelay = noVibrationDelay * 60  
             def sensitivity = object.data.sensitivity              
-            def signal = object.data.loraInfo.signal              
+            def rssi = object.data.loraInfo.signal              
             def temperature = object.data.devTemperature 
                 
             temperature = parent.convertTemperature(temperature) 
@@ -298,16 +302,16 @@ def void processStateData(payload) {
             def shock = "detected"                                //ENUM ["clear", "detected"] 
             if (devstate == "normal"){shock="clear"}                        
     
-            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, Signal=$signal, Motion=$motion, Shock=$shock, Temperature=$temperature")
+            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, RSSI=$rssi, Motion=$motion, Shock=$shock, Temperature=$temperature")
             
             rememberState("state",devstate)
-            rememberState("battery",battery)            
+            rememberState("battery", battery, "%")            
             rememberState("firmware",firmware)         
             rememberState("alertInterval",alertInterval)
             rememberState("noVibrationDelay",noVibrationDelay)
             rememberState("sensitivity",sensitivity)                        
-            rememberState("signal",signal)              
-            rememberState("temperature",temperature)
+            fmtSignal(rssi)             
+            rememberState("temperature", temperature, "°".plus(state.temperatureScale))
             rememberState("motion",motion)
             rememberState("shock",shock)
  		    break;    
@@ -317,14 +321,14 @@ def void processStateData(payload) {
             def noVibrationDelay = object.data.noVibrationDelay   
             noVibrationDelay = noVibrationDelay * 60    
             def sensitivity = object.data.sensitivity              
-            def signal = object.data.loraInfo.signal                                     
+            def rssi = object.data.loraInfo.signal                                     
             
-            logDebug("Parsed: Alert Interval=$alertInterval, No Vibration Delay=$noVibrationDelay, Sensitivity=$sensitivity, Signal=$signal")
+            logDebug("Parsed: Alert Interval=$alertInterval, No Vibration Delay=$noVibrationDelay, Sensitivity=$sensitivity, RSSI=$rssi")
             
             rememberState("alertInterval",alertInterval)
             rememberState("noVibrationDelay",noVibrationDelay)
             rememberState("sensitivity",sensitivity)                        
-            rememberState("signal",signal)  
+            fmtSignal(rssi) 
             break;    
           
 		default:
@@ -340,7 +344,8 @@ def reset(){
     rememberState("driver", clientVersion()) 
     state.remove("online")
     state.remove("firmware")     
-    state.remove("battery")     
+    state.remove("battery")   
+    state.remove("rssi")
     state.remove("signal")  
     state.remove("reportAt")
     state.remove("motion")
@@ -394,5 +399,10 @@ def pollError(object) {
 } 
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+  if (state.debug == "true") {log.debug msg}
 }
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    
