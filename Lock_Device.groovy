@@ -1,6 +1,6 @@
 /***
  *  YoLink™ Lock Device (YS7606-UC,YUF-02BN)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
@@ -16,16 +16,20 @@
  *  2.0.1: Added "driver" attribute and isSetup() for diagnostics
  *         - Define as singleThreaded
  *         - Added "PushableButton" capability for doorbell
+ *  2.0.2: Added formatted "signal" attribute as rssi & " dBm"
+ *         - Added capability "SignalStrength" 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Lock Device (YS7606-UC,YUF-02BN) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"    
+    input title: bold("Driver Version"), description: "YoLink™ Lock Device (YS7606-UC,YUF-02BN) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Date Format Template Specifications"), description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"    
 }
 
 metadata {
@@ -34,6 +38,7 @@ metadata {
         capability "Lock"
         capability "Battery"
         capability "PushableButton"
+        capability "SignalStrength"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
         command "reset"    
@@ -279,16 +284,16 @@ def parseDevice(object) {
    def lock = object.data.state
    def battery = object.data.battery 
    def lockset = object.data.rlSet   
-   def signal = object.data.loraInfo.signal     
+   def rssi = object.data.loraInfo.signal     
     
    battery = parent.batterylevel(battery) 
      
-   logDebug("Parsed: Lock=$lock, Battery=$battery, Lockset=$lockset, Signal=$signal")                      
+   logDebug("Parsed: Lock=$lock, Battery=$battery, Lockset=$lockset, RSSI=$rssi")                      
 
    rememberState("lock", lock)
    rememberState("battery", battery)
    rememberState("lockset", lockset) 
-   rememberState("signal", signal)   
+   fmtSignal(rssi)   
 }   
 
 def parseFetch(object) {
@@ -375,13 +380,13 @@ def void processStateData(payload) {
             
         case "setState":
             def lock = parent.relayState(object.data.state)   
-            def signal = object.data.loraInfo.signal   
+            def rssi = object.data.loraInfo.signal   
             def source = object.data.source
     
-            logDebug("Parsed: DeviceId=$devId, Lock=$lock, Signal=$signal, Source=$source")
+            logDebug("Parsed: DeviceId=$devId, Lock=$lock, RSSI=$rssi, Source=$source")
             
             rememberState("lock",lock)
-            rememberState("signal",signal)                                       
+            fmtSignal(rssi)                                       
             rememberState("source",source)  
 			break;  
             
@@ -391,11 +396,11 @@ def void processStateData(payload) {
             def alertType  = object.data.alertType
             def source = object.data.source   
             def user = object.data.user   
-            def signal = object.data.loraInfo.signal            
+            def rssi = object.data.loraInfo.signal            
        
             battery = parent.batterylevel(battery) 
      
-            logDebug("Parsed: Battery=$battery, Lock=$lock, Source=$source, Alert Type=$alertType, User=$user, Signal=$signal")      
+            logDebug("Parsed: Battery=$battery, Lock=$lock, Source=$source, Alert Type=$alertType, User=$user, RSSI=$rssi")      
             
             if ((source == null) && (user == null) && (alertType=="bell")) {
                 push()
@@ -412,7 +417,7 @@ def void processStateData(payload) {
             rememberState("online", "true")
             rememberState("battery", battery) 
             rememberState("lock", lock)               
-            rememberState("signal",signal)                                       
+            fmtSignal(rssi)                                      
 			break;      
             
 
@@ -450,11 +455,11 @@ def setLock(setState) {
                 rememberState("eventTime",time)
                 
                 lock = object.data.state   
-                def signal = object.data.loraInfo.signal       
+                def rssi = object.data.loraInfo.signal       
                 def source = object.data.source
-                logDebug("Parsed: Lock=$lock, Signal=$signal, Source=$source")
+                logDebug("Parsed: Lock=$lock, RSSI=$rssi, Source=$source")
                 rememberState("lock",lock)
-                rememberState("signal",signal)  
+                fmtSignal(rssi)  
                 rememberState("source",source)   
                 rememberState("user", "app")  
                 lastResponse("Lock ${lock}")     
@@ -506,6 +511,7 @@ def reset(){
     state.remove("online")
     state.remove("lock")
     state.remove("eventTime")  
+    state.remove("rssi")
     state.remove("signal")  
     state.remove("firmware") 
     state.remove("LastResponse")  
@@ -564,3 +570,8 @@ def pollError(object) {
 def logDebug(msg) {
    if (state.debug == "true") {log.debug msg}
 }
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

@@ -1,11 +1,9 @@
 /***
  *  YoLink™ Dimmer (YS5707-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD 
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -16,19 +14,22 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied. 
  * 
  *  2.0.0: Initial Release
- *  2.0.1: - Eliminate non-essential getSchedules() call
- *         - Correct unnecessary polling logic
- *         - Improve error logging
- *         - Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.1: Eliminate non-essential getSchedules() call
+ *          - Correct unnecessary polling logic
+ *          - Improve error logging
+ *          - Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.2: Add formatted "signal" attribute as rssi & " dBm"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Dimmer (YS5707-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ Dimmer (YS5707-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -51,7 +52,7 @@ metadata {
         attribute "devId", "String"
         attribute "driver", "String"  
         attribute "firmware", "String"  
-        attribute "rssi", "String"      
+        attribute "signal", "String"      
         attribute "lastResponse", "String" 
         
         attribute "timerOn", "Number"  
@@ -318,7 +319,7 @@ def parseDevice(object) {
    
    def rssi = object.data.loraInfo.signal         
      
-   logDebug("Parsed: Switch=$swState, level=$level, gentle_on=$gentle_on, gentle_off=$gentle_off, statusLED=$statusLED, levelLED=$levelLED, calibration=$calibration, timerOn=$timerOn, timerOff=$timerOff, timerBrightness=$timerBrightness, Firmware=$firmware, Signal=$signal")      
+   logDebug("Parsed: Switch=$swState, level=$level, gentle_on=$gentle_on, gentle_off=$gentle_off, statusLED=$statusLED, levelLED=$levelLED, calibration=$calibration, timerOn=$timerOn, timerOff=$timerOff, timerBrightness=$timerBrightness, Firmware=$firmware, RSSI=$rssi")      
                 
    rememberState("online", "true")
    rememberState("switch", swState)
@@ -332,7 +333,7 @@ def parseDevice(object) {
    rememberState("timerOff", timerOff)
    rememberState("timerBrightness", timerBrightness)      
    rememberState("firmware", firmware) 
-   rememberState("rssi", rssi)                         
+   fmtSignal(rssi)                        
 }   
 
 def parse(topic) {     
@@ -405,7 +406,7 @@ def void processStateData(payload) {
             
             rememberState("switch",swState)
             rememberState("level", level) 
-            rememberState("rssi",rssi)                                       
+            fmtSignal(rssi)                                       
 			break;  
             
         case "getState":           
@@ -454,7 +455,7 @@ def setSwitch(setState, brightness=null) {
                 def rssi = object.data.loraInfo.signal       
                 logDebug("Parsed: Switch=$swState, rssi=$rssi")
                 rememberState("switch",swState)
-                rememberState("rssi",rssi)  
+                fmtSignal(rssi)  
                 lastResponse("Switch ${swState}")     
                                
             } else {                
@@ -594,6 +595,7 @@ def reset(){
     state.remove("timerOff")       
     state.remove("timerBrightness")
     state.remove("rssi")    
+    state.remove("signal")    
     state.remove("powerOnState")
     state.remove("LastResponse")  
     state.remove("schedules") 
@@ -649,5 +651,10 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug==true) {log.debug msg}
+   if (state.debug=="true") {log.debug msg}
 }
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

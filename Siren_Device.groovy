@@ -1,11 +1,9 @@
 /***
  *  YoLink™ Siren (YS7103-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
- *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD
+ *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP   
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -28,15 +26,19 @@
  *         - Correct Alarm state 
  *         - Recognize when device is turned off
  *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.3: Added formatted "signal" attribute as rssi & " dBm"
+ *         - Added capability "SignalStrength"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "Siren (YS7103-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "Siren (YS7103-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 
@@ -47,6 +49,7 @@ metadata {
         capability "Alarm"                  // ENUM ["strobe", "off", "both", "siren"]    
         capability "PowerSource"            // ENUM ["battery", "dc", "mains", "unknown"]  API "usb" = "mains"
         capability "Switch"                 // ENUM ["on", "off"]
+        capability "SignalStrength"
        
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:[true, false]]] 
         command "reset"          
@@ -140,7 +143,7 @@ def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -240,14 +243,14 @@ def parseDevice(object) {
     if (powerSource == "usb") {powerSource = "mains"}
     def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error   
     def firmware = object.data.version.toUpperCase()
-    def signal = object.data.loraInfo.signal
+    def rssi = object.data.loraInfo.signal
     
     rememberState("volume",volume)
     rememberState("battery",battery)
     rememberState("powerSource",powerSource)    
     rememberState("alarmDuration",alarmDuration)
     rememberState("firmware",firmware)    
-    rememberState("signal",signal)
+    fmtSignal(rssi)
     
     setAlarmState(alarm)
                    
@@ -259,7 +262,7 @@ def parseDevice(object) {
              "Power Source(${state.powerSource}), " +
              "Alarm Duration(${alarmDuration}), " +
              "Firmware(${firmware}), " +
-             "Signal(${signal})")    
+             "RSSI(${rssi})")    
 }   
 
 def setAlarmState(alarm) {
@@ -333,18 +336,18 @@ def void processStateData(payload) {
             
         case "setDuation": //API message has a spelling error    
             def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error    
-            def signal = object.data.loraInfo.signal
+            def rssi = object.data.loraInfo.signal
             rememberState("alarmDuration",alarmDuration)
-            rememberState("signal",signal)
+            fmtSignal(rssi)
             break;   
             
         case "setState":  //"normal","alert","off"
             def alarm = object.data.state    
-            def signal = object.data.loraInfo.signal
+            def rssi = object.data.loraInfo.signal
             
             setAlarmState(alarm)
             
-            rememberState("signal",signal)
+            fmtSignal(rssi)
             break; 
            
 		default:
@@ -366,6 +369,7 @@ def reset(){
     state.remove("alarmDuration")
     state.remove("powerSource")    
     state.remove("firmware")
+    state.remove("rssi")
     state.remove("signal")
           
     poll(true)    
@@ -412,5 +416,10 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
-} 
+  if (state.debug == "true") {log.debug msg}
+}
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

@@ -1,11 +1,9 @@
 /***
  *  YoLink™ LeakSensor (YS7903-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -18,25 +16,29 @@
  *  1.0.1: Process "Report" notification
  *          - Send all Events values as a String per https://docs.hubitat.com/index.php?title=Event_Object#value
  *  1.0.2: Fix syncing of Temperature scale with YoLink™ Device Service app
- *  1.1.0: - Fix donation URL 
+ *  1.1.0: Fix donation URL 
  *         - New Function: Formats event timestamp according to user specifiable format
  *  1.1.1: Added getSetup()
  *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
  *  2.0.1: Added correct state ('water') for WaterSensor capability - fixes dashboard errors. Remove unused setSwitch() routine.
  *  2.0.2: Support diagnostics, correct various errors, make singleThreaded
- *  2.0.3: - Support Switch capability via alerts and alertThreshold
+ *  2.0.3: Support Switch capability via alerts and alertThreshold
  *         - Clean up code
  *         - Add SignalStrength capability (Replaces 'signal' attribute with standard 'rssi')
+ *  2.0.4: Added unit values to: temperature, battery
+ *         - Add formatted "signal" attribute as rssi & " dBm"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.4"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ LeakSensor (YS7903-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Date Format Template Specifications", description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ LeakSensor (YS7903-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Date Format Template Specifications"), description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -57,8 +59,8 @@ metadata {
         attribute "devId", "String"
         attribute "driver", "String"  
         attribute "firmware", "String"  
-        attribute "rssi", "String"
         attribute "lastResponse", "String" 
+        attribute "signal", "String" 
         
         attribute "interval", "integer"
         attribute "state", "String"  
@@ -177,7 +179,6 @@ def timestampFormat(value) {
        logDebug("Date format set to '${value}'")
        logDebug("Current date and time in requested format: '${stamp}'")  
      } catch(Exception e) {       
-       //log.error "dateFormat() exception: ${e}"
        log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
      } 
  }
@@ -255,8 +256,8 @@ def parseDevice(object) {
    rememberState("online", online)
    rememberState("state", swState)
    rememberState("water", waterState(swState)) 
-   rememberState("battery", battery)
-   rememberState("temperature", temperature) 
+   rememberState("battery", battery, "%")
+   rememberState("temperature", temperature, "°".plus(state.temperatureScale)) 
    rememberState("interval", interval)
    rememberState("stateChangedAt", stateChangedAt) 
    rememberState("firmware", firmware)
@@ -289,7 +290,7 @@ def void processStateData(payload) {
             
             rememberState("online", "true")
             rememberState("interval",interval)
-            rememberState("rssi",rssi) 
+            fmtSignal(rssi)
  		    break;
             
         case "Report":     
@@ -316,10 +317,10 @@ def void processStateData(payload) {
             rememberState("state", swState)
             if ((event == "Alert") || (event == "StatusChange"))  {rememberState("water", waterState(swState,"alert"))
             } else {rememberState("water", waterState(swState))}
-            rememberState("battery", battery)
+            rememberState("battery", battery, "%")
             rememberState("firmware", firmware)
-            rememberState("temperature", temperature) 
-            rememberState("rssi", rssi)
+            rememberState("temperature", temperature, "°".plus(state.temperatureScale)) 
+            fmtSignal(rssi)
             rememberState("stateChangedAt", stateChangedAt)                     
           
 			break;
@@ -400,6 +401,7 @@ def reset(){
     state.remove("interval")
     state.remove("firmware")
     state.remove("rssi")
+    state.remove("signal")
     state.remove("stateChangedAt")
     
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
@@ -456,3 +458,8 @@ def pollError(object) {
 def logDebug(msg) {
    if (state.debug == "true") {log.debug msg}
 } 
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

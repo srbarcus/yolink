@@ -1,11 +1,9 @@
 /***
  *  YoLink MultiOutlet (YS6801-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD 
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -26,16 +24,20 @@
  *  2.1.1: Add preference "AllowMixed" to allow 'Mixed' state if some outlets are on and some are off (original behavior). Default is "false": If one or more outlets "on", then switch = "on", else switch = "off"  
  *  2.1.2: Support diagnostics, correct various errors, make singleThreaded
  *  2.1.3: Replaces "MultiOutlet Outlet" with "YoLink MultiOutlet Outlet" driver for naming consistency
+ *  2.1.4: Added formatted "signal" attribute as rssi & " dBm"
+ *         - Added capability "SignalStrength"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.1.3"}
+def clientVersion() {return "2.1.4"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Allow 'Mixed' switch state if some outlets are on and some are off", name: "AllowMixed", type: "bool", required: true, defaultValue: "false" 
-    input title: "Driver Version", description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ MultiOutlet (YS6801-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Allow 'Mixed' state"), description: "Allow 'Mixed' switch state if some outlets are on and some are off", name: "AllowMixed", type: "bool", required: true, defaultValue: "false" 
 }
 
 metadata {
@@ -43,6 +45,7 @@ metadata {
 		capability "Polling"	
         capability "Outlet"
         capability "Switch"
+        capability "SignalStrength"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:[true, false]]] 
         command "reset" 
@@ -95,7 +98,6 @@ metadata {
         attribute "outlet2", "String" 
         attribute "outlet3", "String" 
         attribute "outlet4", "String" 
-
         
         attribute "timer1on", "integer"
         attribute "timer1off", "integer"
@@ -195,7 +197,7 @@ def temperatureScale(value) {}
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value==true) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -455,7 +457,7 @@ def getDevicestate() {
 
 def parseDevice(object) {
    def firmware = object.data.version.toUpperCase()
-   def signal = object.data.loraInfo.signal          
+   def rssi = object.data.loraInfo.signal          
    
    def USB      = outletSwitch(object.data.state[0])
    def outlet1  = outletSwitch(object.data.state[1])
@@ -483,14 +485,14 @@ def parseDevice(object) {
    def timer4onHM  = (timer4on/60).toInteger() + ":" +  (timer4on-((timer4on/60).toInteger()*60)) 
    def timer4offHM = (timer4off/60).toInteger() + ":" + (timer4off-((timer4off/60).toInteger()*60))      
           
-   logDebug("USB=$USB, Outlet1=$outlet1, Outlet2=$outlet2, Outlet3=$outlet3, Outlet4=$outlet4, Firmware=$firmware, Signal=$signal")  
+   logDebug("USB=$USB, Outlet1=$outlet1, Outlet2=$outlet2, Outlet3=$outlet3, Outlet4=$outlet4, Firmware=$firmware, RSSi=$rssi")  
    logDebug("Timer4 on=$timer4on($timer4onHM), Timer4 off=$timer4off($timer4offHM)")   
    logDebug("Timer3 on=$timer3on($timer3onHM), Timer3 off=$timer3off($timer3offHM)")   
    logDebug("Timer2 on=$timer2on($timer2onHM), Timer2 off=$timer2off($timer2offHM)")   
    logDebug("Timer1 on=$timer1on($timer1onHM), Timer1 off=$timer1off($timer1offHM)")       
     
    rememberState("firmware",firmware)
-   rememberState("signal",signal)
+   fmtSignal(rssi)
    rememberState("USBports",USB)
    rememberState("outlet1",outlet1)
    rememberState("outlet2",outlet2)
@@ -596,14 +598,14 @@ def void processStateData(payload) {
             
         case "setState":
         case "StatusChange":
-            def signal = object.data.loraInfo.signal          
+            def rssi = object.data.loraInfo.signal          
             def USB      = outletSwitch(object.data.state[0])
             def outlet1  = outletSwitch(object.data.state[1])
             def outlet2  = outletSwitch(object.data.state[2])
             def outlet3  = outletSwitch(object.data.state[3])
             def outlet4  = outletSwitch(object.data.state[4])
             
-            rememberState("signal",signal)
+            fmtSignal(rssi)
             rememberState("USBports",USB)
             rememberState("outlet1",outlet1)
             rememberState("outlet2",outlet2)
@@ -614,7 +616,7 @@ def void processStateData(payload) {
             
             syncOutlets()
             
-            logDebug("$event: USBports=$USB, Outlet1=$outlet1, Outlet2=$outlet2, Outlet3=$outlet3, Outlet4=$outlet4, Signal=$signal") 
+            logDebug("$event: USBports=$USB, Outlet1=$outlet1, Outlet2=$outlet2, Outlet3=$outlet3, Outlet4=$outlet4, RSSI=$rssi") 
    
 			break;       
             
@@ -696,14 +698,14 @@ def setSwitch(mask,SWstate) {
             logDebug("setSwitch(): pollAPI() response: ${object}")  
                               
             if (successful(object)) {                               
-                def signal   = object.data.loraInfo.signal       
+                def rssi   = object.data.loraInfo.signal       
                 def USB      = outletSwitch(object.data.state[0])
                 def outlet1  = outletSwitch(object.data.state[1])
                 def outlet2  = outletSwitch(object.data.state[2])
                 def outlet3  = outletSwitch(object.data.state[3])
                 def outlet4  = outletSwitch(object.data.state[4])
                             
-                rememberState("signal",signal)  
+                fmtSignal(rssi)  
                 rememberState("USBports",USB)
                 rememberState("outlet1",outlet1)
                 rememberState("outlet2",outlet2)
@@ -818,6 +820,7 @@ def reset(){
     state.remove("watt")   
     state.remove("time")  
     state.remove("tzone")   
+    state.remove("rssi") 
     state.remove("signal")    
     state.remove("powerOnState")
     
@@ -901,8 +904,13 @@ def pollError(object) {
 }  
 
 def logDebug(msg) {
-   if (state.debug==true) {log.debug msg}
+  if (state.debug == "true") {log.debug msg}
 }
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    
 
 def removeSchedules() {
     state.remove("schedules")
@@ -915,4 +923,4 @@ def removeSchedules() {
     state.remove("schedule7")
     state.remove("schedule8")
     state.remove("schedule9") 
-}    
+}

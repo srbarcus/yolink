@@ -1,12 +1,10 @@
 /***
  *  YoLink™ Valve (YS4909-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
  *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD 
- *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
  *  this software under this Agreement. However, the User shall make no commercial use of the software without
@@ -26,22 +24,28 @@
  *         - Removed delay_ch attribute - no useful since device on has a single channel
            - Added delay_on attribute
            - Change null delay_on or delay_off value to 0
+ *  2.0.2: Handle "Alert" event
+ *  2.0.3: Added formatted "signal" attribute as rssi & " dBm"
+ *         - Added capability "SignalStrength" 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.3"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Valve (YS4909-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ Valve (YS4909-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
     definition (name: "YoLink Manipulator Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"	
         capability "Valve"
-        capability "Battery"   
+        capability "Battery"
+        capability "SignalStrength"
                              
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]] 
         command "reset"
@@ -218,7 +222,7 @@ def parseDevice(object) {
    def firmware = object.data.version.toUpperCase()
    def time = object.data.time
    def tzone = object.data.tz
-   def signal = object.data.loraInfo.signal      
+   def rssi = object.data.loraInfo.signal      
    
    if (delay_on == null) {delay_on = 0}
    if (delay_off == null) {delay_off = 0}
@@ -232,7 +236,7 @@ def parseDevice(object) {
    rememberState("firmware", firmware)
    rememberState("time", time)
    rememberState("tzone", tzone)
-   rememberState("signal", signal)                         
+   fmtSignal(rssi)                         
 }   
 
 def parse(topic) {     
@@ -254,14 +258,15 @@ def void processStateData(payload) {
         logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
-		case "StatusChange":         
+		case "StatusChange":
+        case "Alert":     
             def valve = object.data.state
-            def signal = object.data.loraInfo.signal             
+            def rssi = object.data.loraInfo.signal             
     
-            logDebug("Parsed: Valve=$valve, Signal=$signal")
+            logDebug("Parsed: Valve=$valve, RSSI=$rssi")
             
             rememberState("valve", valve)    
-            rememberState("signal",signal)                          
+            fmtSignal(rssi)                          
 		    break;
             
 		case "setDelay":            
@@ -285,12 +290,12 @@ def void processStateData(payload) {
             
         case "setState":
             def valve = object.data.state   
-            def signal = object.data.loraInfo.signal             
+            def rssi = object.data.loraInfo.signal             
     
-            logDebug("Parsed: Valve=$valve, Signal=$signal")
+            logDebug("Parsed: Valve=$valve, RSSI=$rssi")
             
             rememberState("valve", valve)    
-            rememberState("signal",signal)                                       
+            fmtSignal(rssi)                                       
 			break;  
             
         case "getState":           
@@ -372,10 +377,10 @@ def setValve(setState) {
    try {         
       def object = parent.pollAPI(request, state.name, state.type)  
       def valve = object.data.state
-      def signal = object.data.loraInfo.signal         
+      def rssi = object.data.loraInfo.signal         
   
       rememberState("valve", valve)    
-      rememberState("signal", signal)  
+      state.remove("signal")   
    
     } catch (e) {	
         log.error "setValve() exception: $e"
@@ -395,7 +400,8 @@ def reset(){
     state.remove("delay_off")
     state.remove("openRemind")   
     state.remove("time")  
-    state.remove("tzone")   
+    state.remove("tzone")  
+    state.remove("rssi") 
     state.remove("signal")    
     state.remove("schedules") 
     state.remove("schedule1")
@@ -451,3 +457,8 @@ def pollError(object) {
 def logDebug(msg) {
    if (state.debug == "true") {log.debug msg}
 }
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

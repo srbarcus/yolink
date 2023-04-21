@@ -1,11 +1,9 @@
 /***
  *  YoLink™ Motion Sensor (YS7804-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -23,17 +21,23 @@
  *  1.0.4: Minor tracing fix, Fix syncing of Temperature scale with YoLink™ Device Service app
  *  1.0.5: Fix donation URL
  *  1.0.6: Added getSetup()
- *  2.0.0: - Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
+ *  2.0.0: Reengineer driver to use centralized MQTT listener due to new YoLink service restrictions
  *  2.0.1: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.2: Add unit to temperature and battery attributes
+ *         - Added formatted "signal" attribute as rssi & " dBm"
+ *         - Added capability "SignalStrength"
+ *  2.0.3: Handle event 'setOpenRemind'
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.3"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -42,8 +46,9 @@ metadata {
 		capability "Battery"
         capability "Temperature Measurement"
         capability "MotionSensor"
+        capability "SignalStrength"
                                       
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]] 
+        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]] 
         command "reset" 
         
         attribute "online", "String"
@@ -137,7 +142,7 @@ def temperatureScale(value) {
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -196,8 +201,8 @@ def getDevicestate() {
                rememberState("online",online) 
                rememberState("reportAt",reportAt) 
                rememberState("alertInterval",alertInterval) 
-               rememberState("battery",battery)
-               rememberState("temperature",temperature)
+               rememberState("battery", battery, "%")
+               rememberState("temperature", temperature, "°".plus(state.temperatureScale))
                rememberState("ledAlarm",ledAlarm)
                rememberState("nomotionDelay",nomotionDelay)
                rememberState("sensitivity",sensitivity)
@@ -253,23 +258,41 @@ def void processStateData(payload) {
             def alertInterval = object.data.alertInterval    
             def nomotionDelay = object.data.nomotionDelay    
             def sensitivity = object.data.sensitivity              
-            def signal = object.data.loraInfo.signal           
+            def rssi = object.data.loraInfo.signal           
             
             def motion = "active"                                 //ENUM ["inactive", "active"]
             if (devstate == "normal"){motion="inactive"}                               
     
-            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, Signal=$signal, Motion=$motion")
+            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, RSSI=$rssi, Motion=$motion")
             
             rememberState("state",devstate)
-            rememberState("battery",battery)            
+            rememberState("battery", battery, "%")            
             rememberState("firmware",firmware)      
             rememberState("ledAlarm",ledAlarm)
             rememberState("alertInterval",alertInterval)
             rememberState("nomotionDelay",nomotionDelay)
             rememberState("sensitivity",sensitivity)                        
-            rememberState("signal",signal)  
+            fmtSignal(rssi) 
             rememberState("motion",motion)           
- 		    break;      
+ 		    break;     
+            
+//Message received: {"event":"MotionSensor.setOpenRemind","time":1681487912545,"msgid":"1681487912543","data":{"alertInterval":5,"ledAlarm":true,"nomotionDelay":1,
+//"sensitivity":3,"loraInfo":{"signal":-32,"gatewayId":"d88b4c160400012d","gateways":1}},"deviceId":"d88b4c0200049cfa"}
+        case "setOpenRemind":
+            def alertInterval = object.data.alertInterval
+            def ledAlarm = object.data.ledAlarm    
+            def nomotionDelay = object.data.nomotionDelay    
+            def sensitivity = object.data.sensitivity              
+            def rssi = object.data.loraInfo.signal   
+            
+            logDebug("Parsed: DeviceId=$devId, Alert Interval=$alertInterval, LED Alarm=$ledAlarm, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, RSSI=$rssi")
+            
+            rememberState("alertInterval",alertInterval)
+            rememberState("ledAlarm",ledAlarm)
+            rememberState("nomotionDelay",nomotionDelay)
+            rememberState("sensitivity",sensitivity)                        
+            fmtSignal(rssi)  
+            break;
             
         case "Report":
 			def devstate = object.data.state                     
@@ -279,7 +302,7 @@ def void processStateData(payload) {
             def alertInterval = object.data.alertInterval    
             def nomotionDelay = object.data.nomotionDelay    
             def sensitivity = object.data.sensitivity              
-            def signal = object.data.loraInfo.signal              
+            def rssi = object.data.loraInfo.signal              
             def temperature = object.data.devTemperature 
                 
             temperature = parent.convertTemperature(temperature) 
@@ -287,18 +310,18 @@ def void processStateData(payload) {
             def motion = "active"                                 //ENUM ["inactive", "active"]
             if (devstate == "normal"){motion="inactive"} 
     
-            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, Signal=$signal, Motion=$motion, Temperature=$temperature")
+            logDebug("Parsed: DeviceId=$devId, State=$devstate, Battery=$battery, Firmware=$firmware, LED Alarm=$ledAlarm, Alert Interval=$alertInterval, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, RSSI=$rssi, Motion=$motion, Temperature=$temperature")
             
             rememberState("state",devstate)
-            rememberState("battery",battery)            
+            rememberState("battery", battery, "%")            
             rememberState("firmware",firmware)      
             rememberState("ledAlarm",ledAlarm)
             rememberState("alertInterval",alertInterval)
             rememberState("nomotionDelay",nomotionDelay)
             rememberState("sensitivity",sensitivity)                        
-            rememberState("signal",signal)  
+            fmtSignal(rssi)  
             rememberState("motion",motion)
-            rememberState("temperature",temperature)
+            rememberState("temperature", temperature, "°".plus(state.temperatureScale))
  		    break;                                              
             
 		default:
@@ -311,19 +334,22 @@ def void processStateData(payload) {
 
 def reset(){
     state.remove("driver")
-    rememberState("driver", clientVersion()) 
+    rememberState("driver", clientVersion())
     state.remove("online")
-    state.remove("firmware") 
+    state.remove("firmware")
     state.remove("swState")
     state.remove("door")
-    state.remove("alertType")  
-    state.remove("battery")     
-    state.remove("signal")  
+    state.remove("alertType")
+    state.remove("battery")
+    state.remove("rssi")
+    state.remove("signal")
     state.remove("reportAt")
     state.remove("alertInterval")
     state.remove("delay")             //Undocumented response   
+    state.remove("temperature")
     state.remove("openRemindDelay")
-    state.temperatureScale = "F"
+    
+    rememberState("temperatureScale", parent.temperatureScale)
     
     poll(true)
     
@@ -369,5 +395,10 @@ def pollError(object) {
 } 
 
 def logDebug(msg) {
-   if (state.debug) {log.debug msg}
+  if (state.debug == "true") {log.debug msg}
 }
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    

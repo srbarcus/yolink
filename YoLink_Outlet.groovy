@@ -1,10 +1,8 @@
 /***
  *  YoLink Outlet - Allows individual outlet control of a MultiOutlet Device via a Dashboard 
- *  © 2022 Steven Barcus 
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD 
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -14,24 +12,25 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
  *  
- *  2.0.0 - Define as required driver (used as child for YoLink Devices)  
- *  2.0.1 - Replace 'MultiOutlet Outlet' for naming consistency
+ *  2.0.0: Define as required driver (used as child for YoLink Devices)  
+ *  2.0.1: Replace 'MultiOutlet Outlet' for naming consistency
+ *  2.0.2: Copyright update and UI formatting, remove debugging option
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.1"}
+def clientVersion() {return "2.0.2"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink Outlet v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink Outlet v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
     definition (name: "YoLink Outlet", namespace: "srbarcus", author: "Steven Barcus") {     	
         capability "Switch"
-                                     
-        command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["True", "False"]]]
         }
  }
 
@@ -39,7 +38,6 @@ def installed() {
  }
 
 void DeviceSetup(outletNumber) {  
-    state.debug = false
     state.outlet = outletNumber      
  }
 
@@ -48,15 +46,6 @@ def updated() {
 
 def uninstalled() {
  }
-
-def debug(value) { 
-   rememberState("debug",value)
-   if (value) {
-     log.info "Debugging enabled"
-   } else {
-     log.info "Debugging disabled"
-   }    
-}
 
 def on (sync=true) {
   setSwitch("on",sync)
@@ -105,8 +94,4 @@ def rememberState(name,value,unit=null) {
          sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
      }           
    }
-}   
-
-def logDebug(msg) {
-   if (state.debug) {log.debug msg}
 }

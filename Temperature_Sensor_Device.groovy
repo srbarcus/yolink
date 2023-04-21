@@ -1,11 +1,9 @@
 /***
  *  YoLink™ Temperature Sensor (YS8004-UC)
- *  © 2022 Steven Barcus
+ *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
- *
- *  Donations are appreciated and allow me to purchase more YoLink devices for development: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD
  *   
  *  Developer retains all rights, title, copyright, and interest, including patent rights and trade
  *  secrets in this software. Developer grants a non-exclusive perpetual license (License) to User to use
@@ -31,15 +29,20 @@
  *         - Corrected incorrect values if calibrations were specified
  *         - Added isSetup() 
  *  2.0.4: Support diagnostics, correct various errors, make singleThreaded
+ *  2.0.5: Add formatted "signal" attribute as rssi & " dBm"
+ *         - Add capability "SignalStrength"  
+ *         - Add unit values to: temperature, battery
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.0.5"}
+def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: "Driver Version", description: "YoLink™ Temperature Sensor (YS8004-UC) v${clientVersion()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
-    input title: "Please donate", description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ Temperature Sensor (YS8004-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
 metadata {
@@ -48,6 +51,7 @@ metadata {
 		capability "Battery"
         capability "TemperatureMeasurement"   
         capability "Alarm" //ENUM ["strobe", "off", "both", "siren"]
+        capability "SignalStrength"             //rssi
                                       
         command "debug", [[name:"Debug Driver",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]  
         command "temperatureScale", [[name:"Temperature Scale",type:"ENUM", description:"Temperature reporting scale (Fahrenheit or Celsius)", constraints:["F", "C"]]]   
@@ -150,7 +154,7 @@ def temperatureScale(value) {
 
 def debug(value) { 
    rememberState("debug",value)
-   if (value) {
+   if (value == "true") {
      log.info "Debugging enabled"
    } else {
      log.info "Debugging disabled"
@@ -217,7 +221,7 @@ def parseDevice(object, source) {
     def tempLimitMin
     def temperature
     def firmware
-    def signal
+    def rssi
     
     switch(source) {
 		case "devicestate":
@@ -246,12 +250,12 @@ def parseDevice(object, source) {
         
             alarmState(temperature,tempLimitMin,tempLimitMax)
 
-            rememberState("battery",battery)    
+            rememberState("battery", battery, "%")    
             rememberState("alertInterval",alertInterval)
             rememberState("tempCorrection",tempCorrection)
             rememberState("tempLimitMax",tempLimitMax)
             rememberState("tempLimitMin",tempLimitMin)
-            rememberState("temperature",temperature,state.temperatureScale)
+            rememberState("temperature", temperature, "°".plus(state.temperatureScale))
             rememberState("firmware",firmware)
 
             logDebug("Device State: online(${online}), " +
@@ -281,7 +285,7 @@ def parseDevice(object, source) {
             tempLimitMax = object.data.tempLimit.max
             tempLimitMin = object.data.tempLimit.min
             firmware = object.data.version.toUpperCase()   
-            signal = object.data.loraInfo.signal
+            rssi = object.data.loraInfo.signal
 
             logDebug("Report Event Reported: Temperature(${temperature}), Temp Limit Max(${tempLimitMax}), Temp Limit Min(${tempLimitMin})")
             
@@ -292,23 +296,22 @@ def parseDevice(object, source) {
             logDebug("Report Event Converted: Temperature(${temperature}), Temp Limit Max(${tempLimitMax}), Temp Limit Min(${tempLimitMin})")
 
             rememberState("online",online)
-            rememberState("signal",signal)
+            fmtSignal(rssi) 
             rememberState("lowBattery",lowBattery)
-            rememberState("battery",battery)    
+            rememberState("battery", battery, "%")    
             rememberState("alertInterval",alertInterval)
             rememberState("state",devstate)
             rememberState("tempCorrection",tempCorrection)
             rememberState("tempLimitMax",tempLimitMax)
             rememberState("tempLimitMin",tempLimitMin)
-            rememberState("temperature",temperature,state.temperatureScale)
+            rememberState("temperature", temperature, "°".plus(state.temperatureScale))
             rememberState("firmware",firmware)
-            rememberState("signal",signal)
 
             alarmState(temperature,tempLimitMin,tempLimitMax)
          
             logDebug("Device State: online(${online}), " +
                      "Firmware(${firmware}), " +
-                     "Signal(${signal}), " +
+                     "RSSI(${rssi}), " +
                      "Low Battery(${lowBattery}), " +
                      "Low Temp:(${lowTemp}), " +
                      "Hight Temp(${highTemp}), " +
@@ -329,7 +332,7 @@ def parseDevice(object, source) {
             battery = parent.batterylevel(object.data.battery) 
             temperature = object.data.temperature
             firmware = object.data.version.toUpperCase()           
-            signal = object.data.loraInfo.signal    
+            rssi = object.data.loraInfo.signal    
         
             temperature = parent.convertTemperature(temperature,state.temperatureScale)
         
@@ -339,14 +342,14 @@ def parseDevice(object, source) {
             rememberState("lowBattery",lowBattery)  
             rememberState("lowTemp",lowTemp)        
             rememberState("highTemp",highTemp)            
-            rememberState("battery",battery)    
-            rememberState("temperature", temperature, state.temperatureScale)  
+            rememberState("battery", battery, "%")    
+            rememberState("temperature", temperature, "°".plus(state.temperatureScale))  
             rememberState("firmware",firmware)        
-            rememberState("signal",signal)
+            fmtSignal(rssi)  
                
             logDebug("State(${devstate}), " +
                      "Firmware(${firmware}), " +
-                     "Signal(${signal}), " +            
+                     "RSSI(${rssi}), " +            
                      "Low Battery(${lowBattery}), " +
                      "Low Temp:(${lowTemp}), " +
                      "Hight Temp(${highTemp}), " +   
@@ -382,7 +385,7 @@ def void processStateData(payload) {
             def alertInterval = object.data.interval    
             def tempLimitMax = object.data.tempLimit.max
             def tempLimitMin = object.data.tempLimit.min
-            def signal = object.data.loraInfo.signal
+            def rssi = object.data.loraInfo.signal
 
             tempLimitMax = parent.convertTemperature(tempLimitMax,state.temperatureScale)
             tempLimitMin = parent.convertTemperature(tempLimitMin,state.temperatureScale)
@@ -390,12 +393,12 @@ def void processStateData(payload) {
             logDebug("setAlarm: Alert Interval(${alertInterval}), " +
                      "Temp Limit Max(${tempLimitMax}), " + 
                      "Temp Limit Min(${tempLimitMin}), " + 
-                     "Signal(${signal})")
+                     "RSSI(${rssi})")
             
             rememberState("alertInterval",alertInterval)
             rememberState("tempLimitMax",tempLimitMax)
             rememberState("tempLimitMin",tempLimitMin)
-            rememberState("signal",signal)
+            fmtSignal(rssi) 
 			break;	
          
         case "Alert":                            
@@ -453,6 +456,8 @@ def reset(){
     state.remove("lowTemp")
     state.remove("highTemp")
     state.remove("battery")
+    state.remove("rssi")
+    state.remove("signal")    
     state.remove("state")
     state.remove("tempCorrection")
     state.remove("tempLimitMax")
@@ -509,4 +514,9 @@ def pollError(object) {
 
 def logDebug(msg) {
   if (state.debug == "true") {log.debug msg}
-} 
+}
+
+def fmtSignal(rssi) {
+   rememberState("rssi",rssi) 
+   rememberState("signal",rssi.plus(" dBm")) 
+}    
