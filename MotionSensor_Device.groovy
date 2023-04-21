@@ -26,11 +26,12 @@
  *  2.0.2: Add unit to temperature and battery attributes
  *         - Added formatted "signal" attribute as rssi & " dBm"
  *         - Added capability "SignalStrength"
+ *  2.0.3: Handle event 'setOpenRemind'
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -273,7 +274,25 @@ def void processStateData(payload) {
             rememberState("sensitivity",sensitivity)                        
             fmtSignal(rssi) 
             rememberState("motion",motion)           
- 		    break;      
+ 		    break;     
+            
+//Message received: {"event":"MotionSensor.setOpenRemind","time":1681487912545,"msgid":"1681487912543","data":{"alertInterval":5,"ledAlarm":true,"nomotionDelay":1,
+//"sensitivity":3,"loraInfo":{"signal":-32,"gatewayId":"d88b4c160400012d","gateways":1}},"deviceId":"d88b4c0200049cfa"}
+        case "setOpenRemind":
+            def alertInterval = object.data.alertInterval
+            def ledAlarm = object.data.ledAlarm    
+            def nomotionDelay = object.data.nomotionDelay    
+            def sensitivity = object.data.sensitivity              
+            def rssi = object.data.loraInfo.signal   
+            
+            logDebug("Parsed: DeviceId=$devId, Alert Interval=$alertInterval, LED Alarm=$ledAlarm, No Motion Delay=$nomotionDelay, Sensitivity=$sensitivity, RSSI=$rssi")
+            
+            rememberState("alertInterval",alertInterval)
+            rememberState("ledAlarm",ledAlarm)
+            rememberState("nomotionDelay",nomotionDelay)
+            rememberState("sensitivity",sensitivity)                        
+            fmtSignal(rssi)  
+            break;
             
         case "Report":
 			def devstate = object.data.state                     

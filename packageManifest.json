@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Added 'SignalStrength' capability to all devices (State value is 'rssi')\n- Insure State value 'signal' is consistent across devices and append 'dBm' to rssi value\n- Various error fixes\n- Modify THSensor driver to support X3 sensors (beta)\n",
+    "releaseNotes": "- Adds 'MusicPlayer' capability to SpeakerHub for Rules compatibility\n- Fixes "setOpenRemind" error on Motion Sensors\n- Fixes 'getState' error on X3 THSensors\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -33,7 +33,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SpeakerHub_Device.groovy",
             "required": true,
-            "version": "2.0.2"
+            "version": "2.0.3"
         },
         {
             "id": "d353c8a6-55f0-44bb-b3cb-135d7dbaac23",
@@ -65,7 +65,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MotionSensor_Device.groovy",
             "required": false,
-            "version": "2.0.2"
+            "version": "2.0.3"
         },
         {
             "id": "ce627334-e153-4494-8f20-f6f5bc8c1d90",
@@ -121,7 +121,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
             "required": false,
-            "version": "2.0.5"
+            "version": "2.0.6"
         },
         {
             "id": "379a9757-a79d-4584-9f64-61b0c32166f7",

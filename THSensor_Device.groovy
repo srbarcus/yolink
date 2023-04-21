@@ -36,11 +36,13 @@
  *         - Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"  
  *         - Add unit values to: temperature, battery
+ *  2.0.6: Fix handling of X3 "THSensor.DataRecord" events
+ *         - Handle X3 "THSensor.getState" events
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.5"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -225,6 +227,7 @@ def parseDevice(object, source) {
     def lowTemp
     def highTemp
     def battery
+    def batteryType
     def alertInterval
     def devstate
     def tempCorrection
@@ -239,6 +242,7 @@ def parseDevice(object, source) {
     def humidityCorrection
     def humidityLimitMax
     def humidityLimitMin
+    def recordInterval
     
     switch(source) {
 		case "devicestate":
@@ -316,6 +320,8 @@ def parseDevice(object, source) {
             lowTemp = object.data.alarm.lowTemp.toString()
             highTemp = object.data.alarm.highTemp.toString()
             battery = parent.batterylevel(object.data.battery) 
+            batteryType = parent.batteryType              //X3 
+            recordInterval =  object.data.recordInterval  //X3
             alertInterval = object.data.interval
             tempCorrection = object.data.tempCorrection
             temperature = object.data.temperature
@@ -365,6 +371,8 @@ def parseDevice(object, source) {
                      "Low Temp:(${lowTemp}), " +
                      "Hight Temp(${highTemp}), " +
                      "Battery(${battery}), " +
+                     "Battery Type(${batteryType}), " +
+                     "Record Interval(${battery}), " +
                      "Alert Interval(${alertInterval}), " +
                      "State(${devstate}), " + 
                      "Temp Correction(${tempCorrection}), " + 
@@ -487,17 +495,23 @@ def void processStateData(payload) {
 			break;
 
 		case "Report":
+        case "getState":    
             parseDevice(object,"report")
 			break;	
             
         case "DataRecord":            // X3 Sensor
-            temperature = object.data.records.temperature
-            humidity = object.data.records.humidity
+            temperature = object.data.records.temperature[0]
+            humidity = object.data.records.humidity[0]
+            logDebug("DataRecord: Temperature(${temperature}), Humidity(${humidity})")
+                     
             temperature =  parent.convertTemperature(temperature,state.temperatureScale)
+                     
+            logDebug("DataRecord: Converted Temperature(${temperature})")
+            
             rememberState("temperature", temperature, "°".plus(state.temperatureScale))
             rememberState("humidity",humidity,"%rh")
 			break;    
-                
+            
 		default:
             log.error "Unknown event received: $event"
             log.error "Message received: ${payload}"
