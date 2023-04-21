@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Adds 'MusicPlayer' capability to SpeakerHub for Rules compatibility\n- Fixes "setOpenRemind" error on Motion Sensors\n- Fixes 'getState' error on X3 THSensors\n",
+    "releaseNotes": "- Adds 'MusicPlayer' capability to SpeakerHub for Rules compatibility\n- Fixes 'setOpenRemind' error on Motion Sensors\n- Fixes 'getState' error on X3 THSensors\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
