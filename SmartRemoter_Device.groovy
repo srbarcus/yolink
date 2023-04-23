@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Flex Fob (YS3604-UC), Flex Fob V2 (YS3604-UC), On/Off Fob (YS3605-UC), Dimmer Fob (YS3606-UC), Siren Fob (YS3606-UC)
+ *  YoLink™ Flex Fob (YS3604-UC), Flex Fob V2 (YS3604-UC), On/Off Fob (YS3605-UC), Dimmer Fob (YS3606-UC), Siren Fob (YS3607-UC)
  *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -29,11 +29,12 @@
  *         - Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"  
  *  2.0.4: Support for Flex Fob V2, On/Off Fob, Dimmer Fob, Siren Fob
+ *  2.0.5: Default to Flex Fob
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.0.5"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -176,7 +177,7 @@ def allowDoubleTap(value) {
 def doubleTap(button) {    
    logDebug("doubleTap(${button})")   
    if (state.fobModel == "Flex Fob") { 
-     rememberState("DoubleTapped",button,null,true)         
+     rememberState("doubleTapped",button,null,true)         
      rememberState("action","DoubleTapped $button",null,true)              
    } else {
      log.warn "Double-tapping is only allowed on a Flex Fob"  
@@ -317,25 +318,6 @@ def void processStateData(payload) {
             logDebug("Parsed: DeviceId=$devId, Button=$button, Action=$action, Battery=$battery, Firmware=$firmware, RSSI=$rssi")
             
             switch(state.fobModel) {
-              case "Flex Fob":
-                 switch(button) {
-		            case "4":                      
-                        button = 3                    
-                        break;
-                    case "8":          
-                        button = 4                    
-                        break;                  
-	             }
-                 switch(action) {
-                    case "Press":   
-                        push(button,"Pushed $button")
-                        break;
-                    case "LongPress":    
-                        hold(button)
-                        break;                  
-	             }
-              break;                  
-              
               case "On/Off Fob":
                  def func
                  switch(button) {
@@ -409,7 +391,26 @@ def void processStateData(payload) {
                         break;                   
 	             }
                  push(button,func)
-                 break;                  
+                 break; 
+                
+                default:
+                 switch(button) {
+		            case "4":                      
+                        button = 3                    
+                        break;
+                    case "8":          
+                        button = 4                    
+                        break;                  
+	             }
+                 switch(action) {
+                    case "Press":   
+                        push(button,"Pushed $button")
+                        break;
+                    case "LongPress":    
+                        hold(button)
+                        break;                  
+	             }
+              break;       
             }
                 
             rememberState("battery", battery, "%")
