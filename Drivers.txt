@@ -2,7 +2,11 @@ CURRENTLY TESTED AND SUPPORTED*
 ------------------------------
 Hub 				(YS1603-UC)
 Speaker Hub 			(YS1604-UC)
-Fob 				(YS3604-UC)
+Flex Fob 			(YS3604-UC)
+Flex Fob Version 2		(YS3604-UC)
+On/Off Fob 			(YS3605-UC)
+Dimmer Fob 			(YS3606-UC)
+Siren Fob 			(YS3607-UC)
 Thermostat                      (YS4002-UC)
 Sprinkler                       (YS4102-UC)
 Garage Door Controller 		(YS4906-UC)
@@ -26,11 +30,12 @@ Outdoor Motion Sensor 		(YS7805-UC)
 Leak Sensor                     (YS7903-UC)
 Leak Sensor                     (YS7904-UC)
 Smoke & CO Alarm Wireless Base	(YS7A01-UC)
-Temperature Humidity Sensor 	(YS8003-UC)
+Temperature/Humidity Sensor 	(YS8003-UC)
 Weatherproof Temperature Sensor (YS8004-UC)
+X3 Temperature/Humidity Sensor	(YS8006-UC)
 
 
-* As of 04/10/2023. Other devices of the same "type" may work with these drivers, they just haven't been verified.
+* As of 04/23/2023. Other devices of the same "type" may work with these drivers, they just haven't been verified.
 
 NOT SUPPORTED
 -------------
