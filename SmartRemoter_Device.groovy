@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Fob (YS3604-UC)
+ *  YoLink™ Flex Fob (YS3604-UC), Flex Fob V2 (YS3604-UC), On/Off Fob (YS3605-UC), Dimmer Fob (YS3606-UC), Siren Fob (YS3607-UC)
  *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -28,11 +28,13 @@
  *         - Add unit value to battery 
  *         - Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"  
+ *  2.0.4: Support for Flex Fob V2, On/Off Fob, Dimmer Fob, Siren Fob
+ *  2.0.5: Default to Flex Fob
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.5"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -50,6 +52,7 @@ metadata {
         capability "DoubleTapableButton"
         capability "SignalStrength"             //rssi         
         
+        command "fobModel", [[name:"Fob Device Model",type:"ENUM", description:"Model determines function of Fob buttons. Incorrect model selection will result in functionality problems.", constraints:["Flex Fob","On/Off Fob", "Dimmer Fob", "Siren Fob"]]]  
         command "allowDoubleTap", [[name:"Enable double-tapping",type:"ENUM", description:"Allow pressing or holding of the same button without using a different button first)", constraints:[true, false]]]  
         command "tapDelay", [[name:"Maximum seconds between presses for a double-tap",type:"ENUM", description:"Maximum number of seconds between pressing of the same button to be considered as a double-tap if double-tapping is enabled.", constraints:[0, 0.5, 1, 2, 5]]]  
         command "debug", [[name:"Enable debugging",type:"ENUM", description:"Display debugging messages", constraints:[true, false]]] 
@@ -61,9 +64,11 @@ metadata {
         attribute "firmware", "String"  
         attribute "signal", "String" 
         attribute "lastResponse", "String" 
-        attribute "remoteType", "String"         
+        attribute "fobModel", "String"         
         attribute "reportAt", "String"
         attribute "tapDelay", "String" 
+        attribute "action", "String"
+        attribute "beep", "String"
         }
    }
 
@@ -77,7 +82,11 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.token = devtoken
     rememberState("devId", devId)   
     
-	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
+    fobModel("Flex Fob")      
+    
+	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId}, Model${state.fobModel})"	 
+    
+    log.warn "All Fobs models appear the same to Hubitat. This device has been set to the default Fob model of '${state.fobModel}'. If this is incorrect, edit the Device definition and select the correct model otherwise the device will not behave correctly." 
     
     reset()   
  }
@@ -101,7 +110,7 @@ def installed() {
     log.info "Device Installed"
     rememberState("driver", clientVersion())    
     rememberState("numberOfButtons",4)         
-    rememberState("remoteType","FlexFob")  
+    rememberState("fobModel","Flex Fob")  
  }
 
 def updated() {
@@ -109,6 +118,13 @@ def updated() {
     rememberState("driver", clientVersion()) 
     log.info "Driver updated - reseting device"
     reset()
+ }
+
+def fobModel(model) {
+   rememberState("fobModel", model) 
+   if (state.fobModel != "Flex Fob") {      
+     rememberState("allowDoubleTap",false)
+   } 
  }
 
 def uninstalled() {
@@ -143,7 +159,6 @@ def poll(force=null) {
     }  
  }
 
-
 def tapDelay(value) {    
    logDebug("tapDelay(${value})")  
    rememberState("tapDelay",value)                
@@ -151,28 +166,40 @@ def tapDelay(value) {
 
 def allowDoubleTap(value) {    
    logDebug("allowDoubleTap(${value})")  
-   rememberState("allowDoubleTap",value)                
+   if (state.fobModel == "Flex Fob") { 
+     rememberState("allowDoubleTap",value)
+   } else {
+     log.warn "Double-tapping is only allowed on a Flex Fob"  
+     rememberState("allowDoubleTap",false)
+   }    
  }
 
 def doubleTap(button) {    
    logDebug("doubleTap(${button})")   
-   rememberState("doubleTapped",button,null,true)         
-   rememberState("action","doubleTapped",null,true)
-               
+   if (state.fobModel == "Flex Fob") { 
+     rememberState("doubleTapped",button,null,true)         
+     rememberState("action","DoubleTapped $button",null,true)              
+   } else {
+     log.warn "Double-tapping is only allowed on a Flex Fob"  
+   }     
  }
 
-def push(button) {    
+def push(button, func) {    
    if (!honorTap(button)) {
      logDebug("Pushed(${button})")
      rememberState("pushed",button,null,true)              
-     rememberState("action","pushed",null,true)
+     rememberState("action",func,null,true)
    }           
  }
 
 def hold(button) {   
-   logDebug("Held(${button})")
-   rememberState("held",button,null,true)           
-   rememberState("action","held",null,true)
+   logDebug("hold(${button})")
+   if (state.fobModel == "Flex Fob") { 
+     rememberState("held",button,null,true)           
+     rememberState("action","Held $button",null,true)
+   } else {
+     log.warn "Button holding is only allowed on a Flex Fob"  
+   }     
  }
 
 def connect() {
@@ -233,6 +260,7 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) {
+   logDebug("parseDevice(): ${object}")     
    def devId = object.data.deviceId  
    def reportAt = object.data.reportAt
     
@@ -268,37 +296,126 @@ def void processStateData(payload) {
         logDebug("Received Message Type: ${event} for: $name")       
         
         switch(event) {
+         case "setSettings":    
+            def beep = object.data.beep            
+            def rssi = object.data.loraInfo.signal  
+    
+            logDebug("Parsed: Beep=$beep, RSSI=$rssi")
+                
+            rememberState("beep", beep)
+            fmtSignal(rssi) 
+		    break;      
+            
 		case "StatusChange":
         case "Report":    
             def button = object.data.event.keyMask 
             def action = object.data.event.type 
             def battery = parent.batterylevel(object.data.battery)
             def firmware = object.data.version.toUpperCase() 
-          //def temperature = object.data.devTemperature     // Never changes on FlexFob YS3604 V1
+            def beep = object.data.beep
             def rssi = object.data.loraInfo.signal  
     
             logDebug("Parsed: DeviceId=$devId, Button=$button, Action=$action, Battery=$battery, Firmware=$firmware, RSSI=$rssi")
             
-            switch(button) {
-		        case "4":                      
-                    button = 3                    
-                    break;
-                case "8":          
-                    button = 4                    
-                    break;                  
-	        }
-            
-            switch(action) {
-                case "Press":   
-                    push(button)
-                    break;
-                case "LongPress":    
-                    hold(button)
-                    break;                  
-	        }
-            
+            switch(state.fobModel) {
+              case "On/Off Fob":
+                 def func
+                 switch(button) {
+		            case "1":                      
+                       switch(action) {
+                           case "Press":   
+                                func = "Aon"
+                                break;
+                           case "LongPress": 
+                                button = 2 
+                                func = "Aoff"
+                                break;                  
+	                       }
+                        break;
+                    case "2":          
+                       switch(action) {
+                           case "Press":   
+                                button = 3 
+                                func = "Bon"
+                                break;
+                           case "LongPress": 
+                                button = 4 
+                                func = "Boff"
+                                break;                  
+	                       }
+	             }
+                 push(button,func)
+                 break; 
+                
+               case "Dimmer Fob":  
+                 def func
+                 switch(button) {
+		            case "4":                      
+                        button = 3                    
+                        break;
+                    case "8":          
+                        button = 4                    
+                        break;                  
+	             }
+                 switch(button) {
+		            case "1":                      
+                        func = "On"
+                        break;
+                    case "2":          
+                        func = "Up"          
+                        break;                  
+                    case "3":          
+                        func = "Down"
+                        break;                  
+                    case "4":         
+                        func = "Off"      
+                        break;                   
+	             }
+                 push(button,func)
+                 break;                
+                
+               case "Siren Fob":
+                 def func
+                 switch(button) {
+		            case "1":                      
+                        func = "Siren"
+                        break;
+                    case "2":          
+                        func = "Silence"          
+                        break;                  
+                    case "3":          
+                        func = "Unlock"
+                        break;                  
+                    case "4":         
+                        func = "Lock"      
+                        break;                   
+	             }
+                 push(button,func)
+                 break; 
+                
+                default:
+                 switch(button) {
+		            case "4":                      
+                        button = 3                    
+                        break;
+                    case "8":          
+                        button = 4                    
+                        break;                  
+	             }
+                 switch(action) {
+                    case "Press":   
+                        push(button,"Pushed $button")
+                        break;
+                    case "LongPress":    
+                        hold(button)
+                        break;                  
+	             }
+              break;       
+            }
+                
             rememberState("battery", battery, "%")
             rememberState("firmware",firmware)  
+            rememberState("beep",beep)  
             fmtSignal(rssi) 
 		    break;           
 		                
@@ -335,16 +452,19 @@ def reset(){
     state.remove("rssi")
     state.remove("signal")
     state.remove("battery")  
-    state.remove("doubleTap")
     state.remove("pushed")
     state.remove("held")
-    state.remove("tapDelay")      
+    state.remove("tapDelay")  
+    state.remove("doubleTapped")  
+    state.remove("action")
+    state.remove("beep")
     
-    allowDoubleTap("true")
     rememberState("tapDelay",1)
         
     state.lastTap = now()
     state.lastButton = 0
+    
+    rememberState("allowDoubleTap",false)       
         
     poll(true)    
         
