@@ -42,13 +42,14 @@
  *         - Improve diagnostics collection performance
  *  2.1.9: Return null battery level value as "0" 
  *  2.1.10: Copyright update
+ *  2.1.11: Handle new error code: 010104:Header Error!The token expired
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.10"}
+private def get_APP_VERSION() {return "2.1.11"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
@@ -740,6 +741,18 @@ def pollAPI(body, name=null, type=null){
                          rc = object
                          break;
                         
+                    case "Header Error!The token expired":    
+                         if (retry>0) {
+                              retry = retry - 1  
+                              logDebug('Request token expired. Attempting to refreshing access token and re-poll API, Retries=${retry}')  
+                              refreshAuthToken()                                         
+                         } else {          
+                              log.error "Request token expired. Attempt to refreshing access token and re-poll API failed. Final error status code: $e.statusCode"
+                              log.error "Request: $Params"  
+                              retry = -1 // Don't retry
+                         }                          
+                         break;    
+                        
                    default:
                          log.error "Polling of API failed: $desc"
                          log.error "Request: $Params" 
@@ -795,6 +808,7 @@ def translateCode(code) {
      '"000203":"Cannot connect to Device",' +
      '"010000":"Connection not available, try again",' +
      '"010101":"Header Error! Customer ID Error!",' +
+     '"010104":"Header Error!The token expired",' +   
      '"010201":"Body Error! Time can not be null",' +
      '"010203":"Unsupported Request",' +                         //Was returned trying to set WiFi - not documented, but seems to mean "Unsupported"  
      '"020102":"Device mask error",' +
