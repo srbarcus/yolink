@@ -267,9 +267,7 @@ def void processStateData(payload) {
             def rssi = object.data.loraInfo.signal             
     
             logDebug("Parsed: Valve=$valve, RSSI=$rssi")
-            
-            rememberState("valve", valve, null, (device.currentValue("valve") =="unknown"))  
-            
+
             fmtSignal(rssi)                          
 		    break;
             
