@@ -471,7 +471,7 @@ def void processStateData(payload) {
 def close() {
     if (boundToDevice()) {
         if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
-          toggle(true)
+          toggle()
           rememberState("door","closing")    
         }    
     } else {
@@ -482,7 +482,7 @@ def close() {
 def open() {    
    if (boundToDevice()) { 
        if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
-         toggle(true)
+         toggle()
          rememberState("door","opening")  
        }
    } else {
@@ -503,7 +503,9 @@ def push(toggledev=true) {
        rememberState("door","unknown")
    } 
 
-    if (toggledev == true) {toggle()}
+    if (toggledev == true) {
+        logDebug("Sending toggle command to device") 
+        toggle()}
 }
 
 def toggle() {
@@ -516,7 +518,7 @@ def toggle() {
         def object = parent.pollAPI(request, state.name, state.type)
          
         if (object) {
-            logDebug("push(): pollAPI() response: ${object}")  
+            logDebug("toggle(): pollAPI() response: ${object}")  
                               
             if (successful(object)) {        
                   def stateChangedAt = object.data.stateChangedAt
@@ -541,11 +543,11 @@ def toggle() {
             return
                 
 	    } else { 			               
-            logDebug("push() failed")	
-            lastResponse("push() failed")     
+            logDebug("toggle() failed")	
+            lastResponse("toggle() failed")     
         }     		
 	} catch (e) {	
-        log.error "push() exception: $e"
+        log.error "toggle() exception: $e"
         lastResponse("Error ${e}")      
 	} 
 }   
