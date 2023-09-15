@@ -1,0 +1,57 @@
+<font type="Arial">
+	<b>YoLink Device Service v2.1.12</b><br>
+     - Reduce instantaneous hub load when polling devices<br>
+     - Return name of device that MQTT message was passed to back to MQTT Listener for debugging<br>
+<br>
+  <b>SpeakerHub v2.0.5 (YS1604-UC)</b><br> 
+     - Prevent Service app from waiting on device polling completion<br>
+     - Add warnings for unsupported commands instead of causing an error<br>
+<br>
+  <b>Temperature Humidity Sensor v2.0.7 (YS8003-UC) and X3 SMART TEMPERATURE & HUMIDITY SENSOR (YS8006-UC)</b><br>
+     - Prevent Service app from waiting on device polling completion<br>
+     - Add temperature history tracking attributes: "highDay", "lowDay", "highest", "lowest", "highestDate", "lowestDate"<br>
+<br>
+  <b>GarageDoor Device v2.0.6 (YS4906-UC)</b><br>
+     - Prevent Service app from waiting on device polling completion<br>
+     - Fixed MQTT message processing<br>
+<br>
+  <b>Flex Fob v2.0.6 (YS3604-UC), Flex Fob v2 (YS3604-UC), On/Off Fob (YS3605-UC), Dimmer Fob (YS3606-UC), Siren Fob (YS3607-UC)</b><br>
+     - Report buttons as numeric value, report rssi as number, fix multiple events not being reported<br>
+     - Switch to Preferences vs Commands. Display Perferences based on Fob Model chosen<br>
+     <font size="" color="red">*** IMPORTANT: Since YoLink hub does not report the Fob model, the driver assumes it's a "Flex Fob". After installation, set proper model in the Device's preferences section. ***</font><br>
+<br>
+  <b>Finger Device v1.0.5 (YS4908-UC)</b><br>
+     - Prevent Service app from waiting on device polling completion<br>
+     - Updated driver to recognize actions being initiated on the YoLink app<br>
+<br>
+  <b>Temperature Sensor v2.0.6 (YS8004-UC)</b><br>
+     - Prevent Service app from waiting on device polling completion<br>
+     - Add temperature history tracking attributes: "highDay", "highestDate", "lowDay", "lowestDate", "highest", "lowest"<br>
+     - Add commands: "resetDayHighLow", "resetHighLow"<br>
+<br>
+  <b>Manipulator (Valve) v2.0.6 (YS4909-UC</b>)<br>
+     - Prevent Service app from waiting on device polling completion<br>
+     - Set "schedules" attribute to 0 on installation or reset<br>
+     - Correct weekdays displayed in schedules<br>
+<br>
+  <b>Lock Device v2.0.3 (YS7606-UC,YUF-02BN)</b><br>
+     - Prevent Service app from waiting on device polling completion<br>
+     - Add "%" unit to 'battery'<br>
+<br>
+<b><font size="" color="darkblue">Drivers updated to prevent Service app from waiting on device polling completion:</font></b><br>
+  - vibrationSensor Device v2.0.4<br>
+  - Thermostat v2.0.3<br>
+  - Relay v2.0.3<br>
+  - Smart Outdoor Plug v1.0.4<br>
+  - Siren v2.0.4<br>
+  - Plug v2.0.3<br>
+  - MultiOutlet v2.1.5<br>
+  - Motion Sensor v2.0.4<br>
+  - LeakSensor3 v2.0.2<br>
+  - LeakSensor v2.0.5<br>
+  - Hub v2.0.3<br>
+  - Door Sensor v2.0.3<br>
+  - Dimmer v2.0.3<br>
+  - Smoke & CO Alarm v2.0.3<br>
+  - Sprinkler v2.0.3<br>
+</font>
