@@ -19,11 +19,13 @@
  *         - Added capability "Momentary"
  *         - Added warnings for "open" and "close" if no bound device
  *  1.0.3: Added formatted "signal" attribute as rssi & " dBm"
+ *  1.0.4: Prevent Service app from waiting on device polling completion
+ *  1.0.5: Updated driver to recognize actions being initiated on the YoLink app
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.3"}
+def clientVersion() {return "1.0.5"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -55,6 +57,7 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String"         
         }
@@ -110,12 +113,16 @@ def uninstalled() {
  }
 
 def poll(force=null) { 
-   rememberState("driver", clientVersion())
-    
-   if (boundToDevice()) {
-     runIn(1,check_MQTT_Connection) 
-   }
+   pollDevice()
 }    
+
+def pollDevice(delay=1) {
+   if (boundToDevice()) {
+     runIn(delay,check_MQTT_Connection) 
+   }
+   def date = new Date()
+   sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true) 
+ }
 
 def connect() {
    if (state.bound_devId != null) {establish_MQTT_connection(bound_dni, state.bound_homeID, state.bound_devId)}  //Establish MQTT connection to YoLink API for bound device
@@ -367,14 +374,15 @@ def parseTopic(message) {     // Parent MQTT parsing of finger device
             def devstate = object.data.state          
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
-            def rssi = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal              
             
-            rememberState("contact",contact)
             rememberState("battery",battery)
             rememberState("firmware",firmware)
             fmtSignal(rssi)
         
-            logDebug("Parse Status: State=${contact}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
+            if (devstate == "stop") {push(false)}
+        
+            logDebug("Parse Status: State=${devstate}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
         
 		    break;              
               
@@ -463,7 +471,7 @@ def void processStateData(payload) {
 def close() {
     if (boundToDevice()) {
         if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
-          toggle()
+          toggle(true)
           rememberState("door","closing")    
         }    
     } else {
@@ -474,7 +482,7 @@ def close() {
 def open() {    
    if (boundToDevice()) { 
        if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
-         toggle()
+         toggle(true)
          rememberState("door","opening")  
        }
    } else {
@@ -482,7 +490,7 @@ def open() {
    } 
 }
 
-def push(button) {    
+def push(toggledev=true) {    
     if (boundToDevice()) { 
        if (state.door == "closed") {  
          rememberState("door","opening")  
@@ -495,7 +503,7 @@ def push(button) {
        rememberState("door","unknown")
    } 
 
-   toggle()
+    if (toggledev == true) {toggle()}
 }
 
 def toggle() {

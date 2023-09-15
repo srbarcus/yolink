@@ -38,11 +38,13 @@
  *         - Add unit values to: temperature, battery
  *  2.0.6: Fix handling of X3 "THSensor.DataRecord" events
  *         - Handle X3 "THSensor.getState" events
+ *  2.0.7: Prevent Service app from waiting on device polling completion
+ *         - Add temperature history tracking attributes: "highDay", "lowDay", "highest", "lowest", "highestDate", "lowestDate"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.6"}
+def clientVersion() {return "2.0.7"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -61,7 +63,9 @@ metadata {
         capability "SignalStrength"             //rssi
         
         command "debug", [[name:"Debug Driver",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]  
-        command "temperatureScale", [[name:"Temperature Scale",type:"ENUM", description:"Temperature reporting scale (Fahrenheit or Celsius)", constraints:["F", "C"]]] 
+        command "temperatureScale", [[name:"Temperature Scale",type:"ENUM", description:"Temperature reporting scale (Fahrenheit or Celsius)", constraints:["F", "C"]]]
+        command "resetDayHighLow"
+        command "resetHighLow"
         command "reset"                  
               
         attribute "online", "String"
@@ -69,6 +73,7 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String" 
         
         attribute "lowBattery", "String"  
@@ -80,12 +85,19 @@ metadata {
         attribute "tempLimitMax", "String"
         attribute "tempLimitMin", "String"
         attribute "alertInterval", "String"
+        attribute "currentDay", "String"
+        attribute "highDay", "Number"
+        attribute "lowDay", "Number"
+        attribute "highest", "Number"        
+        attribute "lowest", "Number"
+        attribute "highestDate", "String"        
+        attribute "lowestDate", "String"
         
         attribute "lowHumidity", "String"
         attribute "highHumidity", "String" 
         attribute "humidityCorrection", "String" 
         attribute "humidityLimitMax", "String"   
-        attribute "humidityLimitMin", "String"   
+        attribute "humidityLimitMin", "String"
         }
    }
 
@@ -155,10 +167,15 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else { 
-       logDebug("Getting device state")  
-       runIn(1,getDevicestate)           
-       state.lastPoll = now() 
+       pollDevice()
+       state.lastPoll = now()
     }    
+ }
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {
@@ -173,6 +190,51 @@ def debug(value) {
      log.info "Debugging disabled"
    }    
 }
+
+def resetDayHighLow() {
+    state.remove("currentDay")    
+    state.remove("highDay")    
+    state.remove("lowDay")    
+}    
+
+def resetHighLow() {
+    state.remove("highest")
+    state.remove("lowest")    
+}    
+
+def setHighLow(temp) {
+   logDebug("setHighLow(${temp}): Date: ${state?.currentDay} History: ${state?.highest}/${state?.lowest} Day: ${state?.highDay}/${state?.lowDay}")  
+    
+   def todate = new Date(now())    
+   def today = todate.format("MM/dd/yyyy")
+   def todayDetail = todate.format("MM/dd/yyyy hh:mm:ss a")
+    
+   if ((temp >= state?.highest) || (state?.highest==null)) {
+      rememberState("highest",temp)
+      rememberState("highestDate",todayDetail)
+   }
+    
+   if ((temp <= state?.lowest) || (state?.lowest==null)) {
+      rememberState("lowest",temp)
+      rememberState("lowestDate",todayDetail)
+   }
+    
+   if (state?.currentDay !=  today) { 
+      state.remove("highDay")    
+      state.remove("lowDay")
+      state.currentDay = today   
+   }
+        
+   if ((temp > state?.highDay) || (state?.highDay==null)) {
+       rememberState("highDay",temp)
+   }
+    
+   if ((temp < state?.lowDay) || (state?.lowDay)==null) {
+       rememberState("lowDay",temp)
+   } 
+    
+   logDebug("setHighLow(${temp}) exit: Date: ${state?.currentDay} History: ${state?.highest}/${state?.lowest} Day: ${state?.highDay}/${state?.lowDay}")   
+}  
 
 def both() {log.error "'both' command is not supported"}
 def off() {log.error "'off' command is not supported"}
@@ -279,6 +341,8 @@ def parseDevice(object, source) {
             rememberState("lowBattery",lowBattery)  
         
             alarmState(temperature,tempLimitMin,tempLimitMax,humidity,humidityLimitMin,humidityLimitMax)
+        
+            setHighLow(temperature)
 
             rememberState("battery", battery, "%")    
             rememberState("alertInterval",alertInterval)
@@ -363,6 +427,8 @@ def parseDevice(object, source) {
             rememberState("humidityLimitMin",humidityLimitMin)
 
             alarmState(temperature,tempLimitMin,tempLimitMax,humidity,humidityLimitMin,humidityLimitMax)
+            
+            setHighLow(temperature)
          
             logDebug("Device State: online(${online}), " +
                      "Firmware(${firmware}), " +
@@ -401,9 +467,7 @@ def parseDevice(object, source) {
                         
             lowHumidity = object.data.alarm.lowHumidity.toString()       
             highHumidity = object.data.alarm.highHumidity.toString()
-            humidity = object.data.humidity        
-            
-            alarmState(temperature,state.tempLimitMin,state.tempLimitMax,humidity,state.humidityLimitMin,state.humidityLimitMax)
+            humidity = object.data.humidity            
 
             rememberState("online","true")   
             rememberState("lowBattery",lowBattery)  
@@ -417,6 +481,10 @@ def parseDevice(object, source) {
             rememberState("lowHumidity",lowHumidity)
             rememberState("highHumidity", highHumidity)
             rememberState("humidity",humidity,"%rh")
+        
+            alarmState(temperature,state.tempLimitMin,state.tempLimitMax,humidity,state.humidityLimitMin,state.humidityLimitMax)
+        
+            setHighLow(temperature)
                
             logDebug("State(${devstate}), " +
                      "Firmware(${firmware}), " +
@@ -505,6 +573,8 @@ def void processStateData(payload) {
             logDebug("DataRecord: Temperature(${temperature}), Humidity(${humidity})")
                      
             temperature =  parent.convertTemperature(temperature,state.temperatureScale)
+            
+            setHighLow(temperature)
                      
             logDebug("DataRecord: Converted Temperature(${temperature})")
             
@@ -587,7 +657,15 @@ def reset(){
     state.remove("humidityCorrection")
     state.remove("humidityLimitMax")
     state.remove("humidityLimitMin")    
-      
+    
+    state.remove("currentDay")    
+    state.remove("highDay")    
+    state.remove("lowDay")    
+    state.remove("highest")
+    state.remove("lowest")
+    state.remove("highestDate")
+    state.remove("lowestDate")  
+
     poll(true)    
     
     log.warn "Device reset to default values"

@@ -21,11 +21,12 @@
  *  2.0.3: Add unit to temperature and battery attributes
  *         - Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"  
+ *  2.0.4: Prevent Service app from waiting on device polling completion
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.4"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -52,7 +53,8 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "reportAt", "String"
-        attribute "signal", "String" 
+        attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String" 
         
         attribute "alertInterval", "Number"      
@@ -106,8 +108,6 @@ def uninstalled() {
 
 def poll(force=null) {
     logDebug("poll(${force})")
-    
-    rememberState("driver", clientVersion())
 
     def lastPoll
     def cur_time = now()
@@ -126,10 +126,15 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else {
-       logDebug("Getting device state")
-       runIn(1,getDevicestate)
+       pollDevice()
        state.lastPoll = now()
     }    
+ }
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {
@@ -210,7 +215,9 @@ def getDevicestate() {
                rememberState("state",devstate)
                rememberState("motion",motion)
                rememberState("shock",shock) 
-               rememberState("firmware",firmware)                      
+               rememberState("firmware",firmware)  
+                
+               lastResponse("Polling Complete")   
                     
   		       rc = true	
             } else {  //Error

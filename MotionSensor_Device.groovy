@@ -1,5 +1,5 @@
 /***
- *  YoLink™ Motion Sensor (YS7804-UC)
+ *  YoLink™ Motion Sensor (YS7804-UC) and Outdoor Motion Sensor (YS7805-UC)
  *  © 2022, 2023 Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -27,16 +27,17 @@
  *         - Added formatted "signal" attribute as rssi & " dBm"
  *         - Added capability "SignalStrength"
  *  2.0.3: Handle event 'setOpenRemind'
+ *  2.0.4: Prevent Service app from waiting on device polling completion
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.4"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: bold("Driver Version"), description: "YoLink™ Motion Sensor (YS7804-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ Motion Sensor (YS7804-UC) and Outdoor Motion Sensor (YS7805-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
 
@@ -56,7 +57,8 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "reportAt", "String"
-        attribute "signal", "String" 
+        attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String" 
         
         attribute "alertInterval", "Number"      
@@ -110,8 +112,6 @@ def uninstalled() {
 
 def poll(force=null) {
     logDebug("poll(${force})")
-    
-    rememberState("driver", clientVersion())
 
     def lastPoll
     def cur_time = now()
@@ -130,10 +130,15 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else {
-       logDebug("Getting device state")
-       runIn(1,getDevicestate)
+       pollDevice()
        state.lastPoll = now()
     }  
+ }
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {
@@ -208,7 +213,9 @@ def getDevicestate() {
                rememberState("sensitivity",sensitivity)
                rememberState("state",devstate)
                rememberState("motion",motion)
-               rememberState("firmware",firmware)                      
+               rememberState("firmware",firmware)    
+                
+               lastResponse("Poll Complete")  
                     
   		       rc = true	
             } else {  //Error

@@ -32,11 +32,13 @@
  *  2.0.5: Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"  
  *         - Add unit values to: temperature, battery
+ *  2.0.6: Prevent Service app from waiting on device polling completion
+ *         - Add temperature history tracking attributes: "highDay", "lowDay", "highest", "lowest", "highestDate", "lowestDate", 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.5"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -54,7 +56,9 @@ metadata {
         capability "SignalStrength"             //rssi
                                       
         command "debug", [[name:"Debug Driver",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]  
-        command "temperatureScale", [[name:"Temperature Scale",type:"ENUM", description:"Temperature reporting scale (Fahrenheit or Celsius)", constraints:["F", "C"]]]   
+        command "temperatureScale", [[name:"Temperature Scale",type:"ENUM", description:"Temperature reporting scale (Fahrenheit or Celsius)", constraints:["F", "C"]]] 
+        command "resetDayHighLow"
+        command "resetHighLow"
         command "reset"                  
               
         attribute "online", "String"
@@ -62,6 +66,7 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String" 
         
         attribute "lowBattery", "String"  
@@ -73,6 +78,13 @@ metadata {
         attribute "tempLimitMax", "String"
         attribute "tempLimitMin", "String"
         attribute "alertInterval", "String"
+        attribute "currentDay", "String"
+        attribute "highDay", "Number"
+        attribute "lowDay", "Number"
+        attribute "highest", "Number"        
+        attribute "lowest", "Number"
+        attribute "highestDate", "String"        
+        attribute "lowestDate", "String"
         }
    }
 
@@ -142,10 +154,15 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else { 
-       logDebug("Getting device state")  
-       runIn(1,getDevicestate)           
-       state.lastPoll = now() 
+       pollDevice()
+       state.lastPoll = now()
     }    
+ }
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {
@@ -160,6 +177,51 @@ def debug(value) {
      log.info "Debugging disabled"
    }    
 }
+
+def resetDayHighLow() {
+    state.remove("currentDay")    
+    state.remove("highDay")    
+    state.remove("lowDay")    
+}    
+
+def resetHighLow() {
+    state.remove("highest")
+    state.remove("lowest")   
+}    
+
+def setHighLow(temp) {
+  logDebug("setHighLow(${temp}): Date: ${state?.currentDay} History: ${state?.highest}/${state?.lowest} Day: ${state?.highDay}/${state?.lowDay}")  
+    
+   def todate = new Date(now())    
+   def today = todate.format("MM/dd/yyyy")
+   def todayDetail = todate.format("MM/dd/yyyy hh:mm:ss a") 
+    
+   if ((temp >= state?.highest) || (state?.highest==null)) {
+      rememberState("highest",temp)
+      rememberState("highestDate",todayDetail)
+   }
+    
+   if ((temp <= state?.lowest) || (state?.lowest==null)) {
+      rememberState("lowest",temp)
+      rememberState("lowestDate",todayDetail)
+   }
+    
+   if (state?.currentDay !=  today) { 
+      state.remove("highDay")    
+      state.remove("lowDay")
+      state.currentDay = today   
+   }
+        
+   if ((temp > state?.highDay) || (state?.highDay==null)) {
+       rememberState("highDay",temp)
+   }
+    
+   if ((temp < state?.lowDay) || (state?.lowDay)==null) {
+       rememberState("lowDay",temp)
+   } 
+    
+   logDebug("setHighLow(${temp}) exit: Date: ${state?.currentDay} History: ${state?.highest}/${state?.lowest} Day: ${state?.highDay}/${state?.lowDay}")   
+}   
 
 def both() {log.error "'both' command is not supported"}
 def off() {log.error "'off' command is not supported"}
@@ -257,6 +319,8 @@ def parseDevice(object, source) {
             rememberState("tempLimitMin",tempLimitMin)
             rememberState("temperature", temperature, "°".plus(state.temperatureScale))
             rememberState("firmware",firmware)
+        
+            setHighLow(temperature)
 
             logDebug("Device State: online(${online}), " +
                      "State(${devstate}), " + 
@@ -308,6 +372,8 @@ def parseDevice(object, source) {
             rememberState("firmware",firmware)
 
             alarmState(temperature,tempLimitMin,tempLimitMax)
+        
+            setHighLow(temperature)
          
             logDebug("Device State: online(${online}), " +
                      "Firmware(${firmware}), " +
@@ -336,8 +402,6 @@ def parseDevice(object, source) {
         
             temperature = parent.convertTemperature(temperature,state.temperatureScale)
         
-            alarmState(temperature,state.tempLimitMin,state.tempLimitMax)
-
             rememberState("online","true")   
             rememberState("lowBattery",lowBattery)  
             rememberState("lowTemp",lowTemp)        
@@ -346,6 +410,10 @@ def parseDevice(object, source) {
             rememberState("temperature", temperature, "°".plus(state.temperatureScale))  
             rememberState("firmware",firmware)        
             fmtSignal(rssi)  
+        
+            alarmState(temperature,state.tempLimitMin,state.tempLimitMax)
+        
+            setHighLow(temperature)
                
             logDebug("State(${devstate}), " +
                      "Firmware(${firmware}), " +
@@ -468,6 +536,14 @@ def reset(){
     state.remove("alarm")
 
     rememberState("temperatureScale", parent.temperatureScale)
+    
+    state.remove("currentDay")    
+    state.remove("highDay")    
+    state.remove("lowDay")    
+    state.remove("highest")
+    state.remove("lowest")
+    state.remove("highestDate")
+    state.remove("lowestDate") 
   
     poll(true)    
     

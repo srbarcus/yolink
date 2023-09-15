@@ -25,11 +25,13 @@
  *  2.0.2: Copyright update and UI formatting
  *  2.0.3: Fix Rules compatability: 
  *         - Add capability "MusicPlayer"
+ *  2.0.4: Add warnings for unsupported commands instead of causing an error.
+ *  2.0.5: Prevent Service app from waiting on device polling completion
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.5"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -59,9 +61,13 @@ metadata {
         capability "MusicPlayer"
         
         
-        command "restoreTrack"  // Override command definition - not relevant
-        command "resumeTrack"   // Override command definition - not relevant
-        command "setTrack"      // Override command definition - not relevant
+        command "restoreTrack"        // Override command definition - not relevant
+        command "resumeTrack"         // Override command definition - not relevant
+        command "setTrack"            // Override command definition - not relevant
+        command "playTrackAndResume"  // Override command definition - not relevant
+        command "playTrackAndRestore" // Override command definition - not relevant 
+        command "playTextAndResume"   // Override command definition - not relevant
+        command "playTextAndRestore"  // Override command definition - not relevant
         
         command "setVolume", [[name:"volume",type:"ENUM", description:"Speaker volume", constraints:[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]]
         command "setLevel", [[name:"volume",type:"ENUM", description:"Speaker volume", constraints:[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
@@ -70,17 +76,6 @@ metadata {
                             [name:"Volume",type:"ENUM", description:"Optional volume text is to be played at", optional:true,
                              constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
         
-        command "playTextAndResume"   // Override command definition - not relevant
-        //command "playTextAndResume", [[name:"Text",type:"STRING", description:"Text to be played"], 
-        //                              [name:"Volume",type:"ENUM", description:"Optional volume text is to be played at", optional:true,
-        //                               constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
-          
-        command "playTextAndRestore"  // Override command definition - not relevant
-        //command "playTextAndRestore", [[name:"Text",type:"STRING", description:"Text to be played"], 
-        //                               [name:"Volume",type:"ENUM", description:"Optional volume text is to be played at", optional:true,
-        //                                constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
-        
-        
         command "playTrack", [[name:"Track",type:"ENUM", description:"Track to be played", constraints:["Emergency", "Alert", "Warn", "Warning", "Tip",
                                                                                                         "Fire", "Arpeggio", "Chime-down", "Chime-up",                                                                                                             
                                                                                                         "Warble", "Whistle", "Bing-Bong", "Hi-Lo", "Whoop"
@@ -88,23 +83,6 @@ metadata {
                                                                                                         [name:"Volume",type:"ENUM", description:"Optional volume track is to be played at", optional:true,
                                                                                                          constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
         
-        command "playTrackAndResume"  // Override command definition - not relevant
-        //command "playTrackAndResume", [[name:"Track",type:"ENUM", description:"Track to be played", constraints:["Emergency", "Alert", "Warn", "Warning", "Tip",
-        //                                                                                                         "Fire", "Arpeggio", "Chime-down", "Chime-up",                                                                                                             
-        //                                                                                                         "Warble", "Whistle", "Bing-Bong", "Hi-Lo", "Whoop"
-        //                                                                                                ]], 
-        //                                                                                                [name:"Volume",type:"ENUM", description:"Optional volume track is to be played at", optional:true,
-        //                                                                                                 constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
-        
-        command "playTrackAndRestore" // Override command definition - not relevant 
-        //command "playTrackAndRestore", [[name:"Track",type:"ENUM", description:"Track to be played", constraints:["Emergency", "Alert", "Warn", "Warning", "Tip",
-        //                                                                                                          "Fire", "Arpeggio", "Chime-down", "Chime-up",                                                                                                             
-        //                                                                                                          "Warble", "Whistle", "Bing-Bong", "Hi-Lo", "Whoop"
-        //                                                                                                ]], 
-        //                                                                                                [name:"Volume",type:"ENUM", description:"Optional volume track is to be played at", optional:true,
-        //                                                                                                 constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
-       
-
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
         command "reset" 
         command "Repeat", [[name:"repeat",type:"ENUM", description:"Number of times to repeat audio", constraints:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]]
@@ -119,7 +97,8 @@ metadata {
         attribute "online", "String"
         attribute "devId", "String"
         attribute "driver", "String"  
-        attribute "firmware", "String"  
+        attribute "firmware", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String"
         attribute "lastTrack", "String"
         attribute "lastText", "String"
@@ -189,8 +168,6 @@ def uninstalled() {
 def poll(force=null) {
     logDebug("poll(${force})") 
     
-    rememberState("driver", clientVersion())
-    
     def lastPoll
     def cur_time = now()
     def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
@@ -208,10 +185,15 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else { 
-       logDebug("Getting device state")  
-       runIn(1,getDevicestate)           
-       state.lastPoll = now() 
+       pollDevice()
+       state.lastPoll = now()
     }     
+ }
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {}
@@ -311,9 +293,23 @@ def getDevicestate() {
 	return rc
 }    
 
+def playTrackAndResume() {unsupported("Play Track And Resume")}
+def playTrackAndRestore() {unsupported("Play Track And Restore")} 
+def playTextAndResume() {unsupported("Play Text And Resume")}  
+def playTextAndRestore() {unsupported("Play Text And Restore")}
+def nextTrack() {unsupported("Next Track")}
+def pause() {unsupported("Pause")}
+def play() {unsupported("Play")}
+def previousTrack() {unsupported("Previous Track")}
+def restoreTrack() {unsupported("Restore Track")}
+def resumeTrack() {unsupported("Resume Track")}
+def setTrack() {unsupported("Set Track")}
+def stop() {unsupported("Stop")}
+
+def unsupported(cmd) {log.warn "The '$cmd' command is not supported on a SpeakerHub"}
+
 def deviceNotification(text) {playText(text,null)}
-def playTextAndRestore(text,volume=null) {playText(text,volume)}
-def playTextAndResume(text,volume=null) {playText(text,volume)}
+
 def playText(text,volume=null) {
     logDebug("playText($text,$volume)")
     if (text) {   
@@ -321,8 +317,6 @@ def playText(text,volume=null) {
       }
     }  
 
-def playTrackAndRestore(track,volume=null) {playTrack(track,volume)}
-def playTrackAndResume(track,volume=null) {playTrack(track,volume)}
 def playTrack(track,volume=null) {
     if (track) {       
       playAudio(track,null,volume)

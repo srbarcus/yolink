@@ -18,11 +18,13 @@
  *         - Added "PushableButton" capability for doorbell
  *  2.0.2: Added formatted "signal" attribute as rssi & " dBm"
  *         - Added capability "SignalStrength" 
+ *  2.0.3: Prevent Service app from waiting on device polling completion
+ *         - Add "%" unit to 'battery'
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -50,6 +52,7 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String"  
         attribute "Type", "String"
         attribute "source", "String"
@@ -107,8 +110,6 @@ def uninstalled() {
 def poll(force=null) {
     logDebug("poll(${force})") 
     
-    rememberState("driver", clientVersion())
-    
     def lastPoll
     def cur_time = now()
     def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
@@ -126,11 +127,16 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else { 
-       rememberState("passwordError", "false")  
-       logDebug("Getting device state")  
-       runIn(1,getDevicestate)           
-       state.lastPoll = now() 
+       pollDevice()
+       state.lastPoll = now()
     }    
+ }
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    rememberState("passwordError", "false")
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {}
@@ -291,7 +297,7 @@ def parseDevice(object) {
    logDebug("Parsed: Lock=$lock, Battery=$battery, Lockset=$lockset, RSSI=$rssi")                      
 
    rememberState("lock", lock)
-   rememberState("battery", battery)
+   rememberState("battery", battery, "%")
    rememberState("lockset", lockset) 
    fmtSignal(rssi)   
 }   
@@ -317,7 +323,7 @@ def parseFetch(object) {
    logDebug("Parsed: Online=$online, Battery=$battery, Lockset=$lockset, Lock=$lock, Timezone=$timezone, Firmware=$firmware, Source=$source, Alert Type=$alertType, User=$user")      
                 
    rememberState("online", online)
-   rememberState("battery", battery) 
+   rememberState("battery", battery, "%") 
    rememberState("lockset", lockset)  
    rememberState("lock", lock)
    rememberState("timezone", timezone) 
@@ -415,7 +421,7 @@ def void processStateData(payload) {
             }    
                 
             rememberState("online", "true")
-            rememberState("battery", battery) 
+            rememberState("battery", battery, "%") 
             rememberState("lock", lock)               
             fmtSignal(rssi)                                      
 			break;      
