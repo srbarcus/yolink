@@ -27,11 +27,12 @@
  *  2.0.2: Handle "Alert" event
  *  2.0.3: Added formatted "signal" attribute as rssi & " dBm"
  *         - Added capability "SignalStrength" 
+ *  2.0.4: Correct problem with valve state always set to "unknown"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.4"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -226,9 +227,9 @@ def parseDevice(object) {
    
    if (delay_on == null) {delay_on = 0}
    if (delay_off == null) {delay_off = 0}
-                
+                   
    rememberState("online", "true")
-   rememberState("valve", valve)    
+   rememberState("valve", valve, null, (device.currentValue("valve") =="unknown"))
    rememberState("battery", battery) 
    rememberState("delay_on", delay_on) 
    rememberState("delay_off", delay_off)
@@ -237,6 +238,8 @@ def parseDevice(object) {
    rememberState("time", time)
    rememberState("tzone", tzone)
    fmtSignal(rssi)                         
+  
+   logDebug("Parsed: valve=$valve, battery=$battery, delay_on=$delay_on, delay_off=$delay_off, openRemind=$openRemind, firmware=$firmware, time=$time, tzone=$tzone")  
 }   
 
 def parse(topic) {     
@@ -265,7 +268,8 @@ def void processStateData(payload) {
     
             logDebug("Parsed: Valve=$valve, RSSI=$rssi")
             
-            rememberState("valve", valve)    
+            rememberState("valve", valve, null, (device.currentValue("valve") =="unknown"))  
+            
             fmtSignal(rssi)                          
 		    break;
             
@@ -294,7 +298,7 @@ def void processStateData(payload) {
     
             logDebug("Parsed: Valve=$valve, RSSI=$rssi")
             
-            rememberState("valve", valve)    
+            rememberState("valve", valve, null, (device.currentValue("valve") =="unknown"))   
             fmtSignal(rssi)                                       
 			break;  
             
@@ -377,10 +381,11 @@ def setValve(setState) {
    try {         
       def object = parent.pollAPI(request, state.name, state.type)  
       def valve = object.data.state
-      def rssi = object.data.loraInfo.signal         
+      def rssi = object.data.loraInfo.signal 
+       
+      rememberState("valve", valve, null, (device.currentValue("valve") =="unknown"))  
   
-      rememberState("valve", valve)    
-      state.remove("signal")   
+      fmtSignal(rssi)   
    
     } catch (e) {	
         log.error "setValve() exception: $e"
@@ -409,7 +414,8 @@ def reset(){
     state.remove("schedule3")
     state.remove("schedule4")
     state.remove("schedule5")
-    state.remove("schedule6")    
+    state.remove("schedule6")
+    state.remove("valve")
  
     poll(true)
    
@@ -420,17 +426,16 @@ def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }
 
-def rememberState(name,value,unit=null) {   
-   if (state."$name" != value) {
-     state."$name" = value   
-     value=value.toString()
+def rememberState(name, value, unit=null, force=false) {
+   if ((state."$name" != value) || (force)) {    
+     state."$name" = value       
      if (unit==null) {  
          sendEvent(name:"$name", value: "$value", isStateChange:true)
      } else {        
          sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true)      
      }           
    }
-}   
+} 
 
 def successful(object) {
   return (object.code  == "000000")     
