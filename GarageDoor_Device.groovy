@@ -21,11 +21,13 @@
  *         - Replaced "Signal" with "RSSI" per standards and added capability "SignalStrength"
  *         - Added warnings for "open" and "close" if no bound device
  *  2.0.4: Added formatted "signal" attribute as rssi & " dBm"
+ *  2.0.5: Fixed MQTT message processing
+ *  2.0.6: Prevent Service app from waiting on device polling completion
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -57,6 +59,7 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String"         
         }
@@ -111,11 +114,16 @@ def uninstalled() {
  }
 
 def poll(force=null) { 
-   rememberState("driver", clientVersion()) 
-   if (state.bound_devId != null) {
-     runIn(1,check_MQTT_Connection) 
-   }
+     pollDevice()
 }    
+
+def pollDevice(delay=1) {
+    if (boundToDevice()) {
+       runIn(delay,check_MQTT_Connection)
+    }
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
+ }
 
 def connect() {
    if (state.bound_devId != null) {establish_MQTT_connection(bound_dni, state.bound_homeID, state.bound_devId)}  //Establish MQTT connection to YoLink API for bound device
@@ -338,53 +346,65 @@ def mqttClientStatus(String message) {
     }
 }
 
-def parse(message) {        // Internal MQTT parsing of bound device
-    logDebug("parse(Object) ${message}")
-    def topic
+def parse(message) {        
+    logDebug("parse(${message})")
+    boolean skipError = false
     
     try {     
-		  topic = interfaces.mqtt.parseMessage(message)
-          def payload = new JsonSlurper().parseText(topic.payload)
-          logDebug("Processing Bound Device MQTT message")
-          processStateData(topic.payload)
-        
+		  def topic = interfaces.mqtt.parseMessage(message)                 // Internal MQTT parsing of bound device
+          def object = new JsonSlurper().parseText(topic.payload)
+          logDebug("Processing Bound Device MQTT message: $object")
+          skipError = true
+          parseTopic(object)
 	    } catch (Exception e) {	
-          logDebug("Processing YoLink MQTT message")
-		  parseTopic(message)
+            if (!skipError) {
+              logDebug("Processing YoLink MQTT message: $message")
+              processStateData(message.payload) 
+            } else {
+              log.error "Error $e"
+            }  
 	    }  
 }
 
-def parseTopic(message) {     // Parent MQTT parsing of GarageDoor device
-    logDebug("parseTopic(${message})")
+def parseTopic(object) {
+    logDebug("parseTopic(${object})")
     
     rememberState("online","true") 
     
-    def object = new JsonSlurper().parseText(message.payload)    
-    def event = object.event.replace("GarageDoor.","")
-    logDebug("Received Message Type: ${event}")
+    def child = parent.getChildDevice(state.my_dni)
+    def name = child.getLabel()                
+    def event = object.event.replace("DoorSensor.","")
+    logDebug("Received Message Type: ${event} for bound device: $name")  
         
     switch(event) {
-      case "Report":
-      case "setState":  
-            def contact = object.data.state          
+		case "Alert":            
+			def contact = object.data.state           
             def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
-            def rssi = object.data.loraInfo.signal  
+            def rssi = object.data.loraInfo.signal           
+            def door = "unknown"
+            def swState
+        
+            if (contact == "open"){
+                swState = "on"
+                door = "open"
+            } else {
+                swState = "off"
+                door = "closed"
+            }    
             
+            def stateChangedAt = object.data.stateChangedAt 
+            stateChangedAt = formatTimestamp(stateChangedAt)
+            
+            rememberState("switch",swState)
             rememberState("contact",contact)
-            rememberState("battery",battery)
+            rememberState("door",door)
+            rememberState("battery", battery, "%")
             rememberState("firmware",firmware)
-            fmtSignal(rssi)      
-        
-            logDebug("Parsed Status: State=${contact}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
-        
-		    break;              
-              
-		default:
-            log.error "Unknown event received: $event"
-            log.error "Message received: ${payload}"
-			break;
-	    }
+            fmtSignal(rssi)     
+            rememberState("stateChangedAt",stateChangedAt)
+		    break;   
+    }
 }
 
 def void processStateData(payload) {
@@ -393,12 +413,12 @@ def void processStateData(payload) {
     def object = new JsonSlurper().parseText(payload)    
     def devId = object.deviceId   
             
-    if (devId == state.bound_devId) {  // Only handle if message is from bound device
+    if (devId == state.devId) {  // Only handle if message is for me    
         logDebug("processStateData(${payload})")
         
         def child = parent.getChildDevice(state.my_dni)
         def name = child.getLabel()                
-        def event = object.event.replace("DoorSensor.","")
+        def event = object.event.replace("GarageDoor.","")
         logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
@@ -448,7 +468,12 @@ def void processStateData(payload) {
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
             fmtSignal(rssi)                  
-            break;	    
+            break;	  
+            
+          case "StatusChange":    
+            def rssi = object.data.loraInfo.signal  
+            fmtSignal(rssi)                  
+            break;	     
             
 		default:
             log.error "Unknown event received: $event"

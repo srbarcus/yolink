@@ -25,31 +25,33 @@
  *  2.0.0: - Reengineer app and drivers to use centralized MQTT listener due to new YoLink service restrictions
  *         - Update API return code translations  
  *  
- *  2.1.0: Add support for Smart Outdoor Plug (YS6802-UC/SH-18A)
- *  2.1.1: Speed up execution
- *  2.1.2: Allow device driver to override temperation conversion scale
- *  2.1.3: Initialize MQTT listener whenever app is run
+ *  2.1.00: Add support for Smart Outdoor Plug (YS6802-UC/SH-18A)
+ *  2.1.01: Speed up execution
+ *  2.1.02: Allow device driver to override temperation conversion scale
+ *  2.1.03: Initialize MQTT listener whenever app is run
  *         - Correct problem with scheduling under 5 minutes 
- *  2.1.4: Allow collection of diagnostic information
+ *  2.1.04: Allow collection of diagnostic information
  *         - Correct problem with devices not being polled after hub reboot
- *  2.1.5: Correct numerous 'Request was unauthorized. Attempting to refreshing access token and re-poll API.' messages
+ *  2.1.05: Correct numerous 'Request was unauthorized. Attempting to refreshing access token and re-poll API.' messages
  *         - Add 500ms delay between polling of next device to reduce load on Hubs
- *  2.1.6: Add support for Leak Sensor 3 (YS7904-UC)
- *  2.1.7: Add link to Hubitat Community, update copyright date, clean up UI, performance improvements
- *  2.1.8: Correct problem with temperature scale being overridden on defined devices 
+ *  2.1.06: Add support for Leak Sensor 3 (YS7904-UC)
+ *  2.1.07: Add link to Hubitat Community, update copyright date, clean up UI, performance improvements
+ *  2.1.08: Correct problem with temperature scale being overridden on defined devices 
  *         - Support syncing of application name changes
  *         - Add description to settings
  *         - Improve diagnostics collection performance
- *  2.1.9: Return null battery level value as "0" 
+ *  2.1.09: Return null battery level value as "0" 
  *  2.1.10: Copyright update
  *  2.1.11: Handle new error code: 010104:Header Error!The token expired
+ *  2.1.12: Reduce instantaneous hub load when polling devices
+ *         -Return name of device that MQTT message was passed to back to MQTT Listener for debugging 
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.11"}
+private def get_APP_VERSION() {return "2.1.12"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
@@ -463,7 +465,7 @@ def schedulePolling() {
     def interval = (pollInterval) ? pollInterval.toString(): "5" // Default: Poll every 5 minutes 
     def seconds = interval.toInteger() * 60
         
-    log.trace "Scheduling device polling for ${interval} minutes (${seconds} seconds)"  
+    logDebug("Scheduling device polling for ${interval} minutes (${seconds} seconds)")
     
     runIn(seconds, pollDevices)     
 }
@@ -471,12 +473,22 @@ def schedulePolling() {
 def pollDevices() {
     schedulePolling()
     
+    def delay = 0
+    
     def children= getChildDevices()
     children.each { 
-       logDebug("Polling device ${it} (${it.deviceNetworkId})")
-       it.poll()
-       pauseExecution(500) 
-    }  
+       try {     
+           logDebug("Scheduling polling on device ${it} (${it.deviceNetworkId}), delay = ${delay} seconds")
+           it.pollDevice(delay)                         
+           
+           delay = delay + 10
+           
+	   } catch(Exception e) {
+           log.error "pollDevices() Exception: $e"
+           log.error "Device: ${it}"
+       }  
+    }
+    logDebug("Polling acheduled on all devices.")
 }
 
 def passMQTT(topic) {
@@ -494,10 +506,10 @@ def passMQTT(topic) {
     if(dev) {
         logDebug("Passing MQTT message ${topic} to device ${dev} (${dev.deviceNetworkId})")
         dev.parse(topic)
-        return true     
+        return "${dev}"
     } else {      
         log.error "Unable to locate target device ${deviceDNI} for MQTT message ${topic}. Make sure the YoLink device has been defined via the YoLink Device Service app."
-        return false   
+        return null
     }    
 }
 

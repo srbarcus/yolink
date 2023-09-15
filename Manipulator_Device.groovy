@@ -28,11 +28,14 @@
  *  2.0.3: Added formatted "signal" attribute as rssi & " dBm"
  *         - Added capability "SignalStrength" 
  *  2.0.4: Correct problem with valve state always set to "unknown"
+ *  2.0.5: Prevent Service app from waiting on device polling completion
+ *  2.0.6: Set "schedules" attribute to 0 on installation or reset
+ *         - Correct weekdays displayed in schedules
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -54,11 +57,14 @@ metadata {
         command "open"                         
         command "close"  
         
+      //command "getSchedules" //For Debugging only
+        
         attribute "online", "String"
         attribute "devId", "String"
         attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String" 
   
         attribute "delay_on", "Number"     
@@ -123,8 +129,6 @@ def uninstalled() {
 def poll(force=null) {
     logDebug("poll(${force})") 
     
-    rememberState("driver", clientVersion())
-    
     def lastPoll
     def cur_time = now()
     def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
@@ -144,10 +148,20 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else { 
-       logDebug("Getting device state")  
-       runIn(1,getDevicestate)           
-       state.lastPoll = now() 
+       pollDevice()
+       state.lastPoll = now()
     }      
+ }
+
+def pollDevice(delay=0) {
+   if (delay == 0) {
+     getDevicestate()
+   } else {
+     runIn(delay,getDevicestate)
+   }    
+    
+   def date = new Date()
+   sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {}
@@ -212,7 +226,7 @@ def getDevicestate() {
 	}
     
 	return rc
-}    
+}   
 
 def parseDevice(object) {
    def valve = object.data.state
@@ -267,7 +281,9 @@ def void processStateData(payload) {
             def rssi = object.data.loraInfo.signal             
     
             logDebug("Parsed: Valve=$valve, RSSI=$rssi")
-
+            
+            rememberState("valve", valve, null, (device.currentValue("valve") =="unknown"))  
+            
             fmtSignal(rssi)                          
 		    break;
             
@@ -306,6 +322,66 @@ def void processStateData(payload) {
 			break;	
             
         case "setSchedules":
+            parseSchedules(object)
+			break; 
+            
+        case "setOpenRemind":            
+            def openRemind = object.data.openRemind  
+            rememberState("openRemind", openRemind)   
+            break;  
+            
+		default:
+            log.error "Unknown event received: $event"
+            log.error "Message received: ${payload}"
+			break;
+	    }
+    }      
+}
+
+def getSchedules() {
+	logDebug("getSchedules() obtaining schedules")
+    
+	boolean rc=false	//DEFAULT: Return Code = false   
+    
+	try {  
+        def request = [:]
+            request.put("method", "${state.type}.getSchedules")                 
+            request.put("targetDevice", "${state.devId}") 
+            request.put("token", "${state.token}") 
+        
+        def object = parent.pollAPI(request,state.name,state.type)
+          
+        if (object) {
+            logDebug("getSchedules()> pollAPI() response: ${object}")     
+            
+            if (successful(object)) {                
+                parseSchedules(object)                     
+                rc = true	
+                rememberState("online", "true") 
+                lastResponse("Success") 
+            } else {  //Error
+               if (pollError(object) ) {  //Cannot connect to Device
+                 sendEvent(name:"valve", value: "unknown", isStateChange:true)
+               }
+            }     
+        } else {
+            log.error "No response from API request"
+            lastResponse("No response from API")                
+        }   
+	} catch (groovyx.net.http.HttpResponseException e) {	
+            rc = false                        
+			if (e?.statusCode == UNAUTHORIZED_CODE) { 
+                lastResponse("Unauthorized")                
+            } else {
+                    lastResponse("Exception $e")                
+					logDebug("getDevices() Exception $e")
+			}            
+	}
+    
+	return rc
+}    
+
+def parseSchedules(object) {
             def schedules = object.data
                 
             logDebug("Parsed: Schedules=$schedules")
@@ -323,12 +399,10 @@ def void processStateData(payload) {
             while (schedNum < 6){        
                 if (object.data."${schedNum}" != null) { 
                   def schedule  =  object.data."${schedNum}".toString() 
-                  
                   def weekhex =  object.data."${schedNum}".week 
-                    
-                  def weekdays = parent.scheduledDays(weekhex)                    
+                  def weekdays = parent.scheduledDays(weekhex)  
                                                    
-                  schedule = schedule.replaceAll(" week=${weekhex},"," days=[${weekdays}],")                                          
+                  schedule = schedule.replaceAll("week=${weekhex}","days=[${weekdays}]")                                          
                   schedule = schedule.replaceAll(" index=${schedNum},","")                       
                   schedule = schedule.replaceAll("isValid=","enabled=") 
                   schedule = schedule.replaceAll("=25:0","=never")   
@@ -346,24 +420,7 @@ def void processStateData(payload) {
             while (scheds <= 6){        
                 sendEvent(name:"schedule${scheds}", value: " ", isStateChange:false)
                 scheds++
-            }              
-           
-			break; 
-                
-        case "getSchedules":    //Old schedule
-            break;  
-
-        case "setOpenRemind":            
-            def openRemind = object.data.openRemind  
-            rememberState("openRemind", openRemind)   
-            break;  
-            
-		default:
-            log.error "Unknown event received: $event"
-            log.error "Message received: ${payload}"
-			break;
-	    }
-    }      
+            }   
 }
 
 def setValve(setState) {
@@ -405,17 +462,12 @@ def reset(){
     state.remove("time")  
     state.remove("tzone")  
     state.remove("rssi") 
-    state.remove("signal")    
-    state.remove("schedules") 
-    state.remove("schedule1")
-    state.remove("schedule2")
-    state.remove("schedule3")
-    state.remove("schedule4")
-    state.remove("schedule5")
-    state.remove("schedule6")
+    state.remove("signal")        
     state.remove("valve")
  
     poll(true)
+    
+    getSchedules()
    
     log.warn "Device reset to default values"
 }

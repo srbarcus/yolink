@@ -28,11 +28,12 @@
  *  2.0.2: Enhance Power Monitoring plug: add "PowerMeter" capability and return power readings as numbers
  *         - Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"
+ *  2.0.3: Prevent Service app from waiting on device polling completion
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -59,6 +60,7 @@ metadata {
         attribute "driver", "String"        
         attribute "firmware", "String"  
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String" 
         
         attribute "delay_on", "Number"  
@@ -158,10 +160,15 @@ def poll(force=null) {
     if (cur_time < min_time ) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else { 
-       logDebug("Getting device state")  
-       runIn(1,getDevicestate)           
-       state.lastPoll = now() 
+       pollDevice()
+       state.lastPoll = now()
     }      
+ }
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {}

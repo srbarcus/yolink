@@ -18,11 +18,12 @@
  *  2.0.2: Add "%rh" unit to Humidity attribute
  *         - Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"  
+ *  2.0.3: Prevent Service app from waiting on device polling completion
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
+def clientVersion() {return "2.0.3"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -56,6 +57,7 @@ metadata {
         attribute "driver", "String"  
         attribute "firmware", "String"  
         attribute "signal", "String"
+        attribute "lastPoll", "String"
         attribute "lastResponse", "String" 
                 
         attribute "schedules", "String"
@@ -247,37 +249,38 @@ def internalPoll() {
  }
 
 def poll(force=null, internalPoll=null) {
-    rememberState("driver", clientVersion())
-    
     if ((force == true) || (internalPoll == true) || (state.pollingOverride == "None")) {
-    logDebug("poll(${force})") 
-    if (internalPoll == null) { logDebug("Running external poll") }    
+        logDebug("poll(${force})") 
+        if (internalPoll == null) { logDebug("Running external poll") }    
     
-    def lastPoll
-    def cur_time = now()
-    def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
-    def min_interval = min_seconds * 1000    // Convert to milliseconds
+        def lastPoll
+        def cur_time = now()
+        def min_seconds = 10                     // To avoid unecessary load on YoLink servers, limit rate of polling
+        def min_interval = min_seconds * 1000    // Convert to milliseconds
     
-    if (force != null) {
-       logDebug("Forcing poll")  
-       state.lastPoll = cur_time - min_interval
-    }
+        if (force != null) {
+           logDebug("Forcing poll")  
+           state.lastPoll = cur_time - min_interval
+        }
     
-    lastPoll = state.lastPoll
+        lastPoll = state.lastPoll
 
-    def min_time = lastPoll + min_interval
+        def min_time = lastPoll + min_interval
 
-    if (cur_time < min_time ) {
-       log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
-    } else { 
-       logDebug("Getting device state")  
-       if (getDevicestate()) {
-         runIn(1,getSchedules)           
-       }    
-       state.lastPoll = now() 
-    }    
+        if (cur_time < min_time ) {
+           log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
+        } else { 
+           pollDevice()
+           state.lastPoll = now()
+        } 
     }
- }        
+ }      
+
+def pollDevice(delay=1) {
+    runIn(delay,getDevicestate)
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
+ }
 
 def temperatureScale(value) {}
 
@@ -742,6 +745,8 @@ def getDevicestate() {
 					logDebug("getDevices() Exception $e")
 			}            
 	}
+    
+    if (rc) {getSchedules()}    
     
 	return rc
 }    
