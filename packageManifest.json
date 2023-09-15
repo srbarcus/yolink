@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Minor fixes to SmartRemoter Driver\n- SmartRemoter Driver defaults to Flex Fob\n",
+    "releaseNotes": "- Handle new error code: 010104:Header Error!The token expired\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.10"
+            "version": "2.1.11"
         }
     ],
     "drivers": [
@@ -57,7 +57,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Manipulator_Device.groovy",
             "required": false,
-            "version": "2.0.3"
+            "version": "2.0.4"
         },
         {
             "id": "2fc8dba4-61b1-4cfb-9fc7-8862d5368d93",
