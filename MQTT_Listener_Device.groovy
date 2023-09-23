@@ -19,11 +19,12 @@
  *  2.0.4: Added "driver" attribute and isSetup() for diagnostics
  *  2.0.5: Support diagnostics, correct various errors, make singleThreaded
  *  2.0.6: Copyright update and UI formatting
+ *  2.0.7: Updated driver version on poll
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.6"}
+def clientVersion() {return "2.0.7"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -45,6 +46,7 @@ metadata {
         attribute "devId", "String"
         attribute "driver", "String"          
         attribute "firmware", "String"
+        attribute "lastPoll", "String"
         attribute "MQTT", "String" 
         attribute "lastResponse", "String"
         }
@@ -102,7 +104,6 @@ def uninstalled() {
  }
 
 def poll() {
-  rememberState("driver", clientVersion())  
   def MQTT = interfaces.mqtt.isConnected()  
   rememberState("online",MQTT) 
   rememberState("driver", clientVersion())     
@@ -112,6 +113,13 @@ def poll() {
   } else {   
      runIn(1,connect) //Establish MQTT connection to YoLink API
   }
+ }
+
+def pollDevice(delay=1) {
+    rememberState("driver", clientVersion())
+    poll()
+    def date = new Date()
+    sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
 def temperatureScale(value) {}
@@ -190,8 +198,10 @@ def parse(message) {  //CALLED BY MQTT
     
     state.message = topic
     
-    if (parent.passMQTT(topic)) {
-        logDebug("MQTT message passed successfully")
+    def device = parent.passMQTT(topic)
+    
+    if (device != null) {
+        logDebug("MQTT message passed successfully to device ${device}")
     } else {
         log.error "MQTT message ${topic} - Failed passing to device driver"
     }    
