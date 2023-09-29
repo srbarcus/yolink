@@ -31,11 +31,12 @@
  *  2.0.5: Prevent Service app from waiting on device polling completion
  *  2.0.6: Set "schedules" attribute to 0 on installation or reset
  *         - Correct weekdays displayed in schedules
+ *  2.0.7: Updated driver version on poll
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.6"}
+def clientVersion() {return "2.0.7"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -154,6 +155,7 @@ def poll(force=null) {
  }
 
 def pollDevice(delay=0) {
+   rememberState("driver", clientVersion()) 
    if (delay == 0) {
      getDevicestate()
    } else {

@@ -23,11 +23,12 @@
  *  2.0.4: Added formatted "signal" attribute as rssi & " dBm"
  *  2.0.5: Fixed MQTT message processing
  *  2.0.6: Prevent Service app from waiting on device polling completion
+ *  2.0.7: Updated driver version on poll
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.6"}
+def clientVersion() {return "2.0.7"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -118,6 +119,7 @@ def poll(force=null) {
 }    
 
 def pollDevice(delay=1) {
+    rememberState("driver", clientVersion())
     if (boundToDevice()) {
        runIn(delay,check_MQTT_Connection)
     }
