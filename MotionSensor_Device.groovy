@@ -28,11 +28,12 @@
  *         - Added capability "SignalStrength"
  *  2.0.3: Handle event 'setOpenRemind'
  *  2.0.4: Prevent Service app from waiting on device polling completion
+ *  2.0.5: Updated driver version on poll
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.0.5"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -136,6 +137,7 @@ def poll(force=null) {
  }
 
 def pollDevice(delay=1) {
+    rememberState("driver", clientVersion())
     runIn(delay,getDevicestate)
     def date = new Date()
     sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)

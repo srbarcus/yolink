@@ -21,11 +21,18 @@
  *  1.0.3: Added formatted "signal" attribute as rssi & " dBm"
  *  1.0.4: Prevent Service app from waiting on device polling completion
  *  1.0.5: Updated driver to recognize actions being initiated on the YoLink app
+ *  1.0.6: Updated driver version on poll
+ *  1.0.7: Add capability "Battery"
+ *         - Added states: "bound_battery", bound_firmware
+ *         - Fix null StateChangedAt
  */
 
 import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+import java.net.URLEncoder
+import groovy.transform.Field
 
-def clientVersion() {return "1.0.5"}
+def clientVersion() {return "1.0.7"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -42,7 +49,8 @@ metadata {
         capability "Momentary"
         capability "ContactSensor"
         capability "GarageDoorControl"
-        capability "SignalStrength"        
+        capability "SignalStrength"   
+        capability "Battery"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
         command "connect"                       // Attempt to establish MQTT connection
@@ -117,6 +125,7 @@ def poll(force=null) {
 }    
 
 def pollDevice(delay=1) {
+   rememberState("driver", clientVersion())  
    if (boundToDevice()) {
      runIn(delay,check_MQTT_Connection) 
    }
@@ -376,14 +385,13 @@ def parseTopic(message) {     // Parent MQTT parsing of finger device
             def firmware = object.data.version.toUpperCase()    
             def rssi = object.data.loraInfo.signal              
             
-            rememberState("battery",battery)
+            rememberState("battery",battery,"%")
             rememberState("firmware",firmware)
             fmtSignal(rssi)
         
-            if (devstate == "stop") {push(false)}
+            //if (devstate == "stop") {} //User pressed "Set" on Finger
         
-            logDebug("Parse Status: State=${devstate}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
-        
+            logDebug("Parse Finger MQTT: State=${devstate}, Battery=${battery}, Firmware=${firmware}, RSSI=${rssi}")
 		    break;              
               
 		default:
@@ -393,9 +401,7 @@ def parseTopic(message) {     // Parent MQTT parsing of finger device
 	    }
 }
 
-def void processStateData(payload) {
-    rememberState("online","true") 
-    
+def void processStateData(payload) {   // MQTT parsing of bound device   
     def object = new JsonSlurper().parseText(payload)    
     def devId = object.deviceId   
             
@@ -422,8 +428,8 @@ def void processStateData(payload) {
              
             rememberState("contact",contact)
             rememberState("door",contact)
-            rememberState("battery",battery)
-            rememberState("firmware",firmware)
+            rememberState("bound_battery",battery,"%")
+            rememberState("bound_firmware",firmware)
             fmtSignal(rssi)
             rememberState("stateChangedAt",stateChangedAt)
             
@@ -442,9 +448,9 @@ def void processStateData(payload) {
             
             rememberState("contact",contact)
             rememberState("door",contact)
-            rememberState("battery",battery)
+            rememberState("bound_battery",battery,"%")
+            rememberState("bound_firmware",firmware)
             rememberState("delay",delay)               
-            rememberState("firmware",firmware)
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
             fmtSignal(rssi)
@@ -468,47 +474,69 @@ def void processStateData(payload) {
     }      
 }
 
+def open() {
+   logDebug("open()")  
+   toggle("open")
+}
+
 def close() {
-    if (boundToDevice()) {
-        if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
-          toggle()
-          rememberState("door","closing")    
-        }    
-    } else {
-        log.error "No bound device, use 'push' to toggle finger."         
-    }    
+   logDebug("close()")
+   toggle("close")
 }
 
-def open() {    
-   if (boundToDevice()) { 
-       if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
-         toggle()
-         rememberState("door","opening")  
-       }
-   } else {
-        log.error "No bound device, use 'push' to toggle finger."
+def push() {
+   logDebug("push()")
+   toggle()
+}
+
+def toggle(func="toggle") {
+   logDebug("toggle(): Door ".plus(state.door)) 
+   if (!boundToDevice()) { 
+     rememberState("door","not bound")
+     }   
+    
+   switch(func) {
+      case "open":
+         if (boundToDevice()) { 
+            if (state.door == "closed") {  
+               rememberState("door","opening")  
+            } else {
+               if (state.door != "open") {  
+                 rememberState("door",state.door)
+               }
+               return                  
+            }    
+         }  
+         break;
+       
+      case "close":  
+         if (boundToDevice()) { 
+            if (state.door == "open") {  
+               rememberState("door","closing")  
+            } else {
+               if (state.door != "closed") {  
+                 rememberState("door",state.door)
+               }    
+               return   
+            }    
+         }         
+		 break;              
+              
+      default:
+         if (boundToDevice()) { 
+            if (state.door == "open") {  
+               rememberState("door","closing")  
+            } else {
+               if (state.door == "closed") {  
+                 rememberState("door","opening")
+               } else {
+                 rememberState("door",state.door)  
+               }    
+            }    
+         }         
+		 break; 
    } 
-}
-
-def push(toggledev=true) {    
-    if (boundToDevice()) { 
-       if (state.door == "closed") {  
-         rememberState("door","opening")  
-       } else {
-           if (state.door == "open") {  
-             rememberState("door","closing")  
-           }    
-       }    
-   } else {
-       rememberState("door","unknown")
-   } 
-
-    if (toggledev == true) {
-        logDebug("Sending toggle command to device") 
-        toggle()}
-}
-
-def toggle() {
+    
    def request = [:]    
    request.put("method", "${state.type}.toggle")   
    request.put("targetDevice", "${state.devId}") 
@@ -521,13 +549,10 @@ def toggle() {
             logDebug("toggle(): pollAPI() response: ${object}")  
                               
             if (successful(object)) {        
-                  def stateChangedAt = object.data.stateChangedAt
                   def rssi = object.data.loraInfo.signal       
                 
-                  stateChangedAt = formatTimestamp(stateChangedAt)
-                
-                  logDebug("Parsed: stateChangedAt=$stateChangedAt, RSSI=$rssi")
-                  rememberState("stateChangedAt",stateChangedAt)
+                  logDebug("Parsed: RSSI=$rssi")
+
                   fmtSignal(rssi)
                   rememberState("online","true")                    
                   lastResponse("Success")     
@@ -562,6 +587,8 @@ def unbind() {
     state.remove("bound_type")  
     state.remove("bound_token")  
     state.remove("bound_devId") 
+    state.remove("bound_battery")  
+    state.remove("bound_firmware") 
     state.remove("contact")
     
     rememberState("door","unknown")
@@ -595,6 +622,7 @@ def reset(){
     state.remove("stateChangedAt")
     state.remove("LastResponse")  
     state.remove("sensors")  
+    state.remove("battery") 
     
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     

@@ -32,11 +32,12 @@
  *  2.0.5: Default to Flex Fob
  *  2.0.6: Report buttons as numeric value, report rssi as number, fix multiple events not being reported
  *         - Switch to Preferences vs Commands. Display Perferences based on Fob Model chosen
+ *  2.0.7: Updated driver version on poll
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.6"}
+def clientVersion() {return "2.0.7"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 def redTitle(text) 	{ return '<span style="color:#ff0000">'+text+'</span>'}
@@ -155,13 +156,28 @@ def updated() {
     
     rememberState("driver", clientVersion())
     
-    if (state.fobmodel != fobModel) {
-        if (state.fobmodel == "Dimmer Fob") {
+    if (fobModel != state.fobModel) {              //Switching to a new Fob model
+        logDebug("Switching Fob Model from '${state.fobModel}' to '${fobModel}'")
+        
+        if (fobModel == "Dimmer Fob") {
             rememberState("levelChange", 10, "%")   
         } else {
             state.remove("levelChange") 
-        }    
+        }  
     }    
+    
+    rememberState("doubleTapped", "n/a")
+    rememberState("action", " ")
+    
+    
+    if (fobModel == "Flex Fob") {
+        rememberState("allowDoubleTap",allowDoubleTap)
+        if (allowDoubleTap == "True") { 
+          rememberState("doubleTapped", 0)
+        }
+    } else {
+        rememberState("allowDoubleTap","False")        
+    }
     
     setModel(fobModel)
     
@@ -178,9 +194,8 @@ def setModel(model) {
     rememberState("fobModel", model)
     
     device.updateSetting("ignoreButton",[value:0,type:"number"])
-    device.updateSetting("DoubleButton",[value:0,type:"number"])
-    
-    log.info "Settings: $settings"
+    device.updateSetting("DoubleButton",[value:0,type:"number"])  
+
     log.info "Fob Model set to $model"  
  }
 
@@ -193,6 +208,7 @@ def poll(force=null) {
 }
 
 def pollDevice(delay=1) {
+   rememberState("driver", clientVersion())
    if (boundToDevice()) {
      runIn(delay,check_MQTT_Connection)  
    }
@@ -203,16 +219,6 @@ def pollDevice(delay=1) {
 def tapDelay(value) {    
    logDebug("tapDelay(${value})")  
    rememberState("tapDelay",value)                
- }
-
-def allowDoubleTap(value) {    
-   logDebug("allowDoubleTap(${value})")  
-   if (state.fobModel == "Flex Fob") { 
-     rememberState("allowDoubleTap",value)
-   } else {
-     log.warn "Double-tapping is only allowed on a Flex Fob"  
-     rememberState("allowDoubleTap",false)
-   }    
  }
 
 def on() {

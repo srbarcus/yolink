@@ -27,11 +27,12 @@
  *         - Add formatted "signal" attribute as rssi & " dBm"
  *         - Add capability "SignalStrength"
  *  2.0.3: Prevent Service app from waiting on device polling completion
+ *  2.0.4: Updated driver version on poll
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.3"}
+def clientVersion() {return "2.0.4"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -152,6 +153,7 @@ def poll(force=null) {
  }
 
 def pollDevice(delay=1) {
+    rememberState("driver", clientVersion())
     runIn(delay,getDevicestate)
     
     def date = new Date()  
