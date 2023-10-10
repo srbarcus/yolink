@@ -44,14 +44,16 @@
  *  2.1.10: Copyright update
  *  2.1.11: Handle new error code: 010104:Header Error!The token expired
  *  2.1.12: Reduce instantaneous hub load when polling devices
- *         -Return name of device that MQTT message was passed to back to MQTT Listener for debugging 
+ *         -Return name of device that MQTT message was passed to back to MQTT Listener for debugging
+ *  2.1.13: Add retry to pollAPI() if connection timesout
+ *  2.1.14: Added findChild()
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.12"}
+private def get_APP_VERSION() {return "2.1.14"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
@@ -646,6 +648,10 @@ boolean getGeneralInfo() {
 	}
 }    
 
+def findChild(dni) {
+    return allChildDevices.find {it.deviceNetworkId.contains(dni)}	        
+}    
+
 String pageTitle 	(String txt) 	{ return '<h2>'+txt+'</h2>'}
 String sectionTitle	(String txt) 	{ return '<h3>'+txt+'</h3>'}
 String blueTitle	(String txt)	{ return '<span style="color:#0000ff">'+txt+'</span>'} 
@@ -796,9 +802,13 @@ def pollAPI(body, name=null, type=null){
 	    		}            
             }
         } catch (java.net.SocketTimeoutException e) {	                     
-            log.error "pollAPI() HTTP request timed out"
+            log.error "pollAPI() HTTP socket timed out"
             log.error "Request: $Params"
             retry = retry - 1
+        } catch (org.apache.http.conn.ConnectTimeoutException e) {
+            log.error "pollAPI() HTTP connection timed out"
+            log.error "Request: $Params"
+            retry = retry - 1            
 	    } catch(Exception e) {
             log.error "pollAPI() Exception: $e"
             log.error "Request: $Params"
