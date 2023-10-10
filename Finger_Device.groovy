@@ -347,7 +347,7 @@ def bind(sensorid) {
     return  
   }     
   
-  if (boundToDevice) {  
+  if (boundToDevice()) {  
       log.error "Binding failed. Already bound to '${state.bound_name}'."
       lastResponse("Binding failed. Already bound.")
       return  
@@ -407,8 +407,9 @@ def bind(sensorid) {
 def boundToDevice() {(state.bound_devId != null)}
 
 def unbind() {
-    if (!boundToDevice) {  
+    if (!boundToDevice()) {  
       log.error "Unbind failed: No device is currently bound."
+      lastResponse("Unbind failed: Not currently bound.")  
       return  
     }
     
