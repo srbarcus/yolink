@@ -30,11 +30,13 @@
  *         - Added capability "SignalStrength"
  *  2.0.4: Prevent Service app from waiting on device polling completion
  *  2.0.5: Updated driver version on poll
+ *  2.0.6: Handle messages 'setMute' and 'setTimeZone'
+ *         - Add attributes: 'mute', 'muteDuration', 'muteRemaining'
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.5"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -66,7 +68,10 @@ metadata {
         attribute "reportAt", "String"
 
         attribute "volume", "Number" 
-        attribute "alarmDuration", "Number"        
+        attribute "alarmDuration", "Number"
+        attribute "mute", "String"   
+        attribute "muteDuration", "Number"   
+        attribute "muteRemaining", "Number"   
         }
    }
 
@@ -248,7 +253,10 @@ def parseDevice(object) {
     def battery = parent.batterylevel(object.data.battery) 
     def powerSource = object.data.powerSupply 
     if (powerSource == "usb") {powerSource = "mains"}
-    def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error   
+    def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error
+    def mute = object.data.mute
+    def muteDuration = duration(object.data.muteDuration)
+    def muteRemaining = duration(object.data.muteRemaining)
     def firmware = object.data.version.toUpperCase()
     def rssi = object.data.loraInfo.signal
     
@@ -256,6 +264,9 @@ def parseDevice(object) {
     rememberState("battery",battery)
     rememberState("powerSource",powerSource)    
     rememberState("alarmDuration",alarmDuration)
+    rememberState("mute",mute)
+    rememberState("muteDuration",muteDuration)
+    rememberState("muteRemaining",muteRemaining)
     rememberState("firmware",firmware)    
     fmtSignal(rssi)
     
@@ -288,11 +299,13 @@ def setAlarmState(alarm) {
             break;   
             
         case "off":
+        case "disabled":
             alarm = "disabled" 
             swstate = "disabled"                      
             log.warn "Siren has been turned off using the device's switch"
             online = false
-            rememberState("powerSource","unknown") 
+            rememberState("powerSource","unknown")
+            lastResponse("Siren has been turned off using the device's switch")   
             break; 
            
 		default:
@@ -336,10 +349,31 @@ def void processStateData(payload) {
         
         switch(event) {
 		case "Report":   
-        case "StatusChange":   
         case "getState":       
             parseDevice(object) 
  		    break;   
+            
+        case "StatusChange":   
+            def alarm = object.data.state
+            def volume = object.data.soundLevel    
+            def battery = parent.batterylevel(object.data.battery) 
+            def powerSource = object.data.powerSupply 
+            if (powerSource == "usb") {powerSource = "mains"}
+            def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error
+            def mute = object.data.mute
+            def firmware = object.data.version.toUpperCase()
+            def rssi = object.data.loraInfo.signal
+    
+            rememberState("volume",volume)
+            rememberState("battery",battery)
+            rememberState("powerSource",powerSource)    
+            rememberState("alarmDuration",alarmDuration)
+            rememberState("mute",mute)
+            rememberState("firmware",firmware)    
+            fmtSignal(rssi)
+    
+            setAlarmState(alarm)
+ 		    break;       
             
         case "setDuation": //API message has a spelling error    
             def alarmDuration = duration(object.data.alarmDuation)   //API message has a spelling error    
@@ -347,6 +381,19 @@ def void processStateData(payload) {
             rememberState("alarmDuration",alarmDuration)
             fmtSignal(rssi)
             break;   
+            
+        case "setMute":
+            def mute = object.data.mute
+            def muteDuration = duration(object.data.muteDuration)
+            def muteRemaining = duration(object.data.muteRemaining)
+    
+            rememberState("mute",mute)
+            rememberState("muteDuration",muteDuration)
+            rememberState("muteRemaining",muteRemaining)
+            break;  
+            
+        case "setTimeZone":
+            break;              
             
         case "setState":  //"normal","alert","off"
             def alarm = object.data.state    
@@ -374,6 +421,9 @@ def reset(){
     state.remove("volume") 
     state.remove("battery")
     state.remove("alarmDuration")
+    state.remove("mute")
+    state.remove("muteDuration")
+    state.remove("muteRemaining")
     state.remove("powerSource")    
     state.remove("firmware")
     state.remove("rssi")

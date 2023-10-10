@@ -25,11 +25,12 @@
  *         - Add capability "SignalStrength"
  *  2.0.3: Prevent Service app from waiting on device polling completion
  *  2.0.4: Updated driver version on poll
+ *  2.1.0: Support direct updating of bound Finger device
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.1.0"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -131,7 +132,6 @@ def poll(force=null) {
        log.warn "Polling interval of once every ${min_seconds} seconds exceeded, device was not polled."	
     } else {
        pollDevice()
-       state.lastPoll = now()
     }    
  }
 
@@ -243,8 +243,45 @@ def parseDevice(object) {
     rememberState("openRemindDelay",openRemindDelay) 
     rememberState("switch",swState)
     rememberState("contact",contact)
-    rememberState("firmware",firmware)                                     
+    rememberState("firmware",firmware)   
+    
+    setDoorState()
 }   
+
+def bind(dni,name) { 
+   if (dni != null) {
+     if (state.bound_Device != null) {  
+       log.error "Device is already bound to '${state.bound_Device}', DNI=${state.bound_DNI}"
+       lastResponse("Binding failed. Already bound to '${state.bound_Device}'")     
+       return  
+     }   
+       
+     rememberState("bound_Device",name)  
+     rememberState("bound_DNI",dni)  
+     setDoorState()
+     log.info "Bound to '${name}', DNI=${dni}"  
+     lastResponse("Bound to '${name}'")   
+   } else {
+     if (state.bound_Device != null) {  
+       log.warn "Unbinding '${state.bound_Device}', DNI=${state.bound_DNI}"
+     }    
+     state.remove("bound_Device")  
+     state.remove("bound_DNI")    
+     lastResponse("Unbound from '${name}'")   
+   }    
+}
+
+def setDoorState() {   
+   if (state.bound_DNI  != null) {     
+     def dev = parent.findChild(state.bound_DNI )	
+     if (!dev) {
+       log.error "setDoorState(): Cannot locate bound device"
+     } else {
+       logDebug("setDoorState(): Calling bound device setBoundState(${state.contact},${state.battery},${state.firmware},${state.signal},${state.stateChangedAt})")
+       dev.setBoundState(state.contact,state.battery,state.firmware,state.signal,state.stateChangedAt)
+     }
+   }    
+}    
 
 def parse(topic) {     
      processStateData(topic.payload)
@@ -283,6 +320,8 @@ def void processStateData(payload) {
             rememberState("firmware",firmware)
             fmtSignal(rssi)     
             rememberState("stateChangedAt",stateChangedAt)
+            
+            setDoorState()
 		    break;           
 		
                 
@@ -304,7 +343,9 @@ def void processStateData(payload) {
             rememberState("firmware",firmware)
             rememberState("openRemindDelay",openRemindDelay) 
             rememberState("alertInterval",alertInterval)
-            fmtSignal(rssi)        
+            fmtSignal(rssi)      
+            
+            setDoorState()
 		    break;  
             
         case "setOpenRemind":    
@@ -329,7 +370,7 @@ def formatTimestamp(timestamp){
     if ((state.timestampFormat != null) && (timestamp != null)) {
       def date = new Date( timestamp as long )    
       date = date.format(state.timestampFormat)
-      logDebug("formatTimestamp(): '$state.timestampFormat' = '$date'")
+      //logDebug("formatTimestamp(): '$state.timestampFormat' = '$date'")
       return date  
     } else {
       return timestamp  
