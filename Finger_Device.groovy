@@ -436,6 +436,7 @@ def unbind() {
     
     rememberState("door","unknown")
     rememberState("contact","unknown") 
+    interfaces.mqtt.disconnect() // Guarantee we're disconnected - hold over from bound device MQTT processing (delete in future)
 }
 
 def formatTimestamp(timestamp){    
