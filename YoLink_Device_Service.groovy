@@ -47,13 +47,14 @@
  *         -Return name of device that MQTT message was passed to back to MQTT Listener for debugging
  *  2.1.13: Add retry to pollAPI() if connection timesout
  *  2.1.14: Added findChild()
+ *  2.1.15: Fixed polling error caused by API returning new error description: "Invalid request: The token is expired"
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.14"}
+private def get_APP_VERSION() {return "2.1.15"}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
@@ -745,7 +746,10 @@ def pollAPI(body, name=null, type=null){
                     def code = object.code                  
                     def desc = object.desc  
                     
-                    if ((!desc) || (code==desc)) {desc = translateCode(code)}  
+                    if ((!desc) || (code==desc)) {
+                        desc = translateCode(code)
+                        logDebug("Translated Response: ${desc}")
+                    }  
                     
                     switch (desc) {
                     case "Success":
@@ -759,7 +763,8 @@ def pollAPI(body, name=null, type=null){
                          rc = object
                          break;
                         
-                    case "Header Error!The token expired":    
+                    case "Header Error!The token expired":
+                    case "Invalid request: The token is expired":                         
                          if (retry>0) {
                               retry = retry - 1  
                               logDebug('Request token expired. Attempting to refreshing access token and re-poll API, Retries=${retry}')  

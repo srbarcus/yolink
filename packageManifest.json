@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "Service App: Retry Polling if connection times out.\nSiren Driver: - Add states for 'mute', 'muteDuration', 'muteRemaining'.\n  - Fix error processing 'setMute' and 'setTimeZone' messages.\nFinger Driver - Allow direct binding to a door sensor to remove dependency on YoLink cloud\n  - Add 'Unbind' command.\nDoor Sensor Driver - Support direct binding with a Finger device to remove dependency on YoLink cloud\n\nNOTE: If you have a Finger device currently bound to a Door Sensor, after the update you must open the Finger device and do an 'Unbind' and then a 'Bind'.\n\n",
+    "releaseNotes": "Urgent Fix: All device polling is failing due to changes in API response; Update fixes "Polling of API failed: Invalid request: The token is expired"\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.14"
+            "version": "2.1.15"
         }
     ],
     "drivers": [
