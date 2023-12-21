@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "Urgent Fix: All device polling is failing due to changes in API response. Update fixes 'Polling of API failed: Invalid request: The token is expired'.\n\n",
+    "releaseNotes": "Fix Outlet driver for newer Power Monitoring Outlets."\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.15"
+            "version": "2.1.16"
         }
     ],
     "drivers": [
@@ -73,7 +73,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
             "required": false,
-            "version": "2.0.4"
+            "version": "2.0.5"
         },
         {
             "id": "0b5e05f6-69a4-4a40-ac97-ae57d5e0dc9f",
