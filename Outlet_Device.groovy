@@ -30,11 +30,12 @@
  *         - Add capability "SignalStrength"
  *  2.0.3: Prevent Service app from waiting on device polling completion
  *  2.0.4: Updated driver version on poll
+ *  2.0.5: Fix for new hardware with firmware 021F
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.0.5"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -265,10 +266,11 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) {
-   def devId = object.deviceId  
    def swState = parent.relayState(object.data.state)   
-   def delay_on = object.data.delay.on
-   def delay_off = object.data.delay.off    
+   def delay_on = object.data.delay?.on
+   def delay_off = object.data.delay?.off    
+   if (!delay_on)  {delay_on=0}
+   if (!delay_off) {delay_off=0} 
    def power = object.data.power/10 
    def watt = object.data.watt 
    def firmware = object.data.version.toUpperCase()
@@ -278,7 +280,7 @@ def parseDevice(object) {
     
    if (swState == "off") {power = 0} 
     
-   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Watt=$watt, Time=$time, Timezone=$tzone, Firmware=$firmware, RSSI=$rssi")      
+   logDebug("Parsed: Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Watt=$watt, Time=$time, Timezone=$tzone, Firmware=$firmware, RSSI=$rssi")      
                 
    rememberState("online", "true")
    rememberState("switch", swState)
