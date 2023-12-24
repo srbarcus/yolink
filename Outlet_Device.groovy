@@ -31,11 +31,12 @@
  *  2.0.3: Prevent Service app from waiting on device polling completion
  *  2.0.4: Updated driver version on poll
  *  2.0.5: Fix for new hardware with firmware 021F
+ *  2.0.6: Fix historical wattage values
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.5"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -272,7 +273,7 @@ def parseDevice(object) {
    if (!delay_on)  {delay_on=0}
    if (!delay_off) {delay_off=0} 
    def power = object.data.power/10 
-   def watt = object.data.watt 
+   def watt = object.data.watt*10
    def firmware = object.data.version.toUpperCase()
    def time = object.data.time
    def tzone = object.data.tz
@@ -350,23 +351,23 @@ def void processStateData(payload) {
 			break;
             
         case "powerReport":            
-            def watts = object.data.watts
+            def watts = object.data.watts*10
             logDebug("Watt Report = ${watts}")
 
             def time1 = watts.time[0]
-            def watt1 = watts.watt[0]
+            def watt1 = watts.watt[0]*10
             time1 = formatTimestamp(time1)  
                         
             def time2 = watts.time[1]
-            def watt2 = watts.watt[1]
+            def watt2 = watts.watt[1]*10
             time2 = formatTimestamp(time2)  
                         
             def time3 = watts.time[2]
-            def watt3 = watts.watt[2]
+            def watt3 = watts.watt[2]*10
             time3 = formatTimestamp(time3)  
                         
             def time4 = watts.time[3]
-            def watt4 = watts.watt[3]            
+            def watt4 = watts.watt[3]*10         
             time4 = formatTimestamp(time4)  
                         
             logDebug("Parsed: time1 = ${time1}, watt1 = ${watt1}, time2 = ${time2}, watt2 = ${watt2}, time3 = ${time3}, watt3 = ${watt3}, time4 = ${time4}, watt4 = ${watt4}")

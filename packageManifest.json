@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "Fix Outlet driver for newer Power Monitoring Outlets.\n\n",
+    "releaseNotes": "Fix historical wattage values on power monitor Outlet driver. \n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -73,7 +73,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
             "required": false,
-            "version": "2.0.5"
+            "version": "2.0.6"
         },
         {
             "id": "0b5e05f6-69a4-4a40-ac97-ae57d5e0dc9f",
