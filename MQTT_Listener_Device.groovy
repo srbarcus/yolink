@@ -20,12 +20,13 @@
  *  2.0.5: Support diagnostics, correct various errors, make singleThreaded
  *  2.0.6: Copyright update and UI formatting
  *  2.0.7: Updated driver version on poll
+ *  2.0.8: Improve connectivity to YoLink cloud 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.7"}
-def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def clientVersion() {return "2.0.8"}
+def copyright() {return "<br>© 2022, 2023, 2024 Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
@@ -134,12 +135,20 @@ def debug(value) {
 }
 
 def connect() {
+    def topic = "yl-home/${state.homeID}/+/+"
+   
+    logDebug("Unsubscribing to MQTT topic '${topic}'") 
+    interfaces.mqtt.unsubscribe("${topic}") 
+    
     interfaces.mqtt.disconnect()              // Guarantee we're disconnected  
     
-    def zigid = location.hub.zigbeeId
-    establish_MQTT_connection(zigid)
+    def mqtt_ID = location.hub.zigbeeId
+    
+    def date = new Date()
+    mqtt_ID = mqtt_ID + date.format("YYdddhhmmss")
+    
+    establish_MQTT_connection(mqtt_ID)
  }
-
 
 //>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<</
 //>>>>>>>>>>>> MQTT ROUTINES <<<<<<<<<<<</
@@ -160,7 +169,7 @@ def establish_MQTT_connection(mqtt_ID) {
        interfaces.mqtt.connect("tcp://api.yosmart.com:8003","${mqtt_ID}",authToken,null)            
         
        logDebug("Subscribing to MQTT topic '${topic}'") 
-       interfaces.mqtt.subscribe("${topic}", 0) 
+       interfaces.mqtt.subscribe("${topic}", 1) 
          
        MQTT = "connected" 
         
