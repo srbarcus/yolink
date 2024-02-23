@@ -1,6 +1,6 @@
 /***
  *  YoLink™ Flex Fob (YS3604-UC), Flex Fob V2 (YS3604-UC), On/Off Fob (YS3605-UC), Dimmer Fob (YS3606-UC), Siren Fob (YS3607-UC)
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © (See copyright()) Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP   
@@ -33,12 +33,15 @@
  *  2.0.6: Report buttons as numeric value, report rssi as number, fix multiple events not being reported
  *         - Switch to Preferences vs Commands. Display Perferences based on Fob Model chosen
  *  2.0.7: Updated driver version on poll
+ *  2.0.8: Remove .5 as from list of double-tap intervals
+ *  2.0.9: Support "setDeviceToken()"
+ *         - Update copyright
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.7"}
-def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def clientVersion() {return "2.0.9"}
+def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 def redTitle(text) 	{ return '<span style="color:#ff0000">'+text+'</span>'}
 
@@ -55,7 +58,7 @@ preferences {
               redTitle("Note: Double-tap is a software event, not hardware. As such, when a button is first pressed it will always cause a 'Press' event. Program rules accordingly."), 
               options:["True", "False"], required: true, defaultValue: "False"
         input "tapInterval", "enum", title: bold("Double-Tap Interval"), description:"Maximum number of seconds between pressing of the same button to be considered as a double-tap if double-tapping is enabled.",
-              options:["0", "0.5", "1", "2", "5"], required: true, defaultValue: "0"
+              options:["0", "1", "2", "5"], required: true, defaultValue: "0"
         }                
     }
 
@@ -108,6 +111,15 @@ metadata {
         attribute "defaultLevel", "Number"
         }
    }
+
+void setDeviceToken(token) {
+    if (state.token != token) { 
+      log.warn "Device token '${state.token}' changed to '${token}'"
+      state.token=token
+    } else {    
+      logDebug("Device token remains set to '${state.token}'")
+    }    
+ }
 
 void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
 	state.debug = false	

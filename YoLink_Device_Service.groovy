@@ -1,6 +1,6 @@
 /**
  *  YoLink™ Device Service
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © (See copyright()) Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *
  *  Donations are greatly appreciated: https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD 
@@ -29,32 +29,36 @@
  *  2.1.01: Speed up execution
  *  2.1.02: Allow device driver to override temperation conversion scale
  *  2.1.03: Initialize MQTT listener whenever app is run
- *         - Correct problem with scheduling under 5 minutes 
+ *          - Correct problem with scheduling under 5 minutes 
  *  2.1.04: Allow collection of diagnostic information
- *         - Correct problem with devices not being polled after hub reboot
+ *          - Correct problem with devices not being polled after hub reboot
  *  2.1.05: Correct numerous 'Request was unauthorized. Attempting to refreshing access token and re-poll API.' messages
- *         - Add 500ms delay between polling of next device to reduce load on Hubs
+ *          - Add 500ms delay between polling of next device to reduce load on Hubs
  *  2.1.06: Add support for Leak Sensor 3 (YS7904-UC)
  *  2.1.07: Add link to Hubitat Community, update copyright date, clean up UI, performance improvements
  *  2.1.08: Correct problem with temperature scale being overridden on defined devices 
- *         - Support syncing of application name changes
- *         - Add description to settings
- *         - Improve diagnostics collection performance
+ *          - Support syncing of application name changes
+ *          - Add description to settings
+ *          - Improve diagnostics collection performance
  *  2.1.09: Return null battery level value as "0" 
  *  2.1.10: Copyright update
  *  2.1.11: Handle new error code: 010104:Header Error!The token expired
  *  2.1.12: Reduce instantaneous hub load when polling devices
- *         -Return name of device that MQTT message was passed to back to MQTT Listener for debugging
+ *          -Return name of device that MQTT message was passed to back to MQTT Listener for debugging
  *  2.1.13: Add retry to pollAPI() if connection timesout
  *  2.1.14: Added findChild()
  *  2.1.15: Fixed polling error caused by API returning new error description: "Invalid request: The token is expired"
+ *  2.1.16: Copyright date update
+ *          - Handle device toke error
+ *          - Efficency improvements
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.15"}
+private def get_APP_VERSION() {return "2.1.16"}
+private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
 definition(
@@ -96,7 +100,7 @@ def about() {
             paragraph boldTitle ("")
 			paragraph "Please donate and support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development:"
                 href url:"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1&currency_code=USD", title:"Make a Paypal donation..."
-			paragraph boldTitle ("© 2022, 2023 Steven Barcus. All rights reserved.")	 
+			paragraph boldTitle (copyright())	 
             paragraph boldTitle ("")
             paragraph boldTitle ("")
             if (removeDevices != "False"){
@@ -179,20 +183,21 @@ def diagnostics() {
     log.info "$devicesCount devices were selected"
     
     if (devicesCount > 0 ) {
-    exposed.each { dni ->                   
-                    def devname = state.deviceName."${dni}"
-                    def devtype = state.deviceType."${dni}"
-                    def devtoken = state.deviceToken."${dni}"
-                    def devId = state.deviceId."${dni}"
-                    log.info "Creating selected Device: ${devtype} - ${devname}"	
-                    def Hubitat_dni = "yolink_${devtype}_${dni}"
-                    Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
-                    if (Hubitat_dni != null) {
-                        Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)
-                        countNewChildDevices++     
-                        logDebug("Created $countNewChildDevices of ${exposed.size()} selected devices.")    
-                    }
-				} 	 
+    exposed.each { dni ->   
+       def devname = state.deviceName."${dni}"
+       def devtype = state.deviceType."${dni}"
+       def devtoken = state.deviceToken."${dni}"
+       def devId = state.deviceId."${dni}"
+       def devmodel = state.modelName."${dni}"
+       log.info "Creating selected Device: ${devname} - ${devtype} ${devmodel} "	
+       def Hubitat_dni = "yolink_${devtype}_${dni}"
+       Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
+       if (Hubitat_dni != null) {
+          Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)
+          countNewChildDevices++     
+          logDebug("Created $countNewChildDevices of ${exposed.size()} selected devices.")    
+       }
+    } 	 
     
     def devname = "YoLink Cloud Listener"
     def devtype = "MQTT Listener"
@@ -220,7 +225,6 @@ def diagnostics() {
 		    input "diagnose", "enum", title:boldTitle("Enable collection of diagnostic data to local file."), required: true, options:["True","False"], defaultValue: "False" 
             }
     }
- 
 }
 
 def finish() {    
@@ -464,6 +468,51 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
     return newdni
 }
 
+def getDeviceToken(dni) {
+    def body = [:]
+    body.put("method", "Home.getDeviceList") 
+
+    log.info "Polling API to retrieve device tokens..."   
+    
+	try {         
+        def object = pollAPI(body,"YoLink™ Device Service","App")
+         
+        if (object) {
+            def responseValues=[]              
+            
+            if (object.data.devices instanceof Collection) { 
+       		    responseValues=object.data.devices           
+                logDebug("Parsing multiple devices: ${responseValues}")
+    	    } else {
+			    responseValues[0]=object.data.devices                    
+                logDebug("Parsing single device: ${responseValues}")
+		    }                
+           
+            for (def device : responseValues) {               
+              if (device.deviceId == dni) {	
+                 logDebug("Located ${device.name}")
+                 //if (device.token != state.deviceToken[dni]) {
+                 //  log.warn "Device token '${ state.deviceToken[dni]}' changed to '${device.token}'"
+                   def child = findChild(dni)
+                   child.setDeviceToken(device.token)
+                 //} else {
+                 //    log.error "Device token '${ state.deviceToken[dni]}' is already '${device.token}'"
+                 //}  
+                 state.deviceToken[dni] = device.token 
+                 break
+              }
+            }
+		} else { 			               
+  			log.error "getDeviceToken failed"	                
+		} 
+	} catch (groovyx.net.http.HttpResponseException e) {	
+            log.error "Error executing getDeviceToken, Exception: $e"
+			if (e?.statusCode == UNAUTHORIZED()) { 
+				log.warn "Unauthorized Request. Insure your access credentials match those in your YoLink mobile app"
+			}         
+	}
+} 
+
 def schedulePolling() {		 
     def interval = (pollInterval) ? pollInterval.toString(): "5" // Default: Poll every 5 minutes 
     def seconds = interval.toInteger() * 60
@@ -681,7 +730,8 @@ def getDevices() {
                 state.deviceName = [:]
                 state.deviceType = [:]    
                 state.deviceToken = [:]  
-                state.deviceId = [:]  
+                state.deviceId = [:]
+                state.modelName = [:]
 	            
 	            def responseValues=[]              
                     
@@ -702,7 +752,8 @@ def getDevices() {
 						state.deviceName[dni] = device.name                        
                         state.deviceType[dni] = device.type
                         state.deviceToken[dni] = device.token
-                        state.deviceId[dni] = device.deviceId                          
+                        state.deviceId[dni] = device.deviceId   
+                        state.modelName[dni] = device.modelName  //New response 02/09/2024
 					}
 				}                   
 			} else { 			               
@@ -723,6 +774,8 @@ def getDevices() {
 def pollAPI(body, name=null, type=null){
     def rc=null	
     def retry=3
+    
+    logDebug("pollAPI(${body})")
         
     while ((rc == null) && (retry>0)) {      
         def headers = [:]
@@ -751,20 +804,31 @@ def pollAPI(body, name=null, type=null){
                         logDebug("Translated Response: ${desc}")
                     }  
                     
-                    switch (desc) {
-                    case "Success":
+                    switch (code) {
+                    case "000000": //Success
                          logDebug("Polling of API completed successfully")
                  	     rc = object
                          break;
                     
-                    case "Can't connect to Device":    
-                    case "Cannot connect to Device":
+                    case "000201": //Cannot connect to the device    
+                    case "000203": //Cannot connect to the device
                          log.warn "Device '${name}' (Type=${type}) is offline"  
                          rc = object
                          break;
                         
-                    case "Header Error!The token expired":
-                    case "Invalid request: The token is expired":                         
+                    case "000103": //Device token is invalid
+                         if (retry>0) {
+                              log.error "${name}'s device token is invalid. Attempting to refreshing the token and re-poll API"
+                              getDeviceToken(body.targetDevice)
+                              body.token = state.deviceToken[body.targetDevice]
+                              retry = 1 // Retry once
+                         } else {          
+                              log.error "${name}'s device token is invalid. Attempt to refreshing device token and re-poll API failed. Final error status code: $e.statusCode"
+                              log.error "Request: $Params"  
+                         }                          
+                         break;       
+                        
+                    case "010104": //Invalid request: The token is expired
                          if (retry>0) {
                               retry = retry - 1  
                               logDebug('Request token expired. Attempting to refreshing access token and re-poll API, Retries=${retry}')  
@@ -824,62 +888,72 @@ def pollAPI(body, name=null, type=null){
 	return rc
 }
 
+@Field static final Map APIErrorCodes = [
+    "000000":"Success",
+    "000101":"Cannot connect to the Hub",
+    "000102":"Hub cannot respond to this command",
+    "000103":"Device token is invalid",
+    "000104":"Hub token is invalid",
+    "000105":"redirect_uri cannot be null",
+    "000106":"client_id is invalid",
+    "000201":"Cannot connect to the device",
+    "000202":"Device cannot response to this command",
+    "000203":"Cannot connect to the device",
+    "010000":"Service is not available, try again later",
+    "010001":"Internal connection is not available, try again later",
+    "010101":"Invalid request: CSID is invalid",
+    "010102":"Invalid request: SecKey is invalid",
+    "010103":"Invalid request: Authorization is invalid",
+    "010104":"Invalid request: The token is expired",
+    "010200":"Invalid data packet: params is not valid",
+    "010201":"Invalid data packet: time can not be null",
+    "010202":"Invalid data packet: method  can not be null",
+    "010203":"Invalid data packet: method is not supported",       //Was returned trying to set WiFi
+    "010204":"Invalid data packet",
+    "010300":"This interface is restricted to access",
+    "010301":"Access denied due to limits reached. Please retry later",
+    "020100":"The device is already bound by another user",
+    "020101":"The device does not exist",
+    "020102":"Device mask error",
+    "020103":"The device is not supported",
+    "020104":"Device is busy, try again later",
+    "020105":"Unable to retrieve device",
+    "020201":"No devices were searched",
+    "030101":"No data found",
+    "999999":"UnKnown Error, Please email to yaochi@yosmart.com"
+]
 
 def translateCode(code) {
-    def codes = '{"000000":"Success",' + 
-     '"000101":"Cannot connect to the Hub",' +         
-     '"000102":"Hub cannot respond to this command",' +
-     '"000103":"Token is invalid",' +
-     '"000201":"Cannot connect to the Device",' +
-     '"000202":"Device cannot response to this command",' +
-     '"000203":"Cannot connect to Device",' +
-     '"010000":"Connection not available, try again",' +
-     '"010101":"Header Error! Customer ID Error!",' +
-     '"010104":"Header Error!The token expired",' +   
-     '"010201":"Body Error! Time can not be null",' +
-     '"010203":"Unsupported Request",' +                         //Was returned trying to set WiFi - not documented, but seems to mean "Unsupported"  
-     '"020102":"Device mask error",' +
-     '"020201":"No device searched",' + 
-     '"030101":"No Data found",'+
-     '"999999":"UnKnown Error, Please email to support@YoSmart.com"' +
-     '}'
-        
-    def jsonSlurper = new JsonSlurper()
-    def object = jsonSlurper.parseText(codes)
-    
-    def translation = object."${code}"
+    def translation = APIErrorCodes["$code"]
     
     if (translation) {
         return translation
     } else {
-        log.error" ${code} is an undefined return code"
-        return " ${code} is an undefined return code"
-    } 
-}  
+        log.error" ${code} is an undefined API error code"
+        return " ${code} is an undefined API error code"
+    }
+}
+
+@Field static final Map batteryLevels = [
+    "0":0,
+    "1":25,
+    "2":50,
+    "3":75,
+    "4":100
+]
 
 def batterylevel(level) {
     if (!level) {return 0}
-    
-    def levels = '{"0":0,' + 
-     '"1":25,' +         
-     '"2":50,' +
-     '"3":75,' +
-     '"4":100' +     
-     '}'
-        
-    def jsonSlurper = new JsonSlurper()
-    def object = jsonSlurper.parseText(levels)
-    
-    def translation = object."${level}" 
-    
-    if (translation) {
-        return translation
+
+    def battery = batteryLevels["${level}"]
+
+    if (battery) {
+        return battery
     } else {
         log.error" ${level} is an undefined battery level"
         return "-1"
-    } 
-    
-}  
+    }
+}
 
 def relayState(value) {    
     switch (value) {
@@ -929,29 +1003,7 @@ def scheduledDays(weekdays) {
      def bit = daysB.substring(ndx-1,ndx)     
      
      if (bit == "1") {  
-        switch(daysB.length()-ndx) {
-		  case "0":
-            days = commaConcat(days,"Sun")
-            break;
-          case "1":
-            days = commaConcat(days,"Mon")
-            break; 
-          case "2":
-            days = commaConcat(days,"Tue")
-            break; 
-          case "3":
-            days = commaConcat(days,"Wed")
-            break; 
-          case "4":
-            days = commaConcat(days,"Thu")
-            break; 
-          case "5":
-            days = commaConcat(days,"Fri")
-            break; 
-          case "6":
-            days = commaConcat(days,"Sat")
-            break;   
-        }    
+        days = commaConcat(days,scheduledDay(daysB.length()-ndx))
      }    
        
      ndx--  
@@ -961,32 +1013,25 @@ def scheduledDays(weekdays) {
    return days 
 }
 
-def scheduledDay(weekday) {
-    switch(weekday) {
-		  case "0":
-            weekday = "Sun"
-            break;
-          case "1":
-            weekday = "Mon"
-            break; 
-          case "2":
-            weekday = "Tue"
-            break; 
-          case "3":
-            weekday = "Wed"
-            break; 
-          case "4":
-            weekday = "Thu"
-            break; 
-          case "5":
-            weekday = "Fri"
-            break; 
-          case "6":
-            weekday = "Sat"
-            break;   
-        }    
+@Field static final Map weekdays = [
+    "0":"Sun",
+    "1":"Mon",
+    "2":"Tue",
+    "3":"Wed",
+    "4":"Thu",
+    "5":"Fri",
+    "6":"Sat"
+]
 
-   return weekday 
+def scheduledDay(dayndx) {
+    def weekday = weekdays["${dayndx}"]
+
+    if (weekday) {
+        return weekday
+    } else {
+        log.error" ${dayndx} is an invalid weekday index"
+        return "???"
+    }
 }
 
 def commaConcat(oldvalue,newvalue) {

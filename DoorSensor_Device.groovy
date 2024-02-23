@@ -1,6 +1,6 @@
 /***
  *  YoLink™ Door Sensor (YS7707-UC) and YoLink™ Garage Door Sensor 2 (YS7706-UC)
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © (See copyright()) Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
@@ -26,12 +26,16 @@
  *  2.0.3: Prevent Service app from waiting on device polling completion
  *  2.0.4: Updated driver version on poll
  *  2.1.0: Support direct updating of bound Finger device
+ *  2.1.1: Fix unbinding
+ *         - Update copyright
+ *         - Enhance binding
+ *         - Support "setDeviceToken()"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.1.0"}
-def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def clientVersion() {return "2.1.1"}
+def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
@@ -66,6 +70,15 @@ metadata {
         attribute "openRemindDelay", "String"         
         }
    }
+
+void setDeviceToken(token) {
+    if (state.token != token) { 
+      log.warn "Device token '${state.token}' changed to '${token}'"
+      state.token=token
+    } else {    
+      logDebug("Device token remains set to '${state.token}'")
+    }    
+ }
 
 void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.debug = false
@@ -250,7 +263,7 @@ def parseDevice(object) {
 
 def bind(dni,name) { 
    if (dni != null) {
-     if (state.bound_Device != null) {  
+     if (boundToDevice()) {  
        log.error "Device is already bound to '${state.bound_Device}', DNI=${state.bound_DNI}"
        lastResponse("Binding failed. Already bound to '${state.bound_Device}'")     
        return  
@@ -262,7 +275,7 @@ def bind(dni,name) {
      log.info "Bound to '${name}', DNI=${dni}"  
      lastResponse("Bound to '${name}'")   
    } else {
-     if (state.bound_Device != null) {  
+     if (boundToDevice()) {  
        log.warn "Unbinding '${state.bound_Device}', DNI=${state.bound_DNI}"
      }    
      state.remove("bound_Device")  
@@ -271,15 +284,20 @@ def bind(dni,name) {
    }    
 }
 
+def boundToDevice() {(state.bound_DNI != null)}
+def boundDevice() {return state.bound_Device}
+
 def setDoorState() {   
-   if (state.bound_DNI  != null) {     
+   if (boundToDevice()) {     
      def dev = parent.findChild(state.bound_DNI )	
      if (!dev) {
-       log.error "setDoorState(): Cannot locate bound device"
+       log.error "setDoorState(): Cannot locate bound device: ${state.bound_Device} - ${state.bound_DNI}"
      } else {
-       logDebug("setDoorState(): Calling bound device setBoundState(${state.contact},${state.battery},${state.firmware},${state.signal},${state.stateChangedAt})")
+       logDebug("setDoorState(): Calling setBoundState(${state.contact},${state.battery},${state.firmware},${state.signal},${state.stateChangedAt}) on bound device '${state.bound_Device}'")
        dev.setBoundState(state.contact,state.battery,state.firmware,state.signal,state.stateChangedAt)
      }
+   } else {
+       logDebug("setDoorState(Ignored, no bound contact sensor")
    }    
 }    
 
@@ -378,7 +396,6 @@ def formatTimestamp(timestamp){
 }
 
 def reset(){    
-    state.remove("driver")
     rememberState("driver", clientVersion()) 
     state.remove("online")
     state.remove("firmware") 
@@ -399,6 +416,7 @@ def reset(){
     poll(true)    
     
     log.warn "Device reset to default values"
+    lastResponse("Device reset to default values")
 }
 
 def lastResponse(value) {

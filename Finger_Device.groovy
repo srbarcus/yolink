@@ -1,6 +1,6 @@
 /***
  *  YoLink™ Finger Device (YS4908-UC)
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © (See copyright()) Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
@@ -29,6 +29,9 @@
  *         - Add "setBoundState()" for direct processing by bound device
  *         - Remove polling as device doesn't support it
  *         - Added "Unbind" command
+ *  1.1.1: Update copyright date
+ *         - Support "setDeviceToken()"
+ *         - Fix unbinding of bound device
  */
 
 import groovy.json.JsonSlurper
@@ -36,8 +39,8 @@ import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-def clientVersion() {return "1.1.0"}
-def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def clientVersion() {return "1.1.1"}
+def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
@@ -61,8 +64,7 @@ metadata {
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
         command "bind", [[name:"bind",type:"STRING", description:"Device ID (devId) of Garage Door Sensor to be bound to this controller. See 'sensors' under 'State Variables' below and copy & paste a Sensor here."]] 
         command "unbind"
-        
-        attribute "API", "String"
+       
         attribute "online", "String"
         attribute "devId", "String"
         attribute "driver", "String"  
@@ -70,11 +72,21 @@ metadata {
         attribute "signal", "String"
         attribute "lastPoll", "String"
         attribute "stateChangedAt", "String"
-        attribute "lastResponse", "String"         
+        attribute "lastResponse", "String"
+        attribute "model", "String" 
         }
  }
 
-void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {  
+void setDeviceToken(token) {
+    if (state.token != token) { 
+      log.warn "Device token '${state.token}' changed to '${token}'"
+      state.token=token
+    } else {    
+      logDebug("Device token remains set to '${state.token}'")
+    }    
+ }
+
+void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId,devmodel) {  
     state.debug = false
     
     state.my_dni = Hubitat_dni      
@@ -82,9 +94,10 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     state.name = devname
     state.type = devtype
     state.token = devtoken
-    rememberState("devId", devId)   
+    state.model = devmodel
+    state.devId = devId
     
-	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId})"	 
+	log.info "ServiceSetup(Hubitat dni=${state.my_dni}, Home ID=${state.homeID}, Name=${state.name}, Type=${state.type}, Token=${state.token}, Device Id=${state.devId}), Device Model=${state.model})"	 
     
     reset()      
  }
@@ -128,6 +141,114 @@ def pollDevice(delay) {
 
 def temperatureScale(value) {}
 
+def open() {
+   logDebug("open()")  
+   toggle("open")
+}
+
+def close() {
+   logDebug("close()")
+   toggle("close")
+}
+
+def push() {
+   logDebug("push()")
+   toggle()
+}
+
+def toggle(func="toggle") {
+   logDebug("toggle(${func}): Door ".plus(state.door)) 
+   if (!boundToDevice()) { 
+     rememberState("door","not bound")
+     rememberState("contact","not bound")   
+     }   
+    
+   switch(func) {
+      case "open":
+         if (boundToDevice()) { 
+            if (state.door == "closed") {  
+               rememberState("door","opening")  
+            } else {
+               if (state.door != "open") {  
+                 rememberState("door",state.door)
+               }
+               return                  
+            }    
+         }
+         break;
+       
+      case "close":  
+         if (boundToDevice()) { 
+            if (state.door == "open") {  
+               rememberState("door","closing")  
+            } else {
+               if (state.door != "closed") {  
+                 rememberState("door",state.door)
+               }    
+               return   
+            }    
+         }         
+		 break;              
+              
+      default:
+         if (boundToDevice()) { 
+            if (state.door == "open") {  
+               rememberState("door","closing")  
+            } else {
+               if (state.door == "closed") {  
+                 rememberState("door","opening")
+               } else {
+                 rememberState("door",state.door)  
+               }    
+            }    
+         }         
+		 break; 
+   } 
+    
+   if (!boundToDevice()) { 
+      log.warn "No contact sensor is bound to this device. Unable to determine current door state."
+   }     
+    
+   def request = [:]    
+   request.put("method", "${state.type}.toggle")   
+   request.put("targetDevice", "${state.devId}") 
+   request.put("token", "${state.token}")       
+ 
+   try {         
+        def object = parent.pollAPI(request, state.name, state.type)
+         
+        if (object) {
+            logDebug("toggle(): pollAPI() response: ${object}")  
+                              
+            if (successful(object)) {        
+                  def rssi = object.data.loraInfo.signal       
+                
+                  logDebug("Parsed: RSSI=$rssi")
+
+                  fmtSignal(rssi)
+                  rememberState("online","true")                    
+                  lastResponse("Success")     
+                               
+            } else {
+                  if (notConnected(object)) {  //Cannot connect to Device
+                   rememberState("online","false")                    
+                   log.warn "Device '${state.name}' (Type=${state.type}) is offline"  
+                   lastResponse("Device is offline")     
+               }
+            }                     
+                                        
+            return
+                
+	    } else { 			               
+            logDebug("toggle(${func}) failed")	
+            lastResponse("toggle() failed")     
+        }     		
+	} catch (e) {	
+        log.error "toggle(${func}) exception: $e"
+        lastResponse("Error ${e}")      
+	} 
+}   
+
 def scan() {
   def myid = "YoLink " + state.type + " - " + state.name   
     
@@ -136,6 +257,8 @@ def scan() {
   logDebug("Located $devicesCount devices: $devices")
  
   def dev = "<br>Copy and Paste one of these into the 'Bind' value above then click 'Bind' to bind Sensor with Controller:"
+
+  def boundTo
     
   devices.each { dni ->  
      def id = dni.toString() 
@@ -149,11 +272,18 @@ def scan() {
          def name = setup?.name
          def devId = setup?.devId         
               
-          id = devId + "=" + name
+         id = devId + "=" + name
            
-          logDebug("Found Door Sensor: ${id}") 
+         if (dni?.boundToDevice()) {
+            boundTo = dni?.boundDevice()
+            boundTo = "  (Currently bound to '${boundTo}')"
+         } else {
+            boundTo=""
+         }
            
-          dev = dev + "<br>" + id
+         logDebug("Found Door Sensor: ${id} ${boundTo}") 
+           
+         dev = dev + "<br>" + id + boundTo
        }    
      }          
   }    
@@ -187,7 +317,6 @@ def debug(value) {
 }
 
 def parse(topic) {
-    log.info "Parse($topic)"
     processStateData(topic.payload)
 }
 
@@ -228,128 +357,17 @@ def void processStateData(payload) {
 	    }
 }
 
-def setBoundState(doorstate,battery,firmware,signal,stateChangedAt) {
-   logDebug("setBoundState(${doorstate},${battery},${firmare},${signal},${stateChangedAt})")
-   rememberState("door",doorstate)
-   rememberState("contact",doorstate) 
-   rememberState("bound_battery",battery,"%")
-   rememberState("bound_firmware",firmware)
-   rememberState("bound_signal",signal)  
-   rememberState("stateChangedAt",stateChangedAt)
-}  
-
-def open() {
-   logDebug("open()")  
-   toggle("open")
-}
-
-def close() {
-   logDebug("close()")
-   toggle("close")
-}
-
-def push() {
-   logDebug("push()")
-   toggle()
-}
-
-def toggle(func="toggle") {
-   logDebug("toggle(): Door ".plus(state.door)) 
-   if (!boundToDevice()) { 
-     rememberState("door","not bound")
-     }   
-    
-   switch(func) {
-      case "open":
-         if (boundToDevice()) { 
-            if (state.door == "closed") {  
-               rememberState("door","opening")  
-            } else {
-               if (state.door != "open") {  
-                 rememberState("door",state.door)
-               }
-               return                  
-            }    
-         }  
-         break;
-       
-      case "close":  
-         if (boundToDevice()) { 
-            if (state.door == "open") {  
-               rememberState("door","closing")  
-            } else {
-               if (state.door != "closed") {  
-                 rememberState("door",state.door)
-               }    
-               return   
-            }    
-         }         
-		 break;              
-              
-      default:
-         if (boundToDevice()) { 
-            if (state.door == "open") {  
-               rememberState("door","closing")  
-            } else {
-               if (state.door == "closed") {  
-                 rememberState("door","opening")
-               } else {
-                 rememberState("door",state.door)  
-               }    
-            }    
-         }         
-		 break; 
-   } 
-    
-   def request = [:]    
-   request.put("method", "${state.type}.toggle")   
-   request.put("targetDevice", "${state.devId}") 
-   request.put("token", "${state.token}")       
- 
-   try {         
-        def object = parent.pollAPI(request, state.name, state.type)
-         
-        if (object) {
-            logDebug("toggle(): pollAPI() response: ${object}")  
-                              
-            if (successful(object)) {        
-                  def rssi = object.data.loraInfo.signal       
-                
-                  logDebug("Parsed: RSSI=$rssi")
-
-                  fmtSignal(rssi)
-                  rememberState("online","true")                    
-                  lastResponse("Success")     
-                               
-            } else {
-                  if (notConnected(object)) {  //Cannot connect to Device
-                   rememberState("online","false")                    
-                   log.warn "Device '${state.name}' (Type=${state.type}) is offline"  
-                   lastResponse("Device is offline")     
-               }
-            }                     
-                                        
-            return
-                
-	    } else { 			               
-            logDebug("toggle() failed")	
-            lastResponse("toggle() failed")     
-        }     		
-	} catch (e) {	
-        log.error "toggle() exception: $e"
-        lastResponse("Error ${e}")      
-	} 
-}   
+def boundToDevice() {(state.bound_devId != null)}
 
 def bind(sensorid) {
   if (!sensorid) {  
     log.error "Device ID to be bound was not specified"
     return  
-  }     
+  }        
   
   if (boundToDevice()) {  
       log.error "Binding failed. Already bound to '${state.bound_name}'."
-      lastResponse("Binding failed. Already bound.")
+      lastResponse("Binding failed. Already bound to '${state.bound_name}'.")
       return  
   }  
       
@@ -377,18 +395,28 @@ def bind(sensorid) {
   def dev = parent.findChild(sensorid)	
   if (!dev) {
     log.error "Unable to bind device: Could not locate device ID '$sensorid'"
+    lastResponse("Bind failed: Could not locate device ID '$sensorid'")   
     return 
   } else {
       def setup    
       setup = dev.getSetup()   
-              
+    
+      name = setup.name
+      
+      if (dev.boundToDevice()) {
+        def boundTo
+        boundTo = dev.boundDevice()  
+        log.error "Unable to bind '${name}', it is already bound to '${boundTo}'"
+        lastResponse("Bind failed. '${name}' already bound to '${boundTo}'")   
+        return
+      }
+      
       my_dni = setup.my_dni    
       homeID = setup.homeID
-      name = setup.name
       type = setup.type
       token = setup.token
       devId = setup.devId
-      
+            
       state.bound_dni = my_dni  
       state.bound_homeID = homeID
       state.bound_name = name
@@ -404,8 +432,6 @@ def bind(sensorid) {
   }
 }
 
-def boundToDevice() {(state.bound_devId != null)}
-
 def unbind() {
     if (!boundToDevice()) {  
       log.error "Unbind failed: No device is currently bound."
@@ -419,7 +445,7 @@ def unbind() {
     if (!dev) {
         log.error "Unable to unbind device: Could not locate device ID '${state.bound_devId}'"
     } else {
-      dev.bind(null,null)
+        dev.bind(null,null)
     }    
     
     lastResponse("Unbound from contact sensor: ${state.bound_name}") 
@@ -435,10 +461,19 @@ def unbind() {
     state.remove("bound_signal") 
     state.remove("contact")
     
-    rememberState("door","unknown")
-    rememberState("contact","unknown") 
-    interfaces.mqtt.disconnect() // Guarantee we're disconnected - hold over from bound device MQTT processing (delete in future)
+    rememberState("door","not bound")
+    rememberState("contact","not bound") 
 }
+
+def setBoundState(doorstate,battery,firmware,signal,stateChangedAt) {
+   logDebug("setBoundState(${doorstate},${battery},${firmware},${signal},${stateChangedAt})")
+   rememberState("door",doorstate)
+   rememberState("contact",doorstate) 
+   rememberState("bound_battery",battery,"%")
+   rememberState("bound_firmware",firmware)
+   rememberState("bound_signal",signal)  
+   rememberState("stateChangedAt",stateChangedAt)
+} 
 
 def formatTimestamp(timestamp){    
     if ((state.timestampFormat != null) && (timestamp != null)) {
@@ -452,29 +487,33 @@ def formatTimestamp(timestamp){
 }
 
 def reset(){    
-    state.remove("driver")
     rememberState("driver", clientVersion()) 
     state.remove("online")
-    state.remove("API")
+    state.remove("API")              //No long applicable as of v1.1.0 - Remove in future
     state.remove("firmware")    
     state.remove("rssi")     
-    state.remove("signal") 
-    state.remove("contact")
-    rememberState("door","unknown") 
-    state.remove("stateChangedAt")
-    state.remove("LastResponse")  
-    state.remove("sensors")  
+    state.remove("signal")
+    state.remove("sensors")
     state.remove("battery") 
-    
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     
-    unbind()
-        
     scan()
     
-    interfaces.mqtt.disconnect() // Guarantee we're disconnected - hold over from bound device MQTT processing (delete in future)
+    if (boundToDevice()) {  
+      def dev = parent.findChild(state.bound_devId)	
+      if (!dev) {
+        log.error "Unable to refresh contact sensor device: Could not locate device ID '${state.bound_devId}'"
+      } else {
+          dev.setDoorState()
+      }        
+    } else {
+        rememberState("door","not bound")
+        rememberState("contact","not bound") 
+        state.remove("stateChangedAt")
+    }    
     
     log.warn "Device reset to default values"
+    lastResponse("Device reset to default values") 
 }
 
 def lastResponse(value) {
