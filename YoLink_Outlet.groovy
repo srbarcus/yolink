@@ -1,6 +1,6 @@
 /***
  *  YoLink Outlet - Allows individual outlet control of a MultiOutlet Device via a Dashboard 
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © (See copyright()) Steven Barcus. All rights reserved.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
  *   
@@ -15,12 +15,15 @@
  *  2.0.0: Define as required driver (used as child for YoLink Devices)  
  *  2.0.1: Replace 'MultiOutlet Outlet' for naming consistency
  *  2.0.2: Copyright update and UI formatting, remove debugging option
+ *  2.0.3: Minor updates
+ *  2.0.4: Support "setDeviceToken()"
+ *         - Update copyright
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.2"}
-def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def clientVersion() {return "2.0.4"}
+def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
@@ -32,6 +35,15 @@ metadata {
     definition (name: "YoLink Outlet", namespace: "srbarcus", author: "Steven Barcus") {     	
         capability "Switch"
         }
+ }
+
+void setDeviceToken(token) {
+    if (state.token != token) { 
+      log.warn "Device token '${state.token}' changed to '${token}'"
+      state.token=token
+    } else {    
+      logDebug("Device token remains set to '${state.token}'")
+    }    
  }
 
 def installed() {
