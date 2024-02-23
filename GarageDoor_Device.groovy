@@ -30,11 +30,12 @@
  *         - Remove polling capability
  *         - Support "setDeviceToken()"
  *         - Update copyright
+ *  2.0.9: Fix parse() error
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.8"}
+def clientVersion() {return "2.0.9"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -398,6 +399,97 @@ def setBoundState(doorstate,battery,firmware,signal,stateChangedAt) {
    rememberState("stateChangedAt",stateChangedAt)
 } 
 
+def parse(message) {        
+    logDebug("parse(${message})")
+    processStateData(message.payload) 
+}
+
+def void processStateData(payload) {
+    rememberState("online","true") 
+    
+    def object = new JsonSlurper().parseText(payload)    
+    def devId = object.deviceId   
+            
+    if (devId == state.devId) {  // Only handle if message is for me    
+        logDebug("processStateData(${payload})")
+        
+        def child = parent.getChildDevice(state.my_dni)
+        def name = child.getLabel()                
+        def event = object.event.replace("GarageDoor.","")
+        logDebug("Received Message Type: ${event} for: $name")
+        
+        switch(event) {
+		case "Alert":            
+			def contact = object.data.state           
+            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
+            def firmware = object.data.version.toUpperCase()    
+            def rssi = object.data.loraInfo.signal  
+            
+            def stateChangedAt = object.data.stateChangedAt
+                         
+            stateChangedAt = formatTimestamp(stateChangedAt)
+             
+            rememberState("contact",contact)
+            rememberState("door",contact)
+            rememberState("battery",battery)
+            rememberState("firmware",firmware)
+            fmtSignal(rssi)     
+            rememberState("stateChangedAt",stateChangedAt)
+            
+            lastResponse("Garage door is ${contact}")
+		    break;    
+            
+      case "Report":
+            def contact = object.data.state          
+            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
+            def firmware = object.data.version.toUpperCase()    
+            def openRemindDelay = object.data.openRemindDelay   
+            def alertInterval = object.data.alertInterval                             
+            def rssi = object.data.loraInfo.signal  
+            
+            rememberState("contact",contact)
+            rememberState("door",contact)
+            rememberState("battery",battery)
+            rememberState("delay",delay)               
+            rememberState("firmware",firmware)
+            rememberState("openRemindDelay",openRemindDelay) 
+            rememberState("alertInterval",alertInterval)
+            fmtSignal(rssi)      
+		    break;        
+            
+       case "setState":
+            if (!boundToDevice()) {        //If bound, let bound device update state
+              def contact = object.data.state          
+              rememberState("contact",contact)
+              rememberState("door",contact)
+            }    
+
+            def rssi = object.data.loraInfo.signal    
+            fmtSignal(rssi)      
+		    break;             
+            
+        case "setOpenRemind":    
+            def openRemindDelay = object.data.openRemindDelay   
+            def alertInterval = object.data.alertInterval                             
+            def rssi = object.data.loraInfo.signal  
+    
+            rememberState("openRemindDelay",openRemindDelay) 
+            rememberState("alertInterval",alertInterval)
+            fmtSignal(rssi)                  
+            break;	  
+            
+          case "StatusChange":    
+            def rssi = object.data.loraInfo.signal  
+            fmtSignal(rssi)                  
+            break;	     
+            
+		default:
+            log.error "Unknown event received: $event"
+            log.error "Message received: ${payload}"
+			break;
+	    }
+    }      
+}
 
 def timestampFormat(value) {
     value = value ?: "MM/dd/yyyy hh:mm:ss a" // No value, reset to default
