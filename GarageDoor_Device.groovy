@@ -1,6 +1,6 @@
 /***
  *  YoLink™ GarageDoor Device (YS4906-UC)
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © (See copyright()) Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
@@ -24,12 +24,18 @@
  *  2.0.5: Fixed MQTT message processing
  *  2.0.6: Prevent Service app from waiting on device polling completion
  *  2.0.7: Updated driver version on poll
+ *  2.0.8: Remove MQTT processsing for bound device, remove "connect" command and API attribute
+ *         - Add "setBoundState()" for direct processing by bound device
+ *         - Add "unbind" command
+ *         - Remove polling capability
+ *         - Support "setDeviceToken()"
+ *         - Update copyright
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.7"}
-def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def clientVersion() {return "2.0.8"}
+def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
@@ -41,20 +47,18 @@ preferences {
 metadata {
     definition (name: "YoLink GarageDoor Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) { 
         capability "Initialize"
-		capability "Polling"        
         capability "Momentary"
         capability "ContactSensor"
         capability "GarageDoorControl"
         capability "SignalStrength"
                                       
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]]
-        command "connect"                       // Attempt to establish MQTT connection
         command "reset"     
         command "scan"    
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
         command "bind", [[name:"bind",type:"STRING", description:"Device ID (devId) of Garage Door Sensor to be bound to this controller. See 'sensors' under 'State Variables' below and copy & paste a Sensor here."]] 
+        command "unbind"
         
-        attribute "API", "String"
         attribute "online", "String"
         attribute "devId", "String"
         attribute "driver", "String"  
@@ -64,6 +68,15 @@ metadata {
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String"         
         }
+ }
+
+void setDeviceToken(token) {
+    if (state.token != token) { 
+      log.warn "Device token '${state.token}' changed to '${token}'"
+      state.token=token
+    } else {    
+      logDebug("Device token remains set to '${state.token}'")
+    }    
  }
 
 void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {  
@@ -110,420 +123,85 @@ def initialize() {
 }
 
 def uninstalled() {
-   interfaces.mqtt.disconnect() // Guarantee we're disconnected
    log.warn "Device '${state.name}' (Type=${state.type}) has been uninstalled"     
  }
 
-def poll(force=null) { 
-     pollDevice()
-}    
-
 def pollDevice(delay=1) {
     rememberState("driver", clientVersion())
-    if (boundToDevice()) {
-       runIn(delay,check_MQTT_Connection)
-    }
     def date = new Date()
     sendEvent(name:"lastPoll", value: date.format("MM/dd/yyyy hh:mm:ss a"), isStateChange:true)
  }
 
-def connect() {
-   if (state.bound_devId != null) {establish_MQTT_connection(bound_dni, state.bound_homeID, state.bound_devId)}  //Establish MQTT connection to YoLink API for bound device
- }
-
 def temperatureScale(value) {}
 
-def scan() {
-  def myid = "YoLink " + state.type + " - " + state.name   
-    
-  def devices=parent.getChildDevices()
-  int devicesCount=devices.size()      
-  logDebug("Located $devicesCount devices: $devices")
- 
-  def dev = "<br>Copy and Paste one of these into the 'Bind' value above then click 'Bind' to bind Sensor with Controller:"
-    
-  devices.each { dni ->  
-     def id = dni.toString() 
-      
-     logDebug("Checking Device: ${id}") 
-                    
-     if (id != myid) { 
-       def setup = dni?.getSetup()   
-         
-       if (setup?.type == "DoorSensor") {  
-         def name = setup?.name
-         def devId = setup?.devId         
-              
-          id = devId + "=" + name
-           
-          logDebug("Found Door Sensor: ${id}") 
-           
-          dev = dev + "<br>" + id
-       }    
-     }          
-  }    
-    
-  state.sensors = dev
-}
-
-def bind(sensorid) {
-  if (!sensorid) {  
-      if (state.bound_devId == null) {
-          log.error "Device ID to be bound was not specified"
-      } else {    
-          unbind()                          // Unbind current switch sensor
-          interfaces.mqtt.disconnect()      // Guarantee we're disconnected            
-        //connect()                         // Reconnect to API Cloud  Removed v1.0.1
-      }    
-    return  
-  }     
-    
-  def myid = "YoLink " + state.type + " - " + state.name  
-      
-  def devices= parent.getChildDevices()
-  int devicesCount=devices.size()      
-  logDebug("Located " + devicesCount + " devices: " + devices)  
-  
-  def ndx = sensorid.indexOf('=')   
-    
-  if (ndx != -1) {  
-    sensorid = sensorid.substring(0, ndx)        
-  }  
-      
-  if (sensorid.length() != 16) {                      //DevIds are 16 characters
-    log.error "Unable to bind device:  DevId '$sensorid' is not 16 characters long"
-    return
-  }    
-              
-  logDebug ("Attempting to locate device '$sensorid'")    
-     
-  def bound
-  def my_dni
-  def homeID
-  def name
-  def type
-  def token
-  def devId
-    
-  devices.each { dni ->                   
-    if (!bound) {
-      def setup    
-
-      try {
-          if (dni.toString() != myid) {
-           logDebug("Checking device " + dni.toString())
-              
-           setup = dni.getSetup()   
-              
-           my_dni = setup.my_dni    
-           homeID = setup.homeID
-           name = setup.name
-           type = setup.type
-           token = setup.token
-           devId = setup.devId
-
-           log.info "Device's Service Setup(Hubitat dni=${my_dni}, Home ID=${homeID}, Name=${name}, Type=${type}, Token=${token}, Device Id=${devId})"          
-              
-                          
-        if (devId?.contains(sensorid)) {
-           logDebug("Located device to be bound in parent: ${dni} ${devId}") 
-           bound = dni
-        }
-        }
-      } catch (Exception e) {         
-      }    
-    }    
-  }
-    
-  if (!bound) { 
-    log.error "Unable to bind device: Could not locate device ID '$sensorid'"
-    return
-  }       
-  
-  logDebug ("Attempting to bind device '$bound'")  
-    
-  state.bound_dni = my_dni  
-  state.bound_homeID = homeID
-  state.bound_name = name
-  state.bound_type = type
-  state.bound_token = token
-  state.bound_devId = devId
-     
-  establish_MQTT_connection(state.bound_dni, state.bound_homeID, state.bound_devId)
-   
-  if (state.API == "connected") {  
-     msg = "Controller bound to device '$bound'"
-     lastResponse(msg)
-     log.info msg  
-  } else {
-     def msg = "Controller failed to bind to device '$bound'" 
-     lastResponse(msg)
-     log.error msg
-  }    
-}
-
-def timestampFormat(value) {
-    value = value ?: "MM/dd/yyyy hh:mm:ss a" // No value, reset to default
-    def oldvalue = state.timestampFormat 
-    
-    //Validate requested value
-    try{                           
-       def date = new Date()  
-       def stamp = date.format(value)   
-       state.timestampFormat = value   
-       logDebug("Date format set to '${value}'")
-       logDebug("Current date and time in requested format: '${stamp}'")  
-     } catch(Exception e) {       
-       //log.error "dateFormat() exception: ${e}"
-       log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
-     } 
- }
-
-def debug(value) { 
-   rememberState("debug",value)
-   if (value == "true") {
-     log.info "Debugging enabled"
-   } else {
-     log.info "Debugging disabled"
-   }    
-}
-
-def boundToDevice() {(state.bound_devId != null)}
-
-def check_MQTT_Connection() {
-  if (boundToDevice()) {  
-      def MQTT = interfaces.mqtt.isConnected()  
-      logDebug("MQTT connection is ${MQTT}")  
-      if (MQTT) {  
-         rememberState("API", "connected")     
-      } else {    
-         connect()
-      }
-  }    
-}    
-
-def establish_MQTT_connection(mqtt_ID, homeID, devId) {
-    parent.refreshAuthToken()
-    def authToken = parent.AuthToken() 
-      
-    def MQTT = "disconnected"
-        
-    def topic = "yl-home/${homeID}/${devId}/report"
-    
-    try {  	
-        mqtt_ID =  "${mqtt_ID}_${homeID}"
-        logDebug("Connecting to MQTT with ID '${mqtt_ID}', Topic:'${topic}, Token:'${authToken}")
-      
-        interfaces.mqtt.connect("tcp://api.yosmart.com:8003","${mqtt_ID}",authToken,null)                         	
-          
-        logDebug("Subscribing to MQTT topic '${topic}'")
-        interfaces.mqtt.subscribe("${topic}", 0) 
-         
-        MQTT = "connected"          
-          
-        logDebug("MQTT connection to YoLink successful")
-		
-	} catch (e) {	
-        log.error ("establish_MQTT_connection() Exception: $e")	
-    } finally {    
-        rememberState("API", MQTT)    
-        lastResponse("API MQTT ${MQTT}")    
-    }
-}    
-
-def mqttClientStatus(String message) {                          
-    logDebug("mqttClientStatus(${message})")
-
-    if (message.startsWith("Error:")) {
-        log.error "MQTT ${message}"
-
-        try {
-            log.warn "Disconnecting from MQTT"    
-            interfaces.mqtt.disconnect()           // Guarantee we're disconnected            
-            rememberState("API","disconnected") 
-        }
-        catch (e) {
-            log.error ("mqttClientStatus() Exception: $e")	
-        } 
-    }
-}
-
-def parse(message) {        
-    logDebug("parse(${message})")
-    boolean skipError = false
-    
-    try {     
-		  def topic = interfaces.mqtt.parseMessage(message)                 // Internal MQTT parsing of bound device
-          def object = new JsonSlurper().parseText(topic.payload)
-          logDebug("Processing Bound Device MQTT message: $object")
-          skipError = true
-          parseTopic(object)
-	    } catch (Exception e) {	
-            if (!skipError) {
-              logDebug("Processing YoLink MQTT message: $message")
-              processStateData(message.payload) 
-            } else {
-              log.error "Error $e"
-            }  
-	    }  
-}
-
-def parseTopic(object) {
-    logDebug("parseTopic(${object})")
-    
-    rememberState("online","true") 
-    
-    def child = parent.getChildDevice(state.my_dni)
-    def name = child.getLabel()                
-    def event = object.event.replace("DoorSensor.","")
-    logDebug("Received Message Type: ${event} for bound device: $name")  
-        
-    switch(event) {
-		case "Alert":            
-			def contact = object.data.state           
-            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version.toUpperCase()    
-            def rssi = object.data.loraInfo.signal           
-            def door = "unknown"
-            def swState
-        
-            if (contact == "open"){
-                swState = "on"
-                door = "open"
-            } else {
-                swState = "off"
-                door = "closed"
-            }    
-            
-            def stateChangedAt = object.data.stateChangedAt 
-            stateChangedAt = formatTimestamp(stateChangedAt)
-            
-            rememberState("switch",swState)
-            rememberState("contact",contact)
-            rememberState("door",door)
-            rememberState("battery", battery, "%")
-            rememberState("firmware",firmware)
-            fmtSignal(rssi)     
-            rememberState("stateChangedAt",stateChangedAt)
-		    break;   
-    }
-}
-
-def void processStateData(payload) {
-    rememberState("online","true") 
-    
-    def object = new JsonSlurper().parseText(payload)    
-    def devId = object.deviceId   
-            
-    if (devId == state.devId) {  // Only handle if message is for me    
-        logDebug("processStateData(${payload})")
-        
-        def child = parent.getChildDevice(state.my_dni)
-        def name = child.getLabel()                
-        def event = object.event.replace("GarageDoor.","")
-        logDebug("Received Message Type: ${event} for: $name")
-        
-        switch(event) {
-		case "Alert":            
-			def contact = object.data.state           
-            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version.toUpperCase()    
-            def rssi = object.data.loraInfo.signal  
-            
-            def stateChangedAt = object.data.stateChangedAt
-                         
-            stateChangedAt = formatTimestamp(stateChangedAt)
-             
-            rememberState("contact",contact)
-            rememberState("door",contact)
-            rememberState("battery",battery)
-            rememberState("firmware",firmware)
-            fmtSignal(rssi)     
-            rememberState("stateChangedAt",stateChangedAt)
-            
-            lastResponse("Garage door is ${contact}")
-		    break;    
-            
-      case "Report":
-            def contact = object.data.state          
-            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
-            def firmware = object.data.version.toUpperCase()    
-            def openRemindDelay = object.data.openRemindDelay   
-            def alertInterval = object.data.alertInterval                             
-            def rssi = object.data.loraInfo.signal  
-            
-            rememberState("contact",contact)
-            rememberState("door",contact)
-            rememberState("battery",battery)
-            rememberState("delay",delay)               
-            rememberState("firmware",firmware)
-            rememberState("openRemindDelay",openRemindDelay) 
-            rememberState("alertInterval",alertInterval)
-            fmtSignal(rssi)      
-		    break;              
-            
-        case "setOpenRemind":    
-            def openRemindDelay = object.data.openRemindDelay   
-            def alertInterval = object.data.alertInterval                             
-            def rssi = object.data.loraInfo.signal  
-    
-            rememberState("openRemindDelay",openRemindDelay) 
-            rememberState("alertInterval",alertInterval)
-            fmtSignal(rssi)                  
-            break;	  
-            
-          case "StatusChange":    
-            def rssi = object.data.loraInfo.signal  
-            fmtSignal(rssi)                  
-            break;	     
-            
-		default:
-            log.error "Unknown event received: $event"
-            log.error "Message received: ${payload}"
-			break;
-	    }
-    }      
+def open() {
+   logDebug("open()")  
+   toggle("open")
 }
 
 def close() {
-    if (boundToDevice()) {
-        if ((state.door == "open") || (state.door == "unknown") || (!state.door)) {  
-          toggle()
-          rememberState("door","closing")    
-        }    
-    } else {
-        log.error "No bound device, use 'push' to toggle garage door."         
-    }    
+   logDebug("close()")
+   toggle("close")
 }
 
-def open() {    
-   if (boundToDevice()) { 
-       if ((state.door == "closed") || (state.door == "unknown") || (!state.door)) {  
-         toggle()
-         rememberState("door","opening")  
-       }
-   } else {
-        log.error "No bound device, use 'push' to toggle garage door."
-   } 
-}
-
-def push(button) {    
-    if (boundToDevice()) { 
-       if (state.door == "closed") {  
-         rememberState("door","opening")  
-       } else {
-           if (state.door == "open") {  
-             rememberState("door","closing")  
-           }    
-       }    
-   } else {
-       rememberState("door","unknown")
-   } 
-
+def push() {
+   logDebug("push()")
    toggle()
 }
 
-def toggle() {
+def toggle(func="toggle") {
+   logDebug("toggle(${func}): Door ".plus(state.door)) 
+   if (!boundToDevice()) { 
+     rememberState("door","not bound")
+     rememberState("contact","not bound")   
+   }   
+    
+   switch(func) {
+      case "open":
+         if (boundToDevice()) { 
+            if (state.door == "closed") {  
+               rememberState("door","opening")  
+            } else {
+               if (state.door != "open") {  
+                 rememberState("door",state.door)
+               }
+               return                  
+            }    
+         }  
+         break;
+       
+      case "close":  
+         if (boundToDevice()) { 
+            if (state.door == "open") {  
+               rememberState("door","closing")  
+            } else {
+               if (state.door != "closed") {  
+                 rememberState("door",state.door)
+               }    
+               return   
+            }    
+         }         
+		 break;              
+              
+      default:
+         if (boundToDevice()) { 
+            if (state.door == "open") {  
+               rememberState("door","closing")  
+            } else {
+               if (state.door == "closed") {  
+                 rememberState("door","opening")
+               } else {
+                 rememberState("door",state.door)  
+               }    
+            }    
+         }         
+		 break; 
+   } 
+    
+   if (!boundToDevice()) { 
+      log.warn "No contact sensor is bound to this device. Unable to determine current door state."
+   }      
+    
    def request = [:]    
    request.put("method", "${state.type}.toggle")   
    request.put("targetDevice", "${state.devId}") 
@@ -558,16 +236,146 @@ def toggle() {
             return
                 
 	    } else { 			               
-            logDebug("push() failed")	
+            logDebug("toggle(${func}) failed")	
             lastResponse("push() failed")     
         }     		
 	} catch (e) {	
-        log.error "push() exception: $e"
+        log.error "toggle(${func}) exception: $e"
         lastResponse("Error ${e}")      
 	} 
 }   
 
+def scan() {
+  def myid = "YoLink " + state.type + " - " + state.name   
+    
+  def devices=parent.getChildDevices()
+  int devicesCount=devices.size()      
+  logDebug("Located $devicesCount devices: $devices")
+ 
+  def dev = "<br>Copy and Paste one of these into the 'Bind' value above then click 'Bind' to bind Sensor with Controller:"
+    
+  def boundTo
+    
+  devices.each { dni ->  
+     def id = dni.toString() 
+      
+     logDebug("Checking Device: ${id}") 
+                    
+     if (id != myid) { 
+       def setup = dni?.getSetup()   
+         
+       if (setup?.type == "DoorSensor") {  
+         def name = setup?.name
+         def devId = setup?.devId         
+              
+         id = devId + "=" + name
+           
+         if (dni?.boundToDevice()) {
+            boundTo = dni?.boundDevice()
+            boundTo = "  (Currently bound to '${boundTo}')"
+         } else {
+            boundTo=""
+         }
+           
+         logDebug("Found Door Sensor: ${id} ${boundTo}") 
+           
+         dev = dev + "<br>" + id + boundTo
+       }    
+     }          
+  } 
+    
+  state.sensors = dev
+}
+
+def boundToDevice() {(state.bound_devId != null)}
+
+def bind(sensorid) {
+  if (!sensorid) {  
+    log.error "Device ID to be bound was not specified"
+    return  
+  }        
+    
+  if (boundToDevice()) {  
+      log.error "Binding failed. Already bound to '${state.bound_name}'."
+      lastResponse("Binding failed. Already bound to '${state.bound_name}'.")
+      return  
+  }  
+    
+  def ndx = sensorid.indexOf('=')   
+    
+  if (ndx != -1) {  
+    sensorid = sensorid.substring(0, ndx)        
+  }  
+      
+  if (sensorid.length() != 16) {                      //DevIds are 16 characters
+    log.error "Unable to bind device:  DevId '$sensorid' is not 16 characters long"
+    return
+  }      
+    
+  logDebug ("Attempting to locate device '$sensorid'")    
+     
+  def bound
+  def my_dni
+  def homeID
+  def name
+  def type
+  def token
+  def devId
+    
+  def dev = parent.findChild(sensorid)	
+  if (!dev) {
+    log.error "Unable to bind device: Could not locate device ID '$sensorid'"
+    lastResponse("Bind failed: Could not locate device ID '$sensorid'")   
+    return 
+  } else {
+      def setup    
+      setup = dev.getSetup()   
+              
+      name = setup.name
+      
+      if (dev.boundToDevice()) {
+        def boundTo
+        boundTo = dev.boundDevice()  
+        log.error "Unable to bind '${name}', it is already bound to '${boundTo}'"
+        lastResponse("Bind failed. '${name}' already bound to '${boundTo}'")   
+        return
+      }
+      
+      my_dni = setup.my_dni    
+      homeID = setup.homeID
+      type = setup.type
+      token = setup.token
+      devId = setup.devId
+      
+      state.bound_dni = my_dni  
+      state.bound_homeID = homeID
+      state.bound_name = name
+      state.bound_type = type
+      state.bound_token = token
+      state.bound_devId = devId
+    
+      dev.bind(state.my_dni,state.name)      
+      
+      logDebug("Bound Device: dni=${my_dni}, Home ID=${homeID}, Name=${name}, Type=${type}, Token=${token}, Device Id=${devId})")
+      log.info "Bound to '${name}', DNI=${my_dni})"
+      lastResponse("Bound to contact sensor: ${name}") 
+  }  
+}
+
 def unbind() {
+    if (!boundToDevice()) {  
+      log.error "Unbind failed: No device is currently bound."
+      lastResponse("Unbind failed: Not currently bound.")  
+      return  
+    }
+    
+    def dev = parent.findChild(state.bound_devId)	
+    if (!dev) {
+        log.error "Unable to unbind device: Could not locate device ID '${state.bound_devId}'"
+    } else {
+        dev.bind(null,null)
+    }    
+    
     log.warn "Unbinding contact sensor: ${state.bound_name} "
     state.remove("bound_dni")  
     state.remove("bound_homeID")  
@@ -575,10 +383,46 @@ def unbind() {
     state.remove("bound_type")  
     state.remove("bound_token")  
     state.remove("bound_devId") 
-    state.remove("contact")
+        
+    rememberState("door","not bound")
+    rememberState("contact","not bound") 
+}
+
+def setBoundState(doorstate,battery,firmware,signal,stateChangedAt) {
+   logDebug("setBoundState(${doorstate},${battery},${firmare},${signal},${stateChangedAt})")
+   rememberState("door",doorstate)
+   rememberState("contact",doorstate) 
+   rememberState("bound_battery",battery,"%")
+   rememberState("bound_firmware",firmware)
+   rememberState("bound_signal",signal)  
+   rememberState("stateChangedAt",stateChangedAt)
+} 
+
+
+def timestampFormat(value) {
+    value = value ?: "MM/dd/yyyy hh:mm:ss a" // No value, reset to default
+    def oldvalue = state.timestampFormat 
     
-    interfaces.mqtt.disconnect()      // Guarantee we're disconnected  
-    rememberState("API", "not bound")  
+    //Validate requested value
+    try{                           
+       def date = new Date()  
+       def stamp = date.format(value)   
+       state.timestampFormat = value   
+       logDebug("Date format set to '${value}'")
+       logDebug("Current date and time in requested format: '${stamp}'")  
+     } catch(Exception e) {       
+       //log.error "dateFormat() exception: ${e}"
+       log.error "Requested date format, '${value}', is invalid. Format remains '${oldvalue}'" 
+     } 
+ }
+
+def debug(value) { 
+   rememberState("debug",value)
+   if (value == "true") {
+     log.info "Debugging enabled"
+   } else {
+     log.info "Debugging disabled"
+   }    
 }
 
 def formatTimestamp(timestamp){    
@@ -593,32 +437,36 @@ def formatTimestamp(timestamp){
 }
 
 def reset(){   
-    state.remove("driver")
     rememberState("driver", clientVersion()) 
-    state.remove("online")
-    state.remove("API")
-    state.remove("firmware")
-    state.remove("rssi") 
-    state.remove("signal") 
-    state.remove("contact")
-    rememberState("door","unknown") 
-    state.remove("stateChangedAt")
-    state.remove("LastResponse")  
-    state.remove("sensors")  
     
+    state.remove("online")
+    state.remove("API")              //No long applicable as of v1.1.0 - Remove in future
+    state.remove("firmware")    
+    state.remove("rssi")     
+    state.remove("signal")
+    state.remove("sensors")
+    state.remove("battery") 
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     
-    rememberState("driver", clientVersion())
-    
-    unbind()
-        
     scan()
     
-    poll()
+    if (boundToDevice()) {  
+      def dev = parent.findChild(state.bound_devId)	
+      if (!dev) {
+        log.error "Unable to refresh contact sensor device: Could not locate device ID '${state.bound_devId}'"
+      } else {
+          dev.setDoorState()
+      }        
+    } else {
+        rememberState("door","not bound")
+        rememberState("contact","not bound") 
+        state.remove("stateChangedAt")
+    }    
     
     log.warn "Device reset to default values"
+    lastResponse("Device reset to default values") 
 }
-
+    
 def lastResponse(value) {
    sendEvent(name:"lastResponse", value: "$value", isStateChange:true)   
 }

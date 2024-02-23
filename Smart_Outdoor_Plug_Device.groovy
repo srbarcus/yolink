@@ -1,6 +1,6 @@
 /***
  *  YoLink™ Smart Outdoor Plug (YS6802-UC/SH-18A)
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © (See copyright()) Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
  *  DO NOT INSTALL THIS DEVICE MANUALLY - IT WILL NOT WORK. MUST BE INSTALLED USING THE YOLINK DEVICE SERVICE APP  
@@ -19,12 +19,14 @@
  *         - Added capability "SignalStrength"
  *  1.0.4: Prevent Service app from waiting on device polling completion
  *  1.0.5: Updated driver version on poll
+ *  1.0.6: Support "setDeviceToken()"
+ *         - Update copyright
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "1.0.5"}
-def copyright() {return "<br>© 2022, 2023 Steven Barcus. All rights reserved."}
+def clientVersion() {return "1.0.6"}
+def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
@@ -92,6 +94,15 @@ metadata {
         attribute "timer2offHM", "String"  
     }
 }
+
+void setDeviceToken(token) {
+    if (state.token != token) { 
+      log.warn "Device token '${state.token}' changed to '${token}'"
+      state.token=token
+    } else {    
+      logDebug("Device token remains set to '${state.token}'")
+    }    
+ }
 
 void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {  
     state.debug = false
