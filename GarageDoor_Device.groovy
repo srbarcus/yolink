@@ -30,12 +30,14 @@
  *         - Remove polling capability
  *         - Support "setDeviceToken()"
  *         - Update copyright
- *  2.0.9: Fix parse() error
+ *  2.0.9:  Fix parse()
+ *  2.0.10: Fix initialize() errors
+ *         - Added garage door timeout command and setting state to 'unknown'
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.9"}
+def clientVersion() {return "2.0.10"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -59,6 +61,7 @@ metadata {
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
         command "bind", [[name:"bind",type:"STRING", description:"Device ID (devId) of Garage Door Sensor to be bound to this controller. See 'sensors' under 'State Variables' below and copy & paste a Sensor here."]] 
         command "unbind"
+        command "doorTimeout", [[name:"doortimeout",type:"NUMBER", description:"Time in seconds to allow for door to open or close before changing door state to 'unknown'. Must be between 15 and 120. Default=45 seconds"]]
         
         attribute "online", "String"
         attribute "devId", "String"
@@ -119,8 +122,17 @@ def updated() {
  }
 
 def initialize() {
-   rememberState("driver", clientVersion()) 
-   connect()
+   rememberState("driver", clientVersion())
+   if (boundToDevice()) {  
+     def dev = parent.findChild(state.bound_dni)	
+     if (!dev) {
+       log.error "Unable to locate bound device"
+       lastResponse("Unable to locate bound device")   
+      return 
+     } else {
+       dev.setDoorState()
+     }    
+   }    
 }
 
 def uninstalled() {
@@ -160,7 +172,7 @@ def toggle(func="toggle") {
    switch(func) {
       case "open":
          if (boundToDevice()) { 
-            if (state.door == "closed") {  
+            if ((state.door == "closed") || (state.door == "unknown")) {  
                rememberState("door","opening")  
             } else {
                if (state.door != "open") {  
@@ -173,7 +185,7 @@ def toggle(func="toggle") {
        
       case "close":  
          if (boundToDevice()) { 
-            if (state.door == "open") {  
+            if ((state.door == "open") || (state.door == "unknown")) {  
                rememberState("door","closing")  
             } else {
                if (state.door != "closed") {  
@@ -224,7 +236,13 @@ def toggle(func="toggle") {
                   rememberState("stateChangedAt",stateChangedAt)
                   fmtSignal(rssi)
                   rememberState("online","true")                    
-                  lastResponse("Success")     
+                  lastResponse("Success")   
+                  def delay = state.doorTimeout
+                  if (!delay) {delay=45}
+                
+                  logDebug("Door timeout is '${state.doorTimeout}'") 
+                
+                  runIn(delay,setDevicestate)
                                
             } else {
                   if (notConnected(object)) {  //Cannot connect to Device
@@ -244,7 +262,21 @@ def toggle(func="toggle") {
         log.error "toggle(${func}) exception: $e"
         lastResponse("Error ${e}")      
 	} 
-}   
+}
+
+def setDevicestate() {
+   if (boundToDevice()) { 
+      if ((state.door != "open") && (state.door != "closed")) {  
+         rememberState("door","unknown")
+         rememberState("contact","unknown")
+         log.warn "Garage door is in unknown state"
+         lastResponse("Garage door is in unknown state")  
+      }    
+   } else {
+       rememberState("door","unknown")
+       rememberState("contact","unknown") 
+   }
+}
 
 def scan() {
   def myid = "YoLink " + state.type + " - " + state.name   
@@ -390,7 +422,7 @@ def unbind() {
 }
 
 def setBoundState(doorstate,battery,firmware,signal,stateChangedAt) {
-   logDebug("setBoundState(${doorstate},${battery},${firmare},${signal},${stateChangedAt})")
+   logDebug("setBoundState(${doorstate},${battery},${firmware},${signal},${stateChangedAt})")
    rememberState("door",doorstate)
    rememberState("contact",doorstate) 
    rememberState("bound_battery",battery,"%")
@@ -440,20 +472,10 @@ def void processStateData(payload) {
 		    break;    
             
       case "Report":
-            def contact = object.data.state          
-            def battery = parent.batterylevel(object.data.battery)    // Value = 0-4    
             def firmware = object.data.version.toUpperCase()    
-            def openRemindDelay = object.data.openRemindDelay   
-            def alertInterval = object.data.alertInterval                             
             def rssi = object.data.loraInfo.signal  
             
-            rememberState("contact",contact)
-            rememberState("door",contact)
-            rememberState("battery",battery)
-            rememberState("delay",delay)               
             rememberState("firmware",firmware)
-            rememberState("openRemindDelay",openRemindDelay) 
-            rememberState("alertInterval",alertInterval)
             fmtSignal(rssi)      
 		    break;        
             
@@ -508,6 +530,19 @@ def timestampFormat(value) {
      } 
  }
 
+def doorTimeout(value) {
+    value = value ?: 30 // No value, reset to default
+    if ((value < 15) || (value > 120)) {
+      log.error "Door timeout of '${value}' is invalid. Value must be between 15 and 120." 
+      lastResponse("Door timeout of '${value}' is invalid. Value must be between 15 and 120.")
+      return  
+    }    
+    
+    state.doorTimeout = value   
+    logDebug("Door timeout set to '${value}'") 
+    lastResponse("Door timeout set to '${value}'")  
+ }
+
 def debug(value) { 
    rememberState("debug",value)
    if (value == "true") {
@@ -539,15 +574,16 @@ def reset(){
     state.remove("sensors")
     state.remove("battery") 
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
+    state.doorTimeout = 45
     
     scan()
     
     if (boundToDevice()) {  
       def dev = parent.findChild(state.bound_devId)	
       if (!dev) {
-        log.error "Unable to refresh contact sensor device: Could not locate device ID '${state.bound_devId}'"
+         log.error "Unable to refresh contact sensor device: Could not locate device ID '${state.bound_devId}'"
       } else {
-          dev.setDoorState()
+         dev.setDoorState()
       }        
     } else {
         rememberState("door","not bound")
