@@ -30,11 +30,12 @@
  *         - Update copyright
  *         - Enhance binding
  *         - Support "setDeviceToken()"
+ *  2.1.2: Remove state changes due to polling - messing up "Unknown" state
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.1.1"}
+def clientVersion() {return "2.1.2"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -257,8 +258,6 @@ def parseDevice(object) {
     rememberState("switch",swState)
     rememberState("contact",contact)
     rememberState("firmware",firmware)   
-    
-    setDoorState()
 }   
 
 def bind(dni,name) { 
