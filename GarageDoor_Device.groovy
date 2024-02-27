@@ -34,12 +34,13 @@
  *  2.0.10: Fix initialize() errors
  *         - Added garage door timeout command and setting state to 'unknown'
  *  2.0.11: Fix default timeout - set to 45 seconds
- *  2.0.12: Add option to ignore garage state for open and close
+ *  2.0.13: Add option to ignore garage state for open and close
+ *  2.0.14: Added  showInterimState command to suppress "opening" and "closing"
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.12"}
+def clientVersion() {return "2.0.14"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -65,6 +66,7 @@ metadata {
         command "unbind"
         command "doorTimeout", [[name:"doortimeout",type:"NUMBER", description:"Time in seconds to allow for door to open or close before changing door state to 'unknown'. Must be between 15 and 120. Default=45 seconds"]]
         command "ignoreDoorState", [[name:"debug",type:"ENUM", description:"Always toggle controller regardless of indicated door state", constraints:["true", "false"]]]
+        command "showInterimState", [[name:"debug",type:"ENUM", description:"Display 'opening' and 'closing' door states.", constraints:["true", "false"]]]
         
         attribute "online", "String"
         attribute "devId", "String"
@@ -74,8 +76,9 @@ metadata {
         attribute "lastPoll", "String"
         attribute "stateChangedAt", "String"
         attribute "lastResponse", "String" 
-        attribute "doorTimeout", "Boolean"
-        attribute "ignoreDoorState", "Number"
+        attribute "doorTimeout", "Number"
+        attribute "ignoreDoorState", "Boolean"
+        attribute "showInterimState", "Boolean"
         
         attribute "bound_battery", "String"
         attribute "bound_firmware", "String"
@@ -161,9 +164,10 @@ def push() {
 
 def toggle(func) {
    def currentState =  doorState()
-   boolean ignoreDoor = (state."ignoreDoorState" == true) 
+   boolean ignoreDoor = (state."ignoreDoorState" == "true") 
+   boolean interimState = (state."showInterimState" != "false")  
     
-   logDebug("toggle(${func}): Door " + currentState + ", IgnoreDoorState = $ignoreDoor") 
+   logDebug("toggle(${func}): Door $currentState, IgnoreDoorState = $ignoreDoor, interimState = $interimState") 
    if (!boundToDevice()) { 
      rememberState("door","not bound")
      rememberState("contact","not bound")   
@@ -200,14 +204,19 @@ def toggle(func) {
       }      
       
       logDebug("Current sensor state: ${contact}")     
+      
        
-      if (contact == "open") {  
-         rememberState("door","closing")
+      if (interimState) { 
+        if (contact == "open") {  
+           rememberState("door","closing")
+        } else {
+           if (contact == "closed") {  
+              rememberState("door","opening")
+           }    
+        }    
       } else {
-         if (contact == "closed") {  
-            rememberState("door","opening")
-         }    
-      }    
+          refreshSensor() 
+      }     
        
    } else { 
       log.warn "No contact sensor is bound to this device. Unable to determine current door state."
@@ -602,6 +611,12 @@ def ignoreDoorState(value) {
     }    
  }
 
+def showInterimState(value) {
+    rememberState("showInterimState",value)
+    logDebug("Show interim state set to '${value}'") 
+    lastResponse("Show interim state set to '${value}'")  
+}
+
 def debug(value) { 
    rememberState("debug",value)
    if (value == "true") {
@@ -638,7 +653,9 @@ def reset(){
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     
     rememberState("doorTimeout",45)
+    
     rememberState("ignoreDoorState",false)
+    rememberState("showInterimState",true)
     
     scan()
     
