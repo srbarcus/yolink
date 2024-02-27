@@ -31,11 +31,13 @@
  *         - Enhance binding
  *         - Support "setDeviceToken()"
  *  2.1.2: Remove state changes due to polling - messing up "Unknown" state
+ *  2.1.3: Added contactState() for retrieval by controllers
+ *         - Fixed interaction with controllers
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.1.2"}
+def clientVersion() {return "2.1.3"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -69,6 +71,9 @@ metadata {
         attribute "stateChangedAt", "String"
         attribute "alertInterval", "String"  
         attribute "openRemindDelay", "String"         
+        
+        attribute "switch", "String"  
+        attribute "contact", "String"
         }
    }
 
@@ -248,7 +253,7 @@ def parseDevice(object) {
              "Open Reminder Delay(${openRemindDelay}), " +
              "Switch(${swState}), " +
              "Contact(${contact}), " + 
-             "Firmware(${version})")
+             "Firmware(${firmware})")
 
     rememberState("online",online)
     rememberState("reportAt",reportAt)
@@ -270,7 +275,7 @@ def bind(dni,name) {
        
      rememberState("bound_Device",name)  
      rememberState("bound_DNI",dni)  
-     setDoorState()
+     setControllerState()
      log.info "Bound to '${name}', DNI=${dni}"  
      lastResponse("Bound to '${name}'")   
    } else {
@@ -286,19 +291,33 @@ def bind(dni,name) {
 def boundToDevice() {(state.bound_DNI != null)}
 def boundDevice() {return state.bound_Device}
 
-def setDoorState() {   
+def setControllerState() {   
    if (boundToDevice()) {     
-     def dev = parent.findChild(state.bound_DNI )	
-     if (!dev) {
-       log.error "setDoorState(): Cannot locate bound device: ${state.bound_Device} - ${state.bound_DNI}"
+     def controller = parent.findChild(state.bound_DNI )	
+     if (!controller) {
+       log.error "setControllerState(): Cannot locate bound device: ${state.bound_Device} - ${state.bound_DNI}"
      } else {
-       logDebug("setDoorState(): Calling setBoundState(${state.contact},${state.battery},${state.firmware},${state.signal},${state.stateChangedAt}) on bound device '${state.bound_Device}'")
-       dev.setBoundState(state.contact,state.battery,state.firmware,state.signal,state.stateChangedAt)
+       logDebug("setControllerState(${state.contact},${state.battery},${state.firmware},${state.signal},${state.stateChangedAt}) on bound device '${boundDevice()}'")   
+  
+       controller.setControllerState(state.contact,state.battery,state.firmware,state.signal,state.stateChangedAt)  
      }
    } else {
-       logDebug("setDoorState(Ignored, no bound contact sensor")
+       logDebug("setControllerState(Ignored, no bound controller")
    }    
-}    
+}   
+
+def notifyController(controller,name,value,unit=null) {   
+     value=value.toString()
+     if (unit==null) {  
+         controller.sendEvent(name:"$name", value: "$value", isStateChange:true, descriptionText: "Sensor Update")
+     } else {        
+         controller.sendEvent(name:"$name", value: "$value", unit: "$unit", isStateChange:true, descriptionText: "Sensor Update")
+     }           
+}   
+
+def contactState() {
+    return device.currentValue("contact",true) 
+}   
 
 def parse(topic) {     
      processStateData(topic.payload)
@@ -338,7 +357,7 @@ def void processStateData(payload) {
             fmtSignal(rssi)     
             rememberState("stateChangedAt",stateChangedAt)
             
-            setDoorState()
+            setControllerState()
 		    break;           
 		
                 
@@ -362,7 +381,7 @@ def void processStateData(payload) {
             rememberState("alertInterval",alertInterval)
             fmtSignal(rssi)      
             
-            setDoorState()
+            setControllerState()
 		    break;  
             
         case "setOpenRemind":    
