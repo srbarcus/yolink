@@ -49,7 +49,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/DoorSensor_Device.groovy",
             "required": false,
-          "version": "2.1.3"
+             "version": "2.1.3"
         },
         {
             "id": "8d22ba39-b6ea-4740-9f60-b6d56254d5c4",
@@ -145,7 +145,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/GarageDoor_Device.groovy",
             "required": false,
-          "version": "2.0.12"
+          "version": "2.0.14"
         },
         {
             "id": "a5a51abf-a8d7-43f7-8bc2-3f674a2f66a5",
@@ -169,7 +169,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
-          "version": "1.1.3"
+          "version": "1.1.4"
         },
 	{
 	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",
