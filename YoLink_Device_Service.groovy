@@ -51,13 +51,15 @@
  *  2.1.16: Copyright date update
  *          - Handle device toke error
  *          - Efficency improvements
+ *  2.1.17: Display installation errors
+ *  2.1.18: Retry busy device requests
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.16"}
+private def get_APP_VERSION() {return "2.1.18"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -84,8 +86,10 @@ preferences {
 }
 
 @Field static diagFile = "YoLink_Service_Diagnostics.txt"
-@Field static String diagsep = "------------------------------------------------------------------------------------------"
-String diagData 
+@Field static errFile = "YoLink_Service_Errors.txt"
+@Field static String diagsep = "-----------------------------------------------------------------------------------------------------------------------------------------------"
+String diagData
+String errData 
 
 def about() {
  	dynamicPage(name: "about", title: pageTitle("About"), uninstall: true) {
@@ -159,7 +163,7 @@ def deviceList() {
         int devicesCount=devices.size()    
         
         log.info "$devicesCount YoLink devices were found"	    
-	    dynamicPage(name: "deviceList", title: sectionTitle("$devicesCount devices found. Select the devices you want available to Hubitat"), uninstall: false) {
+	    dynamicPage(name: "deviceList", title: sectionTitle("$devicesCount YoLink devices were found. Select the devices you want available to Hubitat"), uninstall: false) {
     		section(""){
 	    		paragraph "Click below to see the list of devices available in your YoLink home"
 		    	input(name: "exposed", title:"", type: "enum",  description: "Click to choose", options:devices, multiple:true)
@@ -171,7 +175,19 @@ def deviceList() {
     }
 }
 
-def diagnostics() {    
+def diagnostics() {   
+    body = JsonOutput.toJson(name:errFile,type:"file")
+    params = [
+              uri: "http://127.0.0.1:8080",
+              path: "/hub/fileManager/delete",
+              contentType:"text/plain",
+              requestContentType:"application/json",
+              body: body
+              ]
+    httpPost(params) {resp}
+    errData = ""
+    state.errors=""
+    
     getGeneralInfo()	
     
     def Keep_Hubitat_dni = ""
@@ -216,6 +232,14 @@ def diagnostics() {
         }    
  	}
     
+    if ($errData != null) {
+      errData = appendData(errData, diagsep)  
+      log.error "Installation errors written to 'YoLink_Service_Errors.txt'."  
+      writeFile(errFile, errData)
+    } 
+    
+    state.errors = errData
+    
 	dynamicPage(name: "diagnostics", title: pageTitle("YoLink™ Device Service Diagnostics"), uninstall: false) {       	
         section(""){			
             paragraph boldRedTitle ("Only set these options to True if instructed to by the Developer. No personal information is collected or sent. The diagnostics data is written to a file on your Hubitat so you can see what's collected.") 
@@ -251,45 +275,44 @@ def finish() {
         def date = new Date(now() )    
         date = date.format("MM/dd/yyyy hh:mm:ss a" )
         
-        appendData("YoLink Device Service Diagnostics - Collected $date")
-     
-        appendData(" ")
-        appendData("YoLink Device Service App Version ".plus(get_APP_VERSION())) 
+        diagData = appendData(diagData,"YoLink Device Service Diagnostics - Collected $date")
+        diagData = appendData(diagData, "YoLink Device Service App Version ".plus(get_APP_VERSION())) 
      
         def hubitat = location.hub
-     
-        def hubfw = hubitat.firmwareVersionString
-        def hubhw = hubitat.hardwareID
-        def hubut = hubitat.uptime
-        
-        appendData(" ")
-        appendData("Hubitat information: Hardware=$hubhw  Firmware=$hubfw  Uptime=$hubut")
+        diagData = appendData(diagData, "Hubitat information: Hardware=$hubitat.hardwareID  Firmware=$hubitat.firmwareVersionString  Uptime=$hubitat.uptime")   
           
         def devices=getDevices() 
         int deviceCount=devices.size()  
-        appendData(" ")    
-        appendData("YoLink Hub reported $deviceCount devices")
+        diagData = appendData(diagData, " ")    
+        diagData = appendData(diagData, "YoLink Hub reported $deviceCount devices")
             
         def yodev = [] 
         def alldev = [] 
-                   
-        devices.each { 
-          def diag = "Device ${it}"  
+        def devmodel
+      
+        devices.each {
+          def NameDNI = it.toString()
+          def DNI = NameToDNI(NameDNI)
+            
+          devmodel = state.modelName[DNI]             
+          
+          def diag = "Device ${it} [${devmodel}}"  
+            
           yodev.add(diag)
           alldev.add(diag)
         }   
       
         def sortedlst = yodev.sort() 
         sortedlst.each { 
-          appendData(it)
+          diagData = appendData(diagData, it)
         }   
         
         def children= getChildDevices()
         int childcount=children.size()  
  
-        appendData(" ")
-        appendData(diagsep)
-        appendData("YoLink Device Service has $childcount devices defined")
+        diagData = appendData(diagData, " ")
+        diagData = appendData(diagData, diagsep)
+        diagData = appendData(diagData, "YoLink Device Service has $childcount devices defined")
        
         def hubdev = []   
         children.each { 
@@ -300,39 +323,49 @@ def finish() {
       
         sortedlst = hubdev.sort() 
         sortedlst.each { 
-          appendData(it)
+          diagData = appendData(diagData, it)
         }   
 
-        appendData(" ")
-        appendData(diagsep)
-        appendData("YoLink and Hubitat Device Cross-Reference")
+        diagData = appendData(diagData, " ")
+        diagData = appendData(diagData, diagsep)
+        diagData = appendData(diagData, "YoLink and Hubitat Device Cross-Reference")
       
         sortedlst = alldev.sort() 
         sortedlst.each { 
-          appendData(it)
+          diagData = appendData(diagData, it)
         }   
      
-        appendData(diagsep) 
-        writeFile(diagData) 
+        diagData = appendData(diagData, diagsep) 
       
+        if (state.errors != "") {
+          diagData = appendData(diagData, state.errors)  
+        } 
+      
+        writeFile(diagFile,diagData)
   }    
+
+  dynamicPage(name: "finish", title: pageTitle("Processing Complete"), install: true) {  
+  if (state.errors != "") {
+     section(boldRedTitle("The installation returned the following error(s):")){
+       paragraph "${state.errors}"
+       }  
+     section("") {	    
+       paragraph "View the error file at <a href=http://${location.hub.localIP}:8080/local/YoLink_Service_Errors.txt target='_blank' rel='noopener noreferrer'>YoLink_Service_Errors.txt</a>"
+       }
+  } 
     
   if (diagnose == "True") {
-       dynamicPage(name: "finish", title: pageTitle("Processing Complete"), install: true) {
-            section("") {	
-			paragraph "Diagnostic data has been collected. Copy and Paste the text into a PM message to the developer." 
-            paragraph "View the file at http://${location.hub.localIP}:8080/local/YoLink_Service_Diagnostics.txt"
-            }
-		}
-        
-    } else {
-        dynamicPage(name: "finish", title: pageTitle("Processing Complete"), install: true) {
-            section("") {	
-		    paragraph "Click 'Done' to exit." 
-            }
-        }       
-  }
-} 
+     section("") {	
+       paragraph "Diagnostic data has been collected. Copy and Paste the text into a PM message to the developer." 
+       paragraph "View the file at <a href=http://${location.hub.localIP}:8080/local/YoLink_Service_Diagnostics.txt target='_blank' rel='noopener noreferrer'>YoLink_Service_Diagnostics.txt</a>"
+       }
+  } else {
+     section("") {	
+       paragraph "Click 'Done' to exit." 
+       }
+  }       
+}
+}    
 
 def installed() {
     log.info "${get_APP_NAME()} app installed."  
@@ -408,25 +441,38 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
               state.speakerhub = newdni
            }  
             
-		} catch (IllegalArgumentException e) {
+		} catch (Exception e) {
             failed = true
+            if ($errData == null) {
+              def date = new Date(now() )    
+              date = date.format("MM/dd/yyyy hh:mm:ss a" )
+        
+              errData = appendData(errData,"YoLink Device Service Installation Errors - Created $date")
+              errData = appendData(errData, "YoLink Device Service App Version ".plus(get_APP_VERSION()))
+     
+              def hubitat = location.hub
+              errData = appendData(errData, "Hubitat information: Hardware=$hubitat.hardwareID  Firmware=$hubitat.firmwareVersionString  Uptime=$hubitat.uptime")   
+                
+              errData = appendData(errData, diagsep)
+            }             
+            
     		log.error "An error occcurred while trying add child device '$labelName'"
-            log.error "Exception: '$e'"
+            errData = appendData(errData, "An error occcurred while trying to add child device '$labelName'")
                                 
-            if (e.message.contains("Please use a different DNI")){    //Could happen if user uninstalled app without deleting previous children                 
-                  throw new IllegalArgumentException("A device with dni '$newdni' already exists. Delete the device and try running the " + get_APP_NAME() + " app again.")
-            } else {    
-                  throw new IllegalArgumentException(e.message)  
-            }                  
-        } catch (Exception e) {
-            failed = true
-    		                                
-            if (e.message.contains("not found")) {                
-                  log.error "Unable to create device '$devname' because driver '$drivername' is not installed. Either the device is not currently supported by the YoLink™ Device Service, or you need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
-            } else {    
-                  log.error "Exception: '$e'"
-                  throw new IllegalArgumentException(e.message)  
-            }                      
+            if (e.message.contains("Please use a different DNI")) {    //Could happen if user uninstalled app without deleting previous children                 
+                 log.error "A device with dni '$newdni' already exists. Delete the device and try running the " + get_APP_NAME() + " app again."
+                 errData = appendData(errData, "A device with dni '$newdni' already exists. Delete the device and try running the " + get_APP_NAME() + " app again.")
+            } else {
+               if (e.message.contains("not found")) {                  
+                  log.error "Unable to create device '$devname' because driver '$drivername' is not installed. Either the device is not currently supported by the YoLink Device Service app or you need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app."
+                  errData = appendData(errData, "Unable to create device '$devname' because driver '$drivername' is not installed.")
+                  errData = appendData(errData, "Either the device is not currently supported by the YoLink Device Service app or you need to install the driver using the 'Modify' option in the 'Hubitat Package Manager' app.") 
+               } else {
+                      log.error "Exception: '$e'"
+                      errData = appendData(errData, "Exception: '$e'")
+                      }  
+            }
+            errData = appendData(errData, " ")
         } finally {
             if (failed) {return null}
         }    
@@ -809,6 +855,20 @@ def pollAPI(body, name=null, type=null){
                          logDebug("Polling of API completed successfully")
                  	     rc = object
                          break;
+                        
+                    case "020104": // Device is busy, try again later
+                         logDebug("Polling failed because device is busy")
+                 	     if (retry>0) {
+                              pauseExecution(5000)
+                              retry = retry - 1  
+                              logDebug("Polling failed because device is busy. Attempting to retry, Retries=${retry}")
+                         } else {          
+                              log.error "Polling failed because device is busy and retry failed. Final error status code: $e.statusCode"
+                              log.error "Request: $Params"  
+                              retry = -1 // Don't retry
+                              rc = object
+                         }     
+                         break;    
                     
                     case "000201": //Cannot connect to the device    
                     case "000203": //Cannot connect to the device
@@ -852,7 +912,8 @@ def pollAPI(body, name=null, type=null){
                      rc = object                     
                 }  
 		    } /* end http post */
-	    } catch (groovyx.net.http.HttpResponseException e) {	            
+	    } catch (groovyx.net.http.HttpResponseException e) {	
+            log.error "HTTP Response Exception: $e"
             if (e?.statusCode) { 
 			    if (e?.statusCode == UNAUTHORIZED()) { 
                     if (retry>0) {
@@ -870,7 +931,7 @@ def pollAPI(body, name=null, type=null){
                     retry = -1 // Don't retry
 	    		}            
             }
-        } catch (java.net.SocketTimeoutException e) {	                     
+        } catch (java.net.SocketTimeoutException e) {
             log.error "pollAPI() HTTP socket timed out"
             log.error "Request: $Params"
             retry = retry - 1
@@ -1011,6 +1072,13 @@ def scheduledDays(weekdays) {
     
    logDebug("Scheduled Days: ${days}")
    return days 
+}
+
+private NameToDNI(nameDNI) {
+   log.info nameDNI 
+   def DNI = nameDNI.substring(0,nameDNI.indexOf("="))  
+   log.warn DNI      
+   return DNI 
 }
 
 @Field static final Map weekdays = [
@@ -1188,26 +1256,26 @@ def getMultiOutletDriver(name,type,token,devId) {
 	return driver
 }   
 
-
 def logDebug(msg) {
     if (debugging == "True"){
        log.debug msg
     }   
 }    
 
-def appendData(String data) {
-    if (diagData == null) {
-       diagData = data.plus("\r\n")
+def appendData(olddata, newdata) {
+    if (olddata == null) {
+       olddata = newdata.plus("\r\n")
     } else {
-       diagData = diagData.plus(data).plus("\r\n") 
-    }    
+       olddata = olddata.plus(newdata).plus("\r\n") 
+    } 
+    return olddata
 }
 
-Boolean writeFile(String fData) {
+Boolean writeFile(fName, fData) {
     String encodedString = location.hub
     encodedString = encodedString.bytes.encodeBase64().toString()
     
-    def String Top = """--${encodedString}\r\nContent-Disposition: form-data; name="uploadFile"; filename="${diagFile}"\r\nContent-Type:text/html\r\n\r\n"""
+    def String Top = """--${encodedString}\r\nContent-Disposition: form-data; name="uploadFile"; filename="${fName}"\r\nContent-Type:text/html\r\n\r\n"""
     def String Bottom = """\r\n\r\n--${encodedString}\r\nContent-Disposition: form-data; name="folder"\r\n\r\n--${encodedString}--"""
     
     ByteArrayOutputStream OutputStream = new ByteArrayOutputStream()
@@ -1237,7 +1305,7 @@ Boolean writeFile(String fData) {
 		}
 	}
 	catch (e) {
-		log.error "Error writing file $diagFile: ${e}"
+		log.error "Error writing file $fName: ${e}"
 	}
 	return false
 }
