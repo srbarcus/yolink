@@ -30,11 +30,13 @@
  *  2.0.6: Updated driver version on poll
  *  2.0.7: Support "setDeviceToken()"
  *         - Update copyright
+ *  2.0.8: Support "SpeechSynthesis" capability
+ *         - Support "Notification" capability 
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.7"}
+def clientVersion() {return "2.0.8"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -58,25 +60,17 @@ preferences {
 metadata {
     definition (name: "YoLink SpeakerHub Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     		
 		capability "Polling"	
-        capability "AudioNotification"
         capability "AudioVolume"
+        capability "SpeechSynthesis"
         capability "Notification"
         capability "MusicPlayer"
-        
-        
-        command "restoreTrack"        // Override command definition - not relevant
-        command "resumeTrack"         // Override command definition - not relevant
-        command "setTrack"            // Override command definition - not relevant
-        command "playTrackAndResume"  // Override command definition - not relevant
-        command "playTrackAndRestore" // Override command definition - not relevant 
-        command "playTextAndResume"   // Override command definition - not relevant
-        command "playTextAndRestore"  // Override command definition - not relevant
         
         command "setVolume", [[name:"volume",type:"ENUM", description:"Speaker volume", constraints:[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]]
         command "setLevel", [[name:"volume",type:"ENUM", description:"Speaker volume", constraints:[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
         
-        command "playText", [[name:"Text",type:"STRING", description:"Text to be played"], 
-                            [name:"Volume",type:"ENUM", description:"Optional volume text is to be played at", optional:true,
+        
+        command "speak", [[name:"text",type:"STRING", description:"Text to be spoken"], 
+                            [name:"volume",type:"ENUM", description:"Optional volume text is to be spoken at", optional:true,
                              constraints:[null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]]] 
         
         command "playTrack", [[name:"Track",type:"ENUM", description:"Track to be played", constraints:["Emergency", "Alert", "Warn", "Warning", "Tip",
@@ -93,7 +87,14 @@ metadata {
         command "DisableBeep"
         command "EnableVoiceResults"
         command "DisableVoiceResults"
-        command "deviceNotification", [[name:"deviceNotification",type:"STRING", description:"Text to be played on SpeakerHub"]]
+        
+        command "restoreTrack"        // Override command definition - not relevant
+        command "resumeTrack"         // Override command definition - not relevant
+        command "setTrack"            // Override command definition - not relevant
+       // command "playTrackAndResume"  // Override command definition - not relevant
+        command "playTrackAndRestore" // Override command definition - not relevant 
+        command "playTextAndResume"   // Override command definition - not relevant
+        //command "playTextAndRestore"  // Override command definition - not relevant
         
       //command "setWiFi"                       // As of 03-06-2022, was not supported by API  
         
@@ -122,6 +123,23 @@ metadata {
         attribute "voiceResults", "Boolean"   
         }
    }
+
+def playTrackAndResume() {unsupported("Play Track And Resume")}
+def playTrackAndRestore() {unsupported("Play Track And Restore")} 
+def playTextAndResume() {unsupported("Play Text And Resume")} 
+def nextTrack() {unsupported("Next Track")}
+def pause() {unsupported("Pause")}
+def play() {unsupported("Play")}
+def previousTrack() {unsupported("Previous Track")}
+def restoreTrack() {unsupported("Restore Track")}
+def resumeTrack() {unsupported("Resume Track")}
+def setTrack() {unsupported("Set Track")}
+def stop() {unsupported("Stop")}
+
+def unsupported(cmd) {
+    lastResponse("The '$cmd' command is not supported on a SpeakerHub")
+    log.warn "The '$cmd' command is not supported on a SpeakerHub"
+}
 
 void setDeviceToken(token) {
     if (state.token != token) { 
@@ -306,29 +324,22 @@ def getDevicestate() {
 	return rc
 }    
 
-def playTrackAndResume() {unsupported("Play Track And Resume")}
-def playTrackAndRestore() {unsupported("Play Track And Restore")} 
-def playTextAndResume() {unsupported("Play Text And Resume")}  
-def playTextAndRestore() {unsupported("Play Text And Restore")}
-def nextTrack() {unsupported("Next Track")}
-def pause() {unsupported("Pause")}
-def play() {unsupported("Play")}
-def previousTrack() {unsupported("Previous Track")}
-def restoreTrack() {unsupported("Restore Track")}
-def resumeTrack() {unsupported("Resume Track")}
-def setTrack() {unsupported("Set Track")}
-def stop() {unsupported("Stop")}
-
-def unsupported(cmd) {log.warn "The '$cmd' command is not supported on a SpeakerHub"}
-
 def deviceNotification(text) {playText(text,null)}
+
+def speak(text,volume=null) {
+    logDebug("speak(): $text $volumewas successful")
+    playText(text,volume)}  
+
+def playTextAndRestore(text,volume=null) {
+    playAudio(null,text,volume)        
+}  
 
 def playText(text,volume=null) {
     logDebug("playText($text,$volume)")
     if (text) {   
       playAudio(null,text,volume)        
       }
-    }  
+    } 
 
 def playTrack(track,volume=null) {
     if (track) {       
@@ -465,8 +476,6 @@ def playAudio(tone = null, message = null, volume = null) {
        log.warn "Attempting to play audio while device is muted"
        mutestate = " (device was muted!)" 
    } 
-    
-   //if (volume == null) {volume = state.volume}                          
        
    def params = [:] 
    
@@ -479,9 +488,10 @@ def playAudio(tone = null, message = null, volume = null) {
                         }
     
    if (volume != null)   {params.put("volume", volume.toInteger())}
-   if (state.repeat != 0) params.put("repeat", Integer.valueOf(state.repeat))       // Integer(0~10),Optional:	Repeat times, 0 or null means not repeat. 
+   if (state.repeat != 0) params.put("repeat", state.repeat.toInteger())        // Integer(0~10),Optional:	Repeat times, 0 or null means not repeat. 
+   // if (state.repeat != 0) params.put("repeat", Integer.valueOf(state.repeat))       // Integer(0~10),Optional:	Repeat times, 0 or null means not repeat.   
     
-   log.trace "playAudio: ${params}" 
+   logDebug("playAudio: ${params}")
     
    def request = [:] 
    request.put("method", "SpeakerHub.playAudio")                
@@ -496,13 +506,14 @@ def playAudio(tone = null, message = null, volume = null) {
                               
             if (successful(object)) {               
                 logDebug("playAudio() was successful")
-                /*
+                
                 if (message != null) {
-                    def pause = message.length() * 30
-                    pauseExecution(pause)                     //Give hub time to respond
+                    def pause = message.length() * 150
+                    pauseExecution(pause)                   //Give hub time to respond
                 } else {
                     pauseExecution(250)                     //Give hub time to respond
-                } */                   
+                }
+                
             } else {
                pollError(object)  
             }    
@@ -516,32 +527,33 @@ def playAudio(tone = null, message = null, volume = null) {
 
 def setOption(volume=null, enableBeep=null, mute=null) {     
    def params = [:]   
-   if (volume != null) {params.put("volume", Integer.valueOf(volume))}         // Integer,Optional: Global volume of device  
+   if (volume != null)     {params.put("volume", Integer.valueOf(volume))}     // Integer,Optional: Global volume of device  
    if (enableBeep != null) {params.put("enableBeep", enableBeep)}              // Boolean,Optional:	Is beep enabled, True means the device will make a beep when performing some actions, such as startup, modify settings
-   if (mute != null) {params.put("mute", mute)}                                // Boolean,Optional:	Is mute mode enabled, True means device will not make any sound,Even if you receive a message 
+   if (mute != null)       {params.put("mute", mute)}                          // Boolean,Optional:	Is mute mode enabled, True means device will not make any sound,Even if you receive a message 
     
    def request = [:] 
    request.put("method", "SpeakerHub.setOption")                
    request.put("targetDevice", "${state.devId}") 
    request.put("token", "${state.token}")     
-   request.put("params", params)       
+   request.put("params", params)  
+   
+   logDebug("setOptions ${request}") 
  
    try {         
-        def object = parent.pollAPI(request, state.name, state.type)
+        def object = parent.pollAPI(request, "SpeakerHub", "SpeakerHub")
         def swState
          
         if (object) {
             logDebug("setOption(): pollAPI() response: ${object}")  
                               
             if (successful(object)) {                               
-                logDebug("setOption() was successful")               
-                
+                logDebug("setOption() was successful")         
             } else {
                 pollError(object)  
             }                         						
                 
 	    } else { 			               
-            logDebug("setOption() failed")	            
+            log.error "setOption() ${request} failed"
         }     		
 	} catch (e) {	
         log.error "setOption() exception: $e" 
