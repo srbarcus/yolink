@@ -1,41 +1,49 @@
-CURRENTLY TESTED AND SUPPORTED*
+As of 06/03/2024 the following devices have been verified to work. 
+(NOTE: Other devices of the same "type" may work with these drivers. For example, most/all of the various temperature devices will work even though they haven't been verified.)
+
+DEVICE TYPES NOT YET SUPPORTED - REQUIRE FURTHER DEVELOPMENT
+------------------------------------------------------------
+   Cellular Hub
+   Infrared Remoter
+   Water Depth Sensor
+
+
+CURRENTLY TESTED AND SUPPORTED
 ------------------------------
-Hub 				(YS1603-UC)
-Speaker Hub 			(YS1604-UC)
-Flex Fob 			(YS3604-UC)
-Flex Fob Version 2		(YS3604-UC)
-On/Off Fob 			(YS3605-UC)
-Dimmer Fob 			(YS3606-UC)
-Siren Fob 			(YS3607-UC)
-Thermostat                      (YS4002-UC)
-Sprinkler                       (YS4102-UC)
+Hub 				              (YS1603-UC)
+Speaker Hub 			        (YS1604-UC)
+Flex Fob 			            (YS3604-UC)
+Flex Fob Version 2		    (YS3604-UC)
+On/Off Fob 			          (YS3605-UC)
+Dimmer Fob 			          (YS3606-UC)
+Siren Fob 			          (YS3607-UC)
+Thermostat                (YS4002-UC)
+Sprinkler                 (YS4102-UC)
 Garage Door Controller 		(YS4906-UC)
-Finger Device 			(YS4908-UC)
-Valve 				(YS4909-UC)
-In-wall Switch			(YS5705-UC)
-YoLink Relay 			(YS5706-UC)
-Dimmer                          (YS5707-UC)
+Finger Device 			      (YS4908-UC)
+Valve 			            	(YS4909-UC)
+In-wall Switch      			(YS5705-UC)
+YoLink Relay 			        (YS5706-UC)
+Dimmer                    (YS5707-UC)
 Plug w/Power Monitoring		(YS6602-UC)
-Plug 				(YS6604-UC)
-In-wall outlet 			(YS6704-UC)
-MultiOutlet                     (YS6801-UC)
-Smart Outdoor Plug 		(YS6802-UC)
-Siren Alarm   			(YS7103-UC)
+Plug 				              (YS6604-UC)
+In-wall outlet 			      (YS6704-UC)
+MultiOutlet               (YS6801-UC)
+Smart Outdoor Plug 		    (YS6802-UC)
+Siren Alarm   			      (YS7103-UC)
 Vibration, Glass Break Sensor   (YS7201-UC)
 Lock Device                     (YS7606-UC)
-Garage Door Sensor   	     	(YS7706-UC)
-Door Sensor 			(YS7707-UC)
-Motion Sensor 			(YS7804-UC)
-Outdoor Motion Sensor 		(YS7805-UC)
+Garage Door Sensor   	        	(YS7706-UC)
+Door Sensor 			              (YS7707-UC)
+Motion Sensor 			            (YS7804-UC)
+Outdoor Motion Sensor 	      	(YS7805-UC)
 Leak Sensor                     (YS7903-UC)
 Leak Sensor                     (YS7904-UC)
 Smoke & CO Alarm Wireless Base	(YS7A01-UC)
-Temperature/Humidity Sensor 	(YS8003-UC)
+Temperature/Humidity Sensor 	  (YS8003-UC)
 Weatherproof Temperature Sensor (YS8004-UC)
 X3 Temperature/Humidity Sensor	(YS8006-UC)
-
-
-* As of 04/23/2023. Other devices of the same "type" may work with these drivers, they just haven't been verified.
+Power Failure Alarm             (YS7106-UC)
 
 NOT SUPPORTED
 -------------
