@@ -218,6 +218,14 @@
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_Outlet.groovy",
 	    "required": true,
 	    "version": "2.0.4"
-	 }
+	 },
+	 {
+	    "id": "c3261cb4-8ef9-486b-8832-66c1fd50d874",
+	    "name": "YoLink Power Failure Alarm Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Power_Failure_Alarm_Device.groovy",
+	    "required": false,
+	    "version": "2.0.0"
+    }
     ]
 }
