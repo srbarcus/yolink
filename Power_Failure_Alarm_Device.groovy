@@ -46,7 +46,7 @@ preferences {
 }
 
 metadata {
-    definition (name: "YoLink Power Failure Alarm Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
+    definition (name: "YoLink PowerFailureAlarm Device", namespace: "srbarcus", author: "Steven Barcus", singleThreaded: true) {     	
 		capability "Polling"				
 		capability "Battery"
         capability "Alarm"                  // ENUM ["strobe", "off", "both", "siren"]    
