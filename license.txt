@@ -1,4 +1,4 @@
- *  © 2022, 2023 Steven Barcus. All rights reserved.
+ *  © 2022 - 2024 Steven Barcus. All rights reserved.
  *
  *
  *  Developer retains all right, title, copyright, and interest, including all copyright, patent rights, trade secret in the Background

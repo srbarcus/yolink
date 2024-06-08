@@ -19,11 +19,12 @@
  *                 - alertInterval
  *                 - mute
  *                 - volume
+ *  2.0.1: Handle 'Report' event
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.0"}
+def clientVersion() {return "2.0.1"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -314,7 +315,7 @@ def void processStateData(payload) {
         logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
-/*            
+              
 		case "Report":
             def alarm = object.data.state
             def volume = object.data.sound    
@@ -335,7 +336,7 @@ def void processStateData(payload) {
     
             setAlarmState(alarm)
  		    break;       
-  */          
+
         case "getState":       
             parseDevice(object) 
  		    break;   
