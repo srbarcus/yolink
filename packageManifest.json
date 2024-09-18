@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Power Failure Alarm update\n\n",
+    "releaseNotes": "- Add driver for Water Depth Sensor\n- Add driver for Cellular Hub\n-Update service to support new drivers\n-Minor update to Leak Sensor3 driver\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.18"
+            "version": "2.1.19"
         }
     ],
     "drivers": [
@@ -145,7 +145,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/GarageDoor_Device.groovy",
             "required": false,
-          "version": "2.0.12"
+            "version": "2.0.12"
         },
         {
             "id": "a5a51abf-a8d7-43f7-8bc2-3f674a2f66a5",
@@ -169,7 +169,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
-          "version": "1.1.3"
+            "version": "1.1.3"
         },
 	{
 	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",
@@ -209,7 +209,7 @@
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor3_Device.groovy",
 	    "required": false,
-	    "version": "2.0.4"
+	    "version": "2.0.5"
 	 },
 	 {
 	    "id": "a8b21aa8-1fef-4964-974a-c99c219a34c1",
@@ -226,6 +226,23 @@
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Power_Failure_Alarm_Device.groovy",
 	    "required": false,
 	    "version": "2.0.1"
-    }
-    ]
+         },
+         {
+	    "id": "e247e1cd-c81a-444c-9a70-e4f3d622fd58",
+	    "name": "YoLink CellularHub Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/CellularHub_Device.groovy",
+	    "required": false,
+	    "version": "2.0.0"
+	  },
+	  {
+	    "id": "7f012dbc-b3d5-4d0f-ae22-668bd69fd5fa",
+	    "name": "YoLink WaterDepthSensor Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/WaterDepthSensor_Device.groovy",
+	    "required": false,
+	    "version": "2.0.0"
+
+	  }
+  ]
 }

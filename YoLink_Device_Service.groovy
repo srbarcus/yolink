@@ -53,13 +53,14 @@
  *          - Efficency improvements
  *  2.1.17: Display installation errors
  *  2.1.18: Retry busy device requests
+ *  2.1.19: Support Cellular Hub (Model YS1605-UC)
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.18"}
+private def get_APP_VERSION() {return "2.1.19"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -205,7 +206,6 @@ def diagnostics() {
        def devtoken = state.deviceToken."${dni}"
        def devId = state.deviceId."${dni}"
        def devmodel = state.modelName."${dni}"
-       log.info "Creating selected Device: ${devname} - ${devtype} ${devmodel} "	
        def Hubitat_dni = "yolink_${devtype}_${dni}"
        Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
        if (Hubitat_dni != null) {
@@ -791,11 +791,14 @@ def getDevices() {
                            
 				responseValues.each { device ->
 					if (device.name) {
-						log.info "Found '${device.name}', type=${device.type}"                        
+                        
+                        if (device.modelName == "YS1605-UC") {device.type = "CellularHub"}
+                        
+						log.info "Found '${device.name}', type=${device.type}, Model=${device.modelName}"                        
                         
                         def dni = device.deviceId
                                       
-						state.deviceName[dni] = device.name                        
+						state.deviceName[dni] = device.name 
                         state.deviceType[dni] = device.type
                         state.deviceToken[dni] = device.token
                         state.deviceId[dni] = device.deviceId   

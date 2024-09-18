@@ -1,5 +1,5 @@
 /***
- *  YoLink™ LeakSensor3 (YS7904-UC)
+ *  YoLink™ LeakSensor3 (Certified for YS7904-UC)
  *  © (See copyright()) Steven Barcus. All rights reserved.
  *  THIS SOFTWARE IS NEITHER DEVELOPED, ENDORSED, OR ASSOCIATED WITH YoLink™ OR YoSmart, Inc.
  *   
@@ -20,6 +20,7 @@
  *  2.0.3: Updated driver version on poll
  *  2.0.4: Support "setDeviceToken()"
  *         - Update copyright
+ *  2.0.5: Removed "sensitivity" support - currently meaningless
  */
 
 // Note: Setting of (beep, mode, and sensitivity) through API appears to not be supported as is always returns "Device offline" error
@@ -27,12 +28,12 @@
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.4"}
+def clientVersion() {return "2.0.5"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
 preferences {
-    input title: bold("Driver Version"), description: "YoLink™ LeakSensor3 (YS7904-UC) v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
+    input title: bold("Driver Version"), description: "YoLink™ LeakSensor3 v${clientVersion()}${copyright()}", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: bold("Please donate"), description: "<p>Please support the development of this application and future drivers. This effort has taken me hundreds of hours of research and development. <a href=\"https://www.paypal.com/donate/?business=HHRCLVYHR4X5J&no_recurring=1\">Donate via PayPal</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
     input title: bold("Date Format Template Specifications"), description: "<p>Click the link to view the possible letters used in timestamp formatting template. <a href=\"https://github.com/srbarcus/yolink/blob/main/DateFormats.txt\">Date Format Template Characters</a></p>", displayDuringSetup: false, type: "paragraph", element: "paragraph"
 }
@@ -59,12 +60,19 @@ metadata {
         attribute "lastPoll", "String"
         attribute "lastResponse", "String"      
         
+        attribute "probe", "String" 
+        attribute "stayError", "String" 
+        attribute "detectorError", "String" 
+        attribute "freezeError", "String" 
+        attribute "reminder", "String" 
+        
         attribute "interval", "integer"
         attribute "beep", "String"
         attribute "mode", "String"
         attribute "state", "String"  
         attribute "stateChangedAt", "String" 
-        
+        attribute "sensitivity", "String" 
+                
         attribute "alerts", "integer"
         attribute "alertThreshold", "integer"  
         }
@@ -196,7 +204,7 @@ def timestampFormat(value) {
  }
 
 def on() {off()}
-def off() {log.info "Switch command is non-functional for this device type."}
+def off() {log.warn "Switch commands are non-functional for this device type."}
 
 def debug(value) { 
    rememberState("debug",value)
@@ -252,11 +260,21 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) { 
+   logDebug("parseDevice: object=$object")
    def online = object.data.online  
+   
+   def stayError = object.data.state.alarmState.stayError
+   def detectorError = object.data.state.alarmState.detectorError
+   if (detectorError) {rememberState("probe", "disconnected")
+   } else {rememberState("probe", "connected")}
+   def freezeError = object.data.state.alarmState.freezeError
+   def reminder = object.data.state.alarmState.reminder 
+    
    def battery = parent.batterylevel(object.data.state.battery)  
    def beep = object.data.state.beep
    def temperature = object.data.state.devTemperature      
    def interval = object.data.state.interval  
+   def sensitivity = object.data.state.sensitivity  
    def mode = object.data.state.sensorMode
    def swState = object.data.state.state
    def stateChangedAt = object.data.state.stateChangedAt
@@ -267,15 +285,22 @@ def parseDevice(object) {
    stateChangedAt = formatTimestamp(stateChangedAt) 
    mode = waterMode(mode) 
      
-   logDebug("Parsed: Online=$online, State=$swState, Battery=$battery, Beep=$beep, Temperature=$temperature, Alert Interval=$interval, Sensitivity=$sensitivity, Mode=$mode, Firmware=$firmware, State Changed At=$stateChangedAt, Support Change Mode=$supportChangeMode")      
+   logDebug("Parsed: Online=$online, State=$swState, stayError=$stayError, detectorError=$detectorError, freezeError=$freezeError, reminder=$reminder, Battery=$battery, Beep=$beep, Temperature=$temperature, Alert Interval=$interval, sensitivity=$sensitivity, Mode=$mode, Firmware=$firmware, State Changed At=$stateChangedAt, Support Change Mode=$supportChangeMode")      
                 
    rememberState("online", online)
    rememberState("state", swState)
+  
+   rememberState("stayError", stayError)
+   rememberState("detectorError", detectorError)
+   rememberState("freezeError", freezeError)
+   rememberState("reminder", reminder) 
+    
    rememberState("water", waterState(swState)) 
    rememberState("battery", battery, "%")
    rememberState("beep", beep)
    rememberState("temperature", temperature, "°".plus(state.temperatureScale)) 
    rememberState("interval", interval)
+   rememberState("sensitivity", sensitivity) 
    rememberState("mode", mode)    
    rememberState("stateChangedAt", stateChangedAt) 
    rememberState("firmware", firmware)
@@ -300,7 +325,7 @@ def void processStateData(payload) {
         logDebug("Received Message Type: ${event} for: $name")
         
         switch(event) {
-		case "setInterval":
+		case "setInterval":          
             def interval = object.data.interval   
             def beep = object.data.beep 
             def mode = object.data.sensorMode
@@ -318,7 +343,7 @@ def void processStateData(payload) {
  		    break;
             
         case "Report":     
-        case "StatusChange":        
+        case "StatusChange":   
   		case "Alert":
             if (event == "Report") {
               def interval = object.data.interval 
@@ -327,6 +352,14 @@ def void processStateData(payload) {
             
             def mode = object.data.sensorMode
             def swState = object.data.state
+            
+            def stayError = object.data.alarmState.stayError
+            def detectorError = object.data.alarmState.detectorError
+            if (detectorError) {rememberState("probe", "disconnected")
+            } else {rememberState("probe", "connected")}    
+            def freezeError = object.data.alarmState.freezeError
+            def reminder = object.data.alarmState.reminder
+            
             def battery = parent.batterylevel(object.data.battery) 
             def firmware = object.data.version.toUpperCase()
             def temperature = object.data.devTemperature   
@@ -338,13 +371,19 @@ def void processStateData(payload) {
             stateChangedAt = formatTimestamp(stateChangedAt) 
             mode = waterMode(mode) 
                         
-            logDebug("Parsed: Mode=$mode, State=$swState, Battery=$battery, Temperature=$temperature, Beep=$beep, Firmware=$firmware, State Changed At=$stateChangedAt, RSSI=$rssi")      
+            logDebug("Parsed: Mode=$mode, State=$swState, stayError=$stayError, detectorError=$detectorError, freezeError=$freezeError, reminder=$reminder,, Battery=$battery, Temperature=$temperature, Beep=$beep, Firmware=$firmware, State Changed At=$stateChangedAt, RSSI=$rssi")      
                 
             rememberState("online", "true")
             rememberState("mode", mode)   
             rememberState("state", swState)
             if ((event == "Alert") || (event == "StatusChange"))  {rememberState("water", waterState(swState,"alert"))
             } else {rememberState("water", waterState(swState))}
+            
+            rememberState("stayError", stayError)
+            rememberState("detectorError", detectorError)
+            rememberState("freezeError", freezeError)
+            rememberState("reminder", reminder)
+            
             rememberState("battery", battery, "%")
             rememberState("firmware", firmware)
             rememberState("temperature", temperature, "°".plus(state.temperatureScale)) 
@@ -448,6 +487,12 @@ def reset(){
     state.remove("state")
     state.remove("switch")
     state.remove("water")
+    
+    state.remove("stayError")
+    state.remove("detectorError")
+    state.remove("freezeError")
+    state.remove("reminder")
+    
     state.remove("battery")
     state.remove("beep")    
     state.remove("temperature")
@@ -457,7 +502,9 @@ def reset(){
     state.remove("firmware")
     state.remove("rssi")    
     state.remove("signal")
-    
+    state.remove("sensitivity")
+    state.remove("probe")
+      
     state.remove("alerts")
     rememberState("alerts", 0) 
     state.remove("alertThreshold")
