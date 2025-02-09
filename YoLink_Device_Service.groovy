@@ -54,13 +54,14 @@
  *  2.1.17: Display installation errors
  *  2.1.18: Retry busy device requests
  *  2.1.19: Support Cellular Hub (Model YS1605-UC)
+ *  2.1.20: Improve diagnostics to return devices' Setup details
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.19"}
+private def get_APP_VERSION() {return "2.1.20"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -200,28 +201,28 @@ def diagnostics() {
     log.info "$devicesCount devices were selected"
     
     if (devicesCount > 0 ) {
-    exposed.each { dni ->   
-       def devname = state.deviceName."${dni}"
-       def devtype = state.deviceType."${dni}"
-       def devtoken = state.deviceToken."${dni}"
-       def devId = state.deviceId."${dni}"
-       def devmodel = state.modelName."${dni}"
-       def Hubitat_dni = "yolink_${devtype}_${dni}"
-       Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
-       if (Hubitat_dni != null) {
-          Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)
-          countNewChildDevices++     
-          logDebug("Created $countNewChildDevices of ${exposed.size()} selected devices.")    
-       }
-    } 	 
+    	exposed.each { dni ->   
+       		def devname = state.deviceName."${dni}"
+       		def devtype = state.deviceType."${dni}"
+       		def devtoken = state.deviceToken."${dni}"
+       		def devId = state.deviceId."${dni}"
+       		def devmodel = state.modelName."${dni}"
+       		def Hubitat_dni = "yolink_${devtype}_${dni}"
+       		Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
+       		if (Hubitat_dni != null) {
+          		Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)
+          		countNewChildDevices++     
+          		logDebug("Created $countNewChildDevices of ${exposed.size()} selected devices.")    
+       		}
+    	} 	 
     
-    def devname = "YoLink Cloud Listener"
-    def devtype = "MQTT Listener"
-    def devtoken = state.UAID.plus("MQTT1")
-    def devId = state.UAID.plus("MQTT1")    
-    def Hubitat_dni = "yolink_${devtype}_${devId}"
-    Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
-    if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}  
+    	def devname = "YoLink Cloud Listener"
+    	def devtype = "MQTT Listener"
+    	def devtoken = state.UAID.plus("MQTT1")
+    	def devId = state.UAID.plus("MQTT1")    
+    	def Hubitat_dni = "yolink_${devtype}_${devId}"
+    	Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
+    	if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}  
     }    
        
     def children= getChildDevices()
@@ -279,12 +280,20 @@ def finish() {
         diagData = appendData(diagData, "YoLink Device Service App Version ".plus(get_APP_VERSION())) 
      
         def hubitat = location.hub
-        diagData = appendData(diagData, "Hubitat information: Hardware=$hubitat.hardwareID  Firmware=$hubitat.firmwareVersionString  Uptime=$hubitat.uptime")   
-          
+        def uptime = hubitat.uptime
+        int days = uptime/60/60/24
+        uptime = uptime - (days*60*60*24)
+        int hours = uptime/60/60
+        uptime = uptime - (hours*60*60)
+        int mins = uptime/60
+        int seconds = uptime - (mins*60)
+            
+        diagData = appendData(diagData, "Hubitat information: Hardware=$hubitat.hardwareID  Firmware=$hubitat.firmwareVersionString  UpTime (D:H:M:S)=$days:$hours:$mins:$seconds")   
+                      
         def devices=getDevices() 
         int deviceCount=devices.size()  
         diagData = appendData(diagData, " ")    
-        diagData = appendData(diagData, "YoLink Hub reported $deviceCount devices")
+        diagData = appendData(diagData, "YoLink Hub (Home ID: $state.homeID) reported $deviceCount devices:")
             
         def yodev = [] 
         def alldev = [] 
@@ -316,7 +325,7 @@ def finish() {
        
         def hubdev = []   
         children.each { 
-             def diag = "Device ${it.currentValue("devId", true)}=${it} v${it.currentValue("driver", true)} (Setup:${it.isSetup()}, Online:${it.currentValue("online", true)}, Firmware:${it.currentValue("firmware", true)})"  
+             def diag = "Device ${it.currentValue("devId", true)}=${it} v${it.currentValue("driver", true)} (Online:${it.currentValue("online", true)}, Firmware:${it.currentValue("firmware", true)}, Setup:${it.getSetup()})"  
              hubdev.add(diag)
              alldev.add(diag)
         } 
@@ -355,9 +364,12 @@ def finish() {
   } 
     
   if (diagnose == "True") {
-     section("") {	
-       paragraph "Diagnostic data has been collected. Copy and Paste the text into a PM message to the developer." 
-       paragraph "View the file at <a href=http://${location.hub.localIP}:8080/local/YoLink_Service_Diagnostics.txt target='_blank' rel='noopener noreferrer'>YoLink_Service_Diagnostics.txt</a>"
+     section("") {
+       paragraph boldTitle ("Diagnostic data has been collected")  
+       paragraph "Click on the link below to view the data. Select the data (Ctrl+A) and Copy it (Ctrl+C):"  
+       paragraph "View the data file at <a href=http://${location.hub.localIP}:8080/local/YoLink_Service_Diagnostics.txt target='_blank' rel='noopener noreferrer'>YoLink_Service_Diagnostics.txt</a>"
+       paragraph "Click on the link below to create a new email addressed to the developer at 'barcussoftware@gmail.com'. Open the email and press (Ctrl+V) to Paste the copied text. Add any additional information that might help diagnose the problem at the top of the email, such as log messages."
+       paragraph "Open a new email <a href='mailto:barcussoftware@gmail.com?subject=YoLink Service Diagnostics'>Create new email</a>"           
        }
   } else {
      section("") {	
@@ -818,7 +830,7 @@ def getDevices() {
 	}
     
     return state.deviceName
-}     
+}    
 
 def pollAPI(body, name=null, type=null){
     def rc=null	

@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Add driver for Water Depth Sensor\n- Add driver for Cellular Hub\n-Update service to support new drivers\n-Minor update to Leak Sensor3 driver\n",
+    "releaseNotes": "- BETA Release of Water Meter Controller device\n- Improve MQTT Message handling and Home ID processing\n- Improve Device Service diagnostics collection\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.19"
+            "version": "2.1.20"
         }
     ],
     "drivers": [
@@ -153,7 +153,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MQTT_Listener_Device.groovy",
             "required": true,
-            "version": "2.0.9"
+            "version": "2.0.10"
         },        
         {
             "id": "a248278d-ec49-4cdc-a616-2cdebb8c203f",
@@ -242,7 +242,14 @@
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/WaterDepthSensor_Device.groovy",
 	    "required": false,
 	    "version": "2.0.0"
-
+	  },
+	  {
+	    "id": "c355649a-8617-433c-9ef1-dc1e5c75f78e",
+	    "name": "YoLink WaterMeterController Device",
+	    "namespace": "srbarcus",
+	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/WaterMeterController_Device.groovy",
+	    "required": false,
+	    "version": "0.1.0"
 	  }
   ]
 }
