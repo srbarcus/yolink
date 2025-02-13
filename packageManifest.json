@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- BETA Release of Water Meter Controller device\n- Improve MQTT Message handling and Home ID processing\n- Improve Device Service diagnostics collection\n\n",
+    "releaseNotes": "- Fixed 'Cannot get property 'on' on null object...' error caused by receipt of non-compliant Relay state message.\n- Minor Relay driver code clean up.\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -89,7 +89,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
             "required": false,
-            "version": "2.0.5"
+            "version": "2.0.6"
         },
         {
             "id": "a49afcee-95fa-44a1-a858-91aafdfffcfc",

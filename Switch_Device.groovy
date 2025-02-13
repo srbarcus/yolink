@@ -30,11 +30,13 @@
  *  2.0.4: Updated driver version on poll
  *  2.0.5: Support "setDeviceToken()"
  *         - Update copyright
+ *  2.0.6: Fix error caused by missing delay data
+ *         - Minor code fixes
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.5"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -241,10 +243,9 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) {
-   def devId = object.deviceId  
    def swState = parent.relayState(object.data.state)       
-   def delay_on = object.data.delay.on
-   def delay_off = object.data.delay.off    
+   def delay_on = object.data?.delay?.on
+   def delay_off = object.data?.delay?.off    
    def power = object.data.power
    def watt = object.data.watt
    def firmware = object.data.version.toUpperCase()
@@ -252,7 +253,7 @@ def parseDevice(object) {
    def tzone = object.data.tz
    def rssi = object.data.loraInfo.signal         
     
-   logDebug("Parsed: DeviceId=$devId, Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Watt=$watt, Time=$time, Timezone=$tzone, Firmware=$firmware, RSSI=$rssi")      
+   logDebug("Parsed: Switch=$swState, Delay_on=$delay_on, Delay_off=$delay_off, Power=$power, Watt=$watt, Time=$time, Timezone=$tzone, Firmware=$firmware, RSSI=$rssi")      
                 
    rememberState("online", "true")
    rememberState("switch", swState)   
