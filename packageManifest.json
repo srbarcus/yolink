@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Fixed 'Cannot get property 'on' on null object...' error caused by receipt of non-compliant Relay state message.\n- Minor Relay driver code clean up.\n\n",
+    "releaseNotes": "- Added support for LockV2 Devices like Model YS7616-UC.\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.20"
+            "version": "2.1.21"
         }
     ],
     "drivers": [

@@ -55,13 +55,14 @@
  *  2.1.18: Retry busy device requests
  *  2.1.19: Support Cellular Hub (Model YS1605-UC)
  *  2.1.20: Improve diagnostics to return devices' Setup details
+ *  2.1.21: Support LockV2 Device (Model YS7616-UC)
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.20"}
+private def get_APP_VERSION() {return "2.1.21"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -645,6 +646,11 @@ private def delete_child_devices(delete=null) {
 }
 
 def getYoLinkDriverName(devtype) {
+    if (devtype == "LockV2") {	// For Model is YS7616-UC.
+       log.info "Changing device type 'LockV2' to 'Lock'"
+	   devtype = "Lock"
+	} 
+    
     def driver = "YoLink ${devtype} Device" 
     log.info "Driver name for type ${devtype} is '${driver}'"
     return driver
