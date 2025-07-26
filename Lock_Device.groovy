@@ -23,11 +23,12 @@
  *  2.0.4: Updated driver version on poll
  *  2.0.5: Support "setDeviceToken()"
  *         - Update copyright
+ *  2.0.6: Support for Lock V2 response
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.5"}
+def clientVersion() {return "2.0.6"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -195,18 +196,6 @@ def lock () {
    }         
 }
 
-def push() {
-   logDebug("Door bell rung")     
-   sendEvent(name:"doorbell", value: "true", isStateChange:true)                
-   sendEvent(name:"pushed", value: "1", isStateChange:true)
-   runIn(5,resetDoorbell) 
-}
-
-def resetDoorbell() {
-   logDebug("Door bell reset")     
-   sendEvent(name:"doorbell", value: "false", isStateChange:true)                
-}
-
 def unlock () {
   if (state.lock == "unlocked") { 
        lastResponse("Lock is already unlocked, request ignored")            
@@ -220,7 +209,19 @@ def unlock () {
          lastResponse("Error unlocking the lock")     
        }    
    }      
-}      
+}     
+
+def push() {
+   logDebug("Door bell rung")     
+   sendEvent(name:"doorbell", value: "true", isStateChange:true)                
+   sendEvent(name:"pushed", value: "1", isStateChange:true)
+   runIn(5,resetDoorbell) 
+}
+
+def resetDoorbell() {
+   logDebug("Door bell reset")     
+   sendEvent(name:"doorbell", value: "false", isStateChange:true)                
+}
 
 def getDevicestate() {
 	logDebug("getDevicestate() obtaining device state")
@@ -300,7 +301,14 @@ def getDevicestate() {
 }    
 
 def parseDevice(object) {
-   def lock = object.data.state
+   def lock 
+   try {
+          lock = object.data.state.lock
+          logDebug("Lock state type V2")
+        } catch (e) {	
+          lock = object.data.state
+		}
+    
    def battery = object.data.battery 
    def lockset = object.data.rlSet   
    def rssi = object.data.loraInfo.signal     
@@ -352,6 +360,7 @@ def parse(topic) {
 }
 
 def void processStateData(payload) {
+    def lock 
     rememberState("online","true") 
     rememberState("passwordError", "false") 
                    
@@ -398,7 +407,7 @@ def void processStateData(payload) {
 			break;     
             
         case "setState":
-            def lock = parent.relayState(object.data.state)   
+            lock = parent.relayState(object.data.state)   
             def rssi = object.data.loraInfo.signal   
             def source = object.data.source
     
@@ -410,7 +419,13 @@ def void processStateData(payload) {
 			break;  
             
         case "Alert":
-            def lock = object.data.state
+            try {
+                    lock = object.data.state.lock
+                    logDebug("Lock state type V2")
+                } catch (e) {	
+                    lock = object.data.state
+				}
+                
             def battery = object.data.battery        
             def alertType  = object.data.alertType
             def source = object.data.source   
@@ -473,7 +488,17 @@ def setLock(setState) {
                 def time = formatTimestamp(object.time) 
                 rememberState("eventTime",time)
                 
-                lock = object.data.state   
+                logDebug("state: ${object.data.state}") 
+
+                try {
+                    lock = object.data.state.lock
+                    logDebug("Lock state type V2")
+                } catch (e) {	
+                    lock = object.data.state
+				}
+                
+                logDebug("Lock currently: ${lock}") 
+                
                 def rssi = object.data.loraInfo.signal       
                 def source = object.data.source
                 logDebug("Parsed: Lock=$lock, RSSI=$rssi, Source=$source")
@@ -500,16 +525,14 @@ def setLock(setState) {
             return lock							
                 
 	    } else { 			               
-            logDebug("setSwitch() failed")	
-            state.lock = "unknown"
-            sendEvent(name:"switch", value: state.lock, isStateChange:true)
-            lastResponse("setSwitch() failed")     
+            logDebug("setState() failed")	
+            state.lock = "unknown"            
+            lastResponse("setState() failed")     
         }     		
 	} catch (e) {	
-        log.error "setSwitch() exception: $e"
+        log.error "setLock() exception: $e"
         lastResponse("Error ${e}")     
-        state.lock = "unknown"
-        sendEvent(name:"switch", value: state.lock, isStateChange:true)  
+        state.lock = "unknown"        
 	} 
 }  
 
