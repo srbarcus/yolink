@@ -3,7 +3,9 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Updated Lock Device driver for LockV2 Devices like Model YS7616-UC.\n\n",
+    "releaseNotes": "- Updated to allow various formats for name of created devices.\n
+    1.Change devices names from 'DeviceType-DeviceName' format to 'DeviceName-DeviceType' format
+    2 Suppress device type in device name,\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +17,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.21"
+            "version": "2.1.22"
         }
     ],
     "drivers": [

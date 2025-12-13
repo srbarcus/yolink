@@ -56,13 +56,14 @@
  *  2.1.19: Support Cellular Hub (Model YS1605-UC)
  *  2.1.20: Improve diagnostics to return devices' Setup details
  *  2.1.21: Support LockV2 Device (Model YS7616-UC)
+ *  2.1.22: Support changing name format from "devicetype-name" to "name=device-type", suppress device type
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.21"}
+private def get_APP_VERSION() {return "2.1.22"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -140,12 +141,16 @@ def credentials() {
 def otherSettings() {    
     if (!pollInterval){pollInterval = 5}
     if (!syncNames){syncNames = True}
+    if (!swapFormat){swapFormat = False}
+    if (!suppressType){suppressType = False}
     if (!removeDevices){removeDevices = True}
     dynamicPage(name: "otherSettings", title: pageTitle("Other Settings"), uninstall: false) {
         section() {
 			input "temperatureScale", "enum", title:boldTitle("Temperature Scale (Celsius or Fahrenheit)") + "</br>Scale used to report temperatures on newly defined devices. Can be overridden individually on each device definition.", required: true, options:["C","F"],defaultValue: "F"
 		    input "pollInterval", "enum", title:boldTitle("Device polling interval in minutes") + "</br>Interval at which devices are polled. Mostly used to determine if device is still online, but some devices may need to be polled to update their settings. 5 Minutes is the recommended interval.", required: true, options:[1,2,3,4,5,10,15,30], defaultValue: 5
             input "syncNames", "enum", title:boldTitle("Synchronize device names with YoLink Mobile app") + "</br>Forces devices to be renamed to match their name in the YoLink Mobile application. To synchronize the names, simply rerun this app from start to finish after renaming the device(s) in the YoLink mobile app.", required: true, options:["True","False"], defaultValue: "True"
+            input "swapFormat", "enum", title:boldTitle("Change devices names from 'DeviceType-DeviceName' format to 'DeviceName-DeviceType' format") + "</br>Forces devices to be named in the format selected. To change the name formats, simply rerun this app from start to finish after selecting True or False.", required: true, options:["True","False"], defaultValue: "False"
+            input "suppressType", "enum", title:boldTitle("Suppress device type in device name.") + "</br>Suppresses the addition of the YoLink device type as part of the device name. To change the name formats, simply rerun this app from start to finish after selecting True or False.", required: true, options:["True","False"], defaultValue: "False"
 			input "removeDevices", "enum", title:boldTitle("Remove associated Hubitat devices when this app is removed") + "</br>This is for advanced users only. Setting it to False will result in orphaned device definitions if the app is removed.", required: true, options:["True","False"], defaultValue: "True"
        	}
 	}
@@ -441,7 +446,19 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
     
     def failed = false
     
-    def labelName = "YoLink $devtype - ${devname}"
+    suppressType
+    if (suppressType == "True") {
+       yoLinkType = ""         
+    } else {
+       yoLinkType = "YoLink $devtype - ${devname}"         
+    }
+    
+    def labelName 
+    if (swapFormat == "True") {
+        labelName = "${devname}${yoLinkType}"
+    } else {
+       labelName = "${yoLinkType}${devname}"         
+    }    
 
 	if (!dev) {
 		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken, Driver = $drivername")
