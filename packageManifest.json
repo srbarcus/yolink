@@ -4,7 +4,7 @@
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
     "releaseNotes": "- Updated to allow various formats for name of created devices.\n
-    Fixes to renaming logic.\n
+    Fixes to renaming logic.\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -253,4 +253,5 @@
 	    "version": "0.1.0"
 	  }
   ]
+
 }
