@@ -57,13 +57,14 @@
  *  2.1.20: Improve diagnostics to return devices' Setup details
  *  2.1.21: Support LockV2 Device (Model YS7616-UC)
  *  2.1.22: Support changing name format from "devicetype-name" to "name=device-type", suppress device type
+ *  2.1.23: Correct 2.1.22 renaming
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.22"}
+private def get_APP_VERSION() {return "2.1.23"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -445,19 +446,22 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
 	def dev = allChildDevices.find {it.deviceNetworkId.contains(newdni)}	
     
     def failed = false
+    def labelName 
     
-    suppressType
     if (suppressType == "True") {
        yoLinkType = ""         
     } else {
-       yoLinkType = "YoLink $devtype - ${devname}"         
+        if (swapFormat == "True") {
+          yoLinkType = "-YoLink $devtype" 
+ 	    } else {
+          yoLinkType = "YoLink $devtype-"         
+    	}      
     }
     
-    def labelName 
     if (swapFormat == "True") {
         labelName = "${devname}${yoLinkType}"
     } else {
-       labelName = "${yoLinkType}${devname}"         
+        labelName = "${yoLinkType}${devname}"         
     }    
 
 	if (!dev) {
