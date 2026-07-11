@@ -3,12 +3,9 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Updated YoLink Device Service app to add option 'Enable MQTT error messages for undefined devices.' on first page.\n\n
-     By default messages: 'MQTT message...Failed passing to device driver' and\n
-	 'Unable to locate target device...Make sure the YoLink device has been defined via the YoLink Device Service app.' are suppressed.\n
-	 If already installed, run YoLink Device Service app until 'YoLink Access Credentials' page is shown.\n\n
-     - Remove error message 'Device name (Type=type) is offline'. Device already issues the same error message.\n"
-    "documentationLink": "https://github.com/srbarcus/yolink/wiki",
+    "releaseNotes": "- Updated YoLink Device Service app to add option 'Enable MQTT error messages for undefined devices.' on first page.\n
+	- Remove error message about device being offline."
+	"documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
         {
