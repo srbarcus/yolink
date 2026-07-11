@@ -58,13 +58,15 @@
  *  2.1.21: Support LockV2 Device (Model YS7616-UC)
  *  2.1.22: Support changing name format from "devicetype-name" to "name=device-type", suppress device type
  *  2.1.23: Correct 2.1.22 renaming
+ *  2.1.24: - Add option to suppress "Unable to locate target device" errors when receiving MQTT message for an undefined device.
+ *          - Remove warning: "Device '${name}' (Type=${type}) is offline"  
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.23"}
+private def get_APP_VERSION() {return "2.1.24"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -117,7 +119,8 @@ def about() {
             }    
 		}
         section("") {          
-			input "debugging", "enum", title:boldTitle("Enable Debugging"), required: true, options:["True","False"],defaultValue: "False"  
+			input "debugging", "enum", title:boldTitle("Enable Debugging"), required: true, options:["True","False"],defaultValue: "False"
+            input "mqtterrors", "enum", title:boldTitle("Enable MQTT error messages for undefined devices."), required: true, options:["True","False"],defaultValue: "False"
 		}  
 	}        
 }
@@ -639,9 +642,12 @@ def passMQTT(topic) {
         logDebug("Passing MQTT message ${topic} to device ${dev} (${dev.deviceNetworkId})")
         dev.parse(topic)
         return "${dev}"
-    } else {      
-        log.error "Unable to locate target device ${deviceDNI} for MQTT message ${topic}. Make sure the YoLink device has been defined via the YoLink Device Service app."
-        return null
+    } else {
+        if (mqtterrors == "True"){
+          log.error "Unable to locate target device ${deviceDNI} for MQTT message ${topic}. Make sure the YoLink device has been defined via the YoLink Device Service app."
+          return null   
+        }   
+        return "Undefined"         
     }    
 }
 
@@ -914,7 +920,7 @@ def pollAPI(body, name=null, type=null){
                     
                     case "000201": //Cannot connect to the device    
                     case "000203": //Cannot connect to the device
-                         log.warn "Device '${name}' (Type=${type}) is offline"  
+                         //log.warn "Device '${name}' (Type=${type}) is offline"  
                          rc = object
                          break;
                         
