@@ -3,8 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Updated YoLink Device Service app to add option 'Enable MQTT error messages for undefined devices.' on first page.\n
-	- Remove error message about device being offline."
+    "releaseNotes": "- Updated YoLink Device Service app to add option to suppress MQTT error messages for undefined devices\n- Remove error message about device being offline"
 	"documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
