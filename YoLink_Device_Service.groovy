@@ -59,14 +59,14 @@
  *  2.1.22: Support changing name format from "devicetype-name" to "name=device-type", suppress device type
  *  2.1.23: Correct 2.1.22 renaming
  *  2.1.24: - Add option to suppress "Unable to locate target device" errors when receiving MQTT message for an undefined device.
- *          - Remove warning: "Device '${name}' (Type=${type}) is offline"  
+ *  2.1.25: - Remove warning: "Device '${name}' (Type=${type}) is offline"  
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.24"}
+private def get_APP_VERSION() {return "2.1.25"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
