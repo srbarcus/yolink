@@ -3,8 +3,9 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Updated YoLink Device Service app to add option to suppress MQTT error messages for undefined devices\n- Remove error message about device being offline"
-	"documentationLink": "https://github.com/srbarcus/yolink/wiki",
+    "releaseNotes": "- Updated to allow various formats for name of created devices.\n
+    Fixes to renaming logic.\n
+    "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
         {
@@ -12,11 +13,10 @@
             "name": "YoLink™ Device Service",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_Device_Service.groovy",
-			"betaLocation":,
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.24"
+            "version": "2.1.23"
         }
     ],
     "drivers": [
@@ -25,8 +25,6 @@
             "name": "YoLink Hub Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Hub_Device.groovy",
-			"betaLocation":,
-			
             "required": true,
             "version": "2.0.5"
         },
@@ -35,7 +33,6 @@
             "name": "YoLink SpeakerHub Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SpeakerHub_Device.groovy",
-			"betaLocation":,
             "required": true,
             "version": "2.0.8"
         },
@@ -44,7 +41,6 @@
             "name": "YoLink COSmokeSensor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/COSmokeSensor_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.5"
         },
@@ -53,16 +49,14 @@
             "name": "YoLink DoorSensor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/DoorSensor_Device.groovy",
-			"betaLocation":,
             "required": false,
-            "version": "2.1.3"
+          "version": "2.1.3"
         },
         {
             "id": "8d22ba39-b6ea-4740-9f60-b6d56254d5c4",
             "name": "YoLink Manipulator Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Manipulator_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.9"
         },
@@ -71,7 +65,6 @@
             "name": "YoLink MotionSensor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MotionSensor_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.6"
         },
@@ -80,7 +73,6 @@
             "name": "YoLink Outlet Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Outlet_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.7"
         },
@@ -89,7 +81,6 @@
             "name": "YoLink SmartRemoter Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SmartRemoter_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.9"
         },
@@ -98,7 +89,6 @@
             "name": "YoLink Switch Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Switch_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.6"
         },
@@ -107,7 +97,6 @@
             "name": "YoLink MultiOutlet Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MultiOutlet_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.1.7"
         },
@@ -116,7 +105,6 @@
             "name": "YoLink Siren Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Siren_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.7"
         },
@@ -125,7 +113,6 @@
             "name": "YoLink Temperature Sensor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Temperature_Sensor_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.8"
         },
@@ -134,7 +121,6 @@
             "name": "YoLink THSensor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/THSensor_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.9"
         },
@@ -143,7 +129,6 @@
             "name": "YoLink LeakSensor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.7"
         },
@@ -152,7 +137,6 @@
             "name": "YoLink VibrationSensor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/VibrationSensor_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.6"
         },
@@ -161,7 +145,6 @@
             "name": "YoLink GarageDoor Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/GarageDoor_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "2.0.12"
         },
@@ -170,7 +153,6 @@
             "name": "YoLink MQTT Listener Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MQTT_Listener_Device.groovy",
-			"betaLocation":,
             "required": true,
             "version": "2.0.11"
         },        
@@ -179,7 +161,6 @@
             "name": "YoLink Smart Outdoor Plug Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Smart_Outdoor_Plug_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "1.0.6"
         },
@@ -188,7 +169,6 @@
             "name": "YoLink Finger Device",
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
-			"betaLocation":,
             "required": false,
             "version": "1.1.3"
         },
@@ -197,7 +177,6 @@
 	    "name": "YoLink Lock Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Lock_Device.groovy",
-		"betaLocation":,
 	    "required": false,
 	    "version": "2.0.6"
 	},
@@ -206,7 +185,6 @@
 	    "name": "YoLink Sprinkler Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Sprinkler_Device.groovy",
-		"betaLocation":,
 	    "required": false,
 	    "version": "2.0.5"
 	},
@@ -215,17 +193,15 @@
 	    "name": "YoLink Thermostat Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Thermostat_Device.groovy",
-		"betaLocation":,
 	    "required": false,
 	    "version": "2.0.5"
 	 },
 	 {
 	    "id": "61ada6dd-d14e-48d9-a3ac-260930815745",
 	    "name": "YoLink Dimmer Device",
-        "namespace": "srbarcus",
-        "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Dimmer_Device.groovy",
-		"betaLocation":,
-        "required": false,
+            "namespace": "srbarcus",
+            "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Dimmer_Device.groovy",
+            "required": false,
             "version": "2.0.5"
 	 },
 	 {
@@ -233,7 +209,6 @@
 	    "name": "YoLink LeakSensor3 Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/LeakSensor3_Device.groovy",
-		"betaLocation":,
 	    "required": false,
 	    "version": "2.0.5"
 	 },
@@ -242,7 +217,6 @@
 	    "name": "YoLink Outlet",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/YoLink_Outlet.groovy",
-		"betaLocation":, 
 	    "required": true,
 	    "version": "2.0.4"
 	 },
@@ -251,7 +225,6 @@
 	    "name": "YoLink Power Failure Alarm Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Power_Failure_Alarm_Device.groovy",
-		"betaLocation":, 
 	    "required": false,
 	    "version": "2.0.1"
          },
@@ -260,7 +233,6 @@
 	    "name": "YoLink CellularHub Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/CellularHub_Device.groovy",
-	    "betaLocation":,
 	    "required": false,
 	    "version": "2.0.0"
 	  },
@@ -269,7 +241,6 @@
 	    "name": "YoLink WaterDepthSensor Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/WaterDepthSensor_Device.groovy",
-		"betaLocation":,  
 	    "required": false,
 	    "version": "2.0.0"
 	  },
@@ -278,7 +249,6 @@
 	    "name": "YoLink WaterMeterController Device",
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/WaterMeterController_Device.groovy",
-	    "betaLocation":,
 	    "required": false,
 	    "version": "0.1.0"
 	  }
