@@ -214,13 +214,14 @@ def diagnostics() {
     log.info "$devicesCount devices were selected"
     
     if (devicesCount > 0 ) {
-    	exposed.each { dni ->   
+    	exposed.each { dni ->
        		def devname = state.deviceName."${dni}"
        		def devtype = state.deviceType."${dni}"
        		def devtoken = state.deviceToken."${dni}"
        		def devId = state.deviceId."${dni}"
        		def devModel = state.modelName."${dni}"
-       		def Hubitat_dni = "yolink_${devtype}_${dni}"
+       	    def Hubitat_dni = "yolink_${devtype}_${dni}"
+            
        		Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId, devModel)
        		if (Hubitat_dni != null) {
           		Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)
@@ -428,7 +429,7 @@ def uninstalled() {
     }   
 }
 
-private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) { 	
+private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId,devModel) { 	
     def drivername = devtype
         
     if (devtype == "THSensor") {
@@ -471,7 +472,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
     }    
 
 	if (!dev) {
-		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken, Driver = $drivername")
+		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken, Driver = $drivername, Model = $devModel")
         
         try {
            dev = addChildDevice("srbarcus", drivername, newdni, null, [label:"${labelName}"])
@@ -540,7 +541,8 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
     
     try {                                                                                   //Not all devices support model specification yet.
         dev.ServiceSetup(newdni,state.homeID,labelName,devtype,devtoken,devId,devModel) 	// Initial setup of the Child Device. Pass model if driver is accepting it.
-	} catch (Exception e) {                 
+	} catch (Exception e) {           
+        logDebug("Device does not support Device Model in setup.")
         dev.ServiceSetup(newdni,state.homeID,labelName,devtype,devtoken,devId) 	            // Initial setup of the Child Device   
     }   
       
