@@ -60,13 +60,15 @@
  *  2.1.23: Correct 2.1.22 renaming
  *  2.1.24: - Add option to suppress "Unable to locate target device" errors when receiving MQTT message for an undefined device.
  *  2.1.25: - Remove warning: "Device '${name}' (Type=${type}) is offline"  
+ *  2.1.26: - Correct problem with device renames not propagating to device.
+ *  2.1.27: - Added 'menu: "Integrations",' to device definition.
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.25"}
+private def get_APP_VERSION() {return "2.1.27"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -77,6 +79,7 @@ definition(
     description: "Connects your YoLink™ devices to Hubitat.",
     oauth: false,    
     category: "YoLink",
+    menu: "Integrations",         // new in platform 2.5.0 (Integrations, Automations, or Apps)  
     singleInstance: true,
     iconUrl: "${getImagePath()}yolink.png",
     iconX2Url: "${getImagePath()}yolink.png",
@@ -216,9 +219,9 @@ def diagnostics() {
        		def devtype = state.deviceType."${dni}"
        		def devtoken = state.deviceToken."${dni}"
        		def devId = state.deviceId."${dni}"
-       		def devmodel = state.modelName."${dni}"
+       		def devModel = state.modelName."${dni}"
        		def Hubitat_dni = "yolink_${devtype}_${dni}"
-       		Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
+       		Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId, devModel)
        		if (Hubitat_dni != null) {
           		Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)
           		countNewChildDevices++     
@@ -513,16 +516,6 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
         } finally {
             if (failed) {return null}
         }    
-            
-        logDebug("Calling child device setup: $newdni, $state.homeID, $devname, $devtype, $devtoken, $devId")
-        dev.ServiceSetup(newdni,state.homeID,devname,devtype,devtoken,devId) 	// Initial setup of the Child Device   
-        logDebug("Syncing temperature scale on device ${dev}")
-        try {                                                //Not all devices support temperature
-            dev.temperatureScale(settings.temperatureScale)  
-	    } catch (Exception e) {                 
-            logDebug("Temperature scale not supported on device ${dev}")                  
-        }   
-		logDebug("Setup of ${dev.displayName} with id $newdni has been completed")            
 	   
 	} else {
 		log.info "Child device ${dev.displayName} already exists with id $newdni, new device not created"
@@ -541,7 +534,23 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId) {
               log.warn "Device '${currentName}' was renamed in the YoLink mobile app to '${labelName}', but name synchronizing is set to 'False'. Device was not renamed on Hubitat."
             }
         }
-	}
+  	}
+    
+    logDebug("Calling child device setup: $newdni, $state.homeID, $labelName, $devtype, $devtoken, $devId, $devModel")
+    
+    try {                                                                                   //Not all devices support model specification yet.
+        dev.ServiceSetup(newdni,state.homeID,labelName,devtype,devtoken,devId,devModel) 	// Initial setup of the Child Device. Pass model if driver is accepting it.
+	} catch (Exception e) {                 
+        dev.ServiceSetup(newdni,state.homeID,labelName,devtype,devtoken,devId) 	            // Initial setup of the Child Device   
+    }   
+      
+    logDebug("Syncing temperature scale on device ${dev}")
+    try {                                                //Not all devices support temperature
+        dev.temperatureScale(settings.temperatureScale)  
+	} catch (Exception e) {                 
+        logDebug("Temperature scale not supported on device ${dev}")                  
+    }   
+	logDebug("Setup of ${dev.displayName} with id $newdni has been completed")  
     
     if ((dev) && (devtype == "MQTT Listener")) {
            log.info "Initializing MQTT Listener Device"

@@ -35,6 +35,7 @@
  *  1.1.2: Added garage door timeout command and setting state to 'unknown'
  *  1.1.3: Add option to ignore garage state for open and close, corrected sensor interaction
  *  1.1.4: Added  showInterimState command to suppress "opening" and "closing"
+ *  1.1.5: Added "Switch" capability. Fix "ignoreDoorState" and "showInterimState".
  */
 
 import groovy.json.JsonSlurper
@@ -42,7 +43,7 @@ import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-def clientVersion() {return "1.1.4"}
+def clientVersion() {return "1.1.5"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -60,16 +61,18 @@ metadata {
         capability "GarageDoorControl"
         capability "SignalStrength"   
         capability "Battery"
+        capability "Switch"  //switch - ENUM ["on", "off"] Commands: off() on()
                                       
+        command "switchDelay", [[name:"switchDelay",type:"NUMBER", description:"Time in milliseconds to allow finger to cycle between setting switch on and off. Must be between 1,000 (1 seconds) and 30,000 (30 seconds). Default=1,500 milliseconds"]]
         command "debug", [[name:"debug",type:"ENUM", description:"Display debugging messages", constraints:["true", "false"]]] 
         command "reset"     
-        command "scan"    
+        command "scanForSensors"     
         command "timestampFormat", [[name:"timestampFormat",type:"STRING", description:"Formatting template for event timestamp values. See Preferences below for details."]] 
         command "bind", [[name:"bind",type:"STRING", description:"Device ID (devId) of Garage Door Sensor to be bound to this controller. See 'sensors' under 'State Variables' below and copy & paste a Sensor here."]] 
         command "unbind"
         command "doorTimeout", [[name:"doortimeout",type:"NUMBER", description:"Time in seconds to allow for door to open or close before changing door state to 'unknown'. Must be between 15 and 120. Default=45 seconds"]]
-        command "ignoreDoorState", [[name:"debug",type:"ENUM", description:"Always toggle controller regardless of indicated door state", constraints:["true", "false"]]]
-        command "showInterimState", [[name:"debug",type:"ENUM", description:"Display 'opening' and 'closing' door states.", constraints:["true", "false"]]]
+        command "ignoreDoorState", [[name:"ignoreDoorState",type:"ENUM", description:"Always toggle controller regardless of indicated door state", constraints:["true", "false"]]]
+        command "showInterimState", [[name:"showInterimState",type:"ENUM", description:"Display 'opening' and 'closing' door states.", constraints:["true", "false"]]]
        
         attribute "online", "String"
         attribute "devId", "String"
@@ -83,12 +86,15 @@ metadata {
         attribute "ignoreDoorState", "Boolean"
         attribute "showInterimState", "Boolean"
         
+        attribute "switch", "String"
+        attribute "switchDelay", "Number"
+        
         attribute "bound_battery", "String"
+        attribute "bound_name", "String"
         attribute "bound_firmware", "String"
         attribute "bound_signal", "String"
         }
  }
-
 
 void setDeviceToken(token) {
     if (state.token != token) { 
@@ -156,7 +162,7 @@ def pollDevice(delay) {
 def temperatureScale(value) {}
 
 def open() {
-   toggle("open")
+   toggle("open")    
 }
 
 def close() {
@@ -164,7 +170,22 @@ def close() {
 }
 
 def push() {
-   toggle("push")
+   on()
+}
+
+def on() {
+   rememberState("switch","on")
+   logDebug("Switch set on")
+   toggle("open")
+   def delay = state.switchDelay
+   pauseExecution(delay) 
+   rememberState("switch","off")
+   logDebug("Switch set off") 
+}
+
+def off() {
+   rememberState("switch","off")
+   logDebug("Switch set off") 
 }
 
 def toggle(func) {
@@ -173,10 +194,6 @@ def toggle(func) {
    boolean interimState = (state."showInterimState" != "false")  
     
    logDebug("toggle(${func}): Door " + currentState + ", IgnoreDoorState = $ignoreDoor") 
-   if (!boundToDevice()) { 
-     rememberState("door","not bound")
-     rememberState("contact","not bound")   
-   }   
     
    switch(func) {
       case "open":
@@ -227,7 +244,7 @@ def toggle(func) {
    }      
     
    def request = [:]    
-   request.put("method", "${state.type}.toggle")   
+   request.put("method", "${state.type}.toggle")
    request.put("targetDevice", "${state.devId}") 
    request.put("token", "${state.token}")       
  
@@ -260,7 +277,6 @@ def toggle(func) {
                    if (boundToDevice()) {checkDoorState()} 
                }
             }                     
-                                        
             return
                 
 	    } else { 			               
@@ -326,7 +342,7 @@ def refreshSensor() {
     }    
 }
 
-def scan() {
+def scanForSensors() {
   def myid = "YoLink " + state.type + " - " + state.name   
     
   def devices=parent.getChildDevices()
@@ -433,14 +449,14 @@ def bind(sensorid) {
       type = setup.type
       token = setup.token
       devId = setup.devId
-            
-      state.bound_dni = my_dni  
-      state.bound_homeID = homeID
-      state.bound_name = name
-      state.bound_type = type
-      state.bound_token = token
-      state.bound_devId = devId
-    
+      
+      rememberState("bound_dni",my_dni)
+      rememberState("bound_homeID",homeID)
+      rememberState("bound_name",name)
+      rememberState("bound_type",type)
+      rememberState("bound_token",token)
+      rememberState("bound_devId",devId)            
+      
       dev.bind(state.my_dni,state.name)      
       
       logDebug("Bound Device: dni=${my_dni}, Home ID=${homeID}, Name=${name}, Type=${type}, Token=${token}, Device Id=${devId})")
@@ -464,22 +480,24 @@ def unbind() {
     } else {
         dev.bind(null,null)
     }    
+   
+    def boundTo = state.bound_name
+       
+    rememberState("bound_battery","")
+    rememberState("bound_firmware","")
+    rememberState("bound_signal","")
     
-    lastResponse("Unbound from contact sensor: ${state.bound_name}") 
-    
-    state.remove("bound_dni")  
-    state.remove("bound_homeID")  
-    state.remove("bound_name")  
-    state.remove("bound_type")  
-    state.remove("bound_token")  
-    state.remove("bound_devId") 
-    state.remove("bound_battery")  
-    state.remove("bound_firmware")
-    state.remove("bound_signal") 
-    state.remove("contact")
+    rememberState("bound_devId","")
+    rememberState("bound_dni","")
+    rememberState("bound_homeID","")
+    rememberState("bound_name","")
+    rememberState("bound_token","")
+    rememberState("bound_type","")
     
     rememberState("door","not bound")
     rememberState("contact","not bound") 
+    
+    lastResponse("Unbound from contact sensor: ${boundTo}") 
 }
 
 def setControllerState(contact,battery,firmware,signal,stateChangedAt) {
@@ -556,6 +574,19 @@ def timestampFormat(value) {
      } 
  }
 
+def switchDelay(value) {
+    value = value ?: 1500 // No value, reset to default
+    if ((value < 1000) || (value > 30000)) {
+      log.error "Switch delay of '${value}' is invalid. Value must be between 1000 and 30000." 
+      lastResponse("Switch delay of '${value}' is invalid. Value must be between 1000 and 30000.")
+      return  
+    }    
+
+    rememberState("switchDelay",value)
+    logDebug("Switch delay set to '${value}'") 
+    lastResponse("Switch delay set to '${value}'")  
+ }
+
 def doorTimeout(value) {
     value = value ?: 45 // No value, reset to default
     if ((value < 15) || (value > 120)) {
@@ -617,11 +648,14 @@ def reset(){
     state.remove("sensors")
     state.remove("battery")
     state.remove("doorTimeout")
+    state.remove("switchDelay")
     state.remove("ignoreDoorState")
+    state.remove("showInterimState")
     
     state.timestampFormat = "MM/dd/yyyy hh:mm:ss a" 
     
     rememberState("doorTimeout",45)
+    rememberState("switchDelay",1500)
     rememberState("ignoreDoorState",false)
     rememberState("showInterimState",true)
     
@@ -643,7 +677,7 @@ def lastResponse(value) {
 def rememberState(name,value,unit=null) {
    def curValue = state."$name"
     
-   logDebug("-->rememberState() name='${name}', value='${value}', Unit='${unit}'. Current state:'" +  curValue + "'")  
+   //logDebug("-->rememberState() name='${name}', value='${value}', Unit='${unit}'. Current state:'" +  curValue + "'")  
           
    if (curValue.toString() != value.toString()) {
      state."$name" = value  
@@ -653,7 +687,7 @@ def rememberState(name,value,unit=null) {
         device.updateDataValue("door", value) 
      }
          
-     logDebug("<>rememberState() Sending Event(name='${name}, value='${value}')")    
+     //logDebug("<>rememberState() Sending Event(name='${name}, value='${value}')")    
        
      if (unit==null) {  
          device.sendEvent(name:"$name", value: "$value", isStateChange:true)
@@ -662,7 +696,7 @@ def rememberState(name,value,unit=null) {
      }           
    }  
        
-   logDebug("<--rememberState() Result:'${name}' = '" + state."$name" + "'")  
+   //logDebug("<--rememberState() Result:'${name}' = '" + state."$name" + "'")  
 }   
 
 def successful(object) {

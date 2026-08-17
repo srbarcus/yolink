@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "- Suppress MQTT errors and redundant offline device warnings.\n\n",
+    "releaseNotes": "YoLink Device Service - As of Hubitat platform 2.5.0 there are three Hubitat menus (Integrations, Automations, and Apps).\nThe 'YoLink Device Service' is being moving from 'Apps' to 'Integrations' to better reflect its functionality.\n\nYoLink Finger Device - Added 'Switch' functionality and 'Switch Delay' setting.\n- Fixed 'Ignore Door State' and 'Show Interim State' settings.\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.25"
+            "version": "2.1.27"
         }
     ],
     "drivers": [
@@ -154,7 +154,7 @@
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/MQTT_Listener_Device.groovy",
             "required": true,
             "version": "2.0.11"
-        },        
+        },
         {
             "id": "a248278d-ec49-4cdc-a616-2cdebb8c203f",
             "name": "YoLink Smart Outdoor Plug Device",
@@ -169,7 +169,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
-            "version": "1.1.3"
+            "version": "1.1.4"
         },
 	{
 	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",
@@ -254,5 +254,3 @@
   ]
 
 }
-
-
