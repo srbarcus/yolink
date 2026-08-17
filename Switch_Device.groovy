@@ -91,8 +91,7 @@ void setDeviceToken(token) {
       logDebug("Device token remains set to '${state.token}'")
     }    
  }
-
-void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {  
+void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId,devModel=null) {
     state.debug = false
     
     state.my_dni = Hubitat_dni      
