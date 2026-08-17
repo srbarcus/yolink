@@ -234,8 +234,9 @@ def diagnostics() {
     	def devtype = "MQTT Listener"
     	def devtoken = state.UAID.plus("MQTT1")
     	def devId = state.UAID.plus("MQTT1")    
+        def devModel = "(Internal)"
     	def Hubitat_dni = "yolink_${devtype}_${devId}"
-    	Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId)
+    	Hubitat_dni = create_yolink_device(Hubitat_dni, devname, devtype, devtoken, devId, devModel)
     	if (Hubitat_dni != null) {Keep_Hubitat_dni = Keep_Hubitat_dni.plus(Hubitat_dni)}  
     }    
        
