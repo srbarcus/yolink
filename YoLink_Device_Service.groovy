@@ -62,13 +62,14 @@
  *  2.1.25: - Remove warning: "Device '${name}' (Type=${type}) is offline"  
  *  2.1.26: - Correct problem with device renames not propagating to device.
  *  2.1.27: - Added 'menu: "Integrations",' to device definition.
+ *  2.1.28: - Fix ServiceSetup() errors.
  */
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-private def get_APP_VERSION() {return "2.1.27"}
+private def get_APP_VERSION() {return "2.1.28"}
 private def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 private def get_APP_NAME() {return "YoLink™ Device Service"}
 
@@ -473,7 +474,7 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId,devModel
     }    
 
 	if (!dev) {
-		logDebug("Creating child device named ${devname} with id $newdni, Type = $devtype,  Device Token = $devtoken, Driver = $drivername, Model = $devModel")
+		log.info "Creating child device named ${devname} with id $newdni, Type=$devtype,  Device Token=$devtoken, Driver=$drivername, Model=$devModel"
         
         try {
            dev = addChildDevice("srbarcus", drivername, newdni, null, [label:"${labelName}"])
@@ -539,13 +540,18 @@ private create_yolink_device(Hubitat_dni,devname,devtype,devtoken,devId,devModel
   	}
     
     logDebug("Calling child device setup: $newdni, $state.homeID, $labelName, $devtype, $devtoken, $devId, $devModel")
+    dev.ServiceSetup(newdni,state.homeID,labelName,devtype,devtoken,devId) 	            // Initial setup of the Child Device 
     
+    /*
     try {                                                                                   //Not all devices support model specification yet.
         dev.ServiceSetup(newdni,state.homeID,labelName,devtype,devtoken,devId,devModel) 	// Initial setup of the Child Device. Pass model if driver is accepting it.
+        log.info "Device setup complete"
 	} catch (Exception e) {           
-        logDebug("Device does not support Device Model in setup.")
+        log.warn "Device does not support Device Model in setup."
+        log.info "Device setup complete"
         dev.ServiceSetup(newdni,state.homeID,labelName,devtype,devtoken,devId) 	            // Initial setup of the Child Device   
-    }   
+    }
+    */  
       
     logDebug("Syncing temperature scale on device ${dev}")
     try {                                                //Not all devices support temperature

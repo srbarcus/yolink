@@ -32,11 +32,12 @@
  *         - Update copyright
  *  2.0.8: Support "SpeechSynthesis" capability
  *         - Support "Notification" capability 
+ *  2.0.9: Suppress errors in reset() caused by device being offline.
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "2.0.8"}
+def clientVersion() {return "2.0.9"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -661,13 +662,15 @@ def reset(setup = false){
         state.voiceResults=false
     }
 
-    unmute()
-    setVolume(5)    
-    Repeat(0)
-    DisableBeep()
-    DisableVoiceResults()
-       
-    poll(true)    
+    poll(true)
+    
+    if (state.online == true) {
+    	unmute()
+    	setVolume(5)    
+    	Repeat(0)
+    	DisableBeep()
+    	DisableVoiceResults()
+    }
 
     if (setup == false) {
         Announce("Speaker hub reset complete.",null)      

@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "YoLink Device Service - As of Hubitat platform 2.5.0 there are three Hubitat menus (Integrations, Automations, and Apps).\nThe 'YoLink Device Service' is being moving from 'Apps' to 'Integrations' to better reflect its functionality.\n\nYoLink Finger Device - Added 'Switch' functionality and 'Switch Delay' setting.\n- Fixed 'Ignore Door State' and 'Show Interim State' settings.\n\n",
+    "releaseNotes": "YoLink Device Service - As of Hubitat platform 2.5.0 there are three Hubitat menus (Integrations, Automations, and Apps).\nThe 'YoLink Device Service' is being moving from 'Apps' to 'Integrations' to better reflect its functionality.\n- Fix ServiceSetup() errors.\n\nFinger Device - Added 'Switch' functionality and 'Switch Delay' setting.\n- Fixed 'Ignore Door State' and 'Show Interim State' settings.\n- Fixed errors during device reset.\n\nSpeakerHub Device - Suppress errors during device reset caused by the device being offline.\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -15,7 +15,7 @@
             "required": true,
             "oauth": false,
             "primary": true,
-            "version": "2.1.27"
+            "version": "2.1.28"
         }
     ],
     "drivers": [
@@ -33,7 +33,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/SpeakerHub_Device.groovy",
             "required": true,
-            "version": "2.0.8"
+            "version": "2.0.9"
         },
         {
             "id": "d353c8a6-55f0-44bb-b3cb-135d7dbaac23",
@@ -169,7 +169,7 @@
             "namespace": "srbarcus",
             "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/Finger_Device.groovy",
             "required": false,
-            "version": "1.1.4"
+            "version": "1.1.6"
         },
 	{
 	    "id": "835bb38b-22fe-44ef-9c4b-fa66fe23c82d",

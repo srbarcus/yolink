@@ -36,6 +36,7 @@
  *  1.1.3: Add option to ignore garage state for open and close, corrected sensor interaction
  *  1.1.4: Added  showInterimState command to suppress "opening" and "closing"
  *  1.1.5: Added "Switch" capability. Fix "ignoreDoorState" and "showInterimState".
+ *  1.1.6: Fix scan() error in reset(). Changed to scanForSensors().
  */
 
 import groovy.json.JsonSlurper
@@ -43,7 +44,7 @@ import groovy.json.JsonOutput
 import java.net.URLEncoder
 import groovy.transform.Field
 
-def clientVersion() {return "1.1.5"}
+def clientVersion() {return "1.1.6"}
 def copyright() {return "<br>© 2022-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -659,7 +660,7 @@ def reset(){
     rememberState("ignoreDoorState",false)
     rememberState("showInterimState",true)
     
-    scan()
+    scanForSensors()
     
     rememberState("door","unknown")
     rememberState("contact","unknown")
