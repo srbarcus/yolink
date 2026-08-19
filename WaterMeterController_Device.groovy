@@ -16,11 +16,12 @@
  *  0.0.0: ALPHA release
  *  0.0.1: ALPHA release - Added "Report" message processing
  *  0.1.0: BETA release - Cleaned up code
+ *  0.1.1: Fixed errors caused by 'StatusChange' and 'Alert' events.
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "0.1.0"}
+def clientVersion() {return "0.1.1"}
 def copyright() {return "<br>© 2025-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -505,14 +506,60 @@ def void processStateData(payload) {
             "timeZone(${timeZone})"
             )                  
                             
-            break;      
+            break;
             
+        case "Alert":             
+        case "StatusChange": 
+    	    def valve = object.data.state.valve                                  //Valve state, ["close","open"]            
+     	    def openReminderAlarm = object.data.alarm.openReminder               //Open remind alarm, Boolean
+           	def leak = object.data.alarm.leak                                    //Leak alarm, Boolean
+           	def amountOverrun = object.data.alarm.amountOverrun                  //Amount overrun alarm, Boolean
+            def durationOverrun = object.data.alarm.durationOverrun              //Duration overrun alarm, Boolean
+   	        def valveError = object.data.alarm.valveError                        //Valve error alarm, Boolean
+       	    def reminder = object.data.alarm.reminder                            //Remind repeat, Boolean
+           	def freezeError = object.data.alarm.freezeError                      //Freeze alarm, Boolean
+            def battery = parent.batterylevel(object.data.state.battery)         //Level of device's battery, 0 to 4 means empty to full 
+   	        def powerSupply = object.data.powerSupply                            //Power supply, ["battery","PowerLine"]
+       	    def openReminder = object.data.attributes.openReminder  
            
-	default:
+            def rssi = object.data.loraInfo.signal
+   	        fmtSignal(rssi)  
+
+       	    rememberState("valve", valve)
+           	rememberState("openReminderAlarm", openReminderAlarm)
+            rememberState("leak", leak)
+   	        rememberState("amountOverrun", amountOverrun)
+       	    rememberState("durationOverrun", durationOverrun)
+           	rememberState("valveError", valveError)
+            rememberState("reminder", reminder)
+   	        rememberState("freezeError", freezeError)
+       	    rememberState("battery", battery)
+           	rememberState("powerSupply", powerSupply)
+            rememberState("openReminder", openReminder)            
+   	        rememberState("timeZone", timeZone)
+                  
+       	    logDebug("processStateData() Parsed: " +
+           	"valve(${valve}), " +
+            "openReminder(${openReminder}), " +
+   	        "leak(${leak}), " +
+       	    "amountOverrun(${amountOverrun}), " +
+           	"durationOverrun(${durationOverrun}), " +
+            "valveError(${valveError}), " +
+   	        "reminder(${reminder}), " +
+       	    "freezeError(${freezeError}), " +
+           	"battery(${battery}), " +
+            "powerSupply(${powerSupply}), " +
+   	        "openReminder(${openReminder}), " +
+       	    "rssi(${rssi})"
+           	)                  
+            
+        	break;  
+           
+		default:
             log.error "Unknown event received: $event"
             log.error "Message received: ${payload}"
 			break;
-	}				
+		}				
     }
 }
 

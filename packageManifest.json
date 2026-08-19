@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "YoLink Device Service - As of Hubitat platform 2.5.0 there are three Hubitat menus (Integrations, Automations, and Apps).\nThe 'YoLink Device Service' is being moving from 'Apps' to 'Integrations' to better reflect its functionality.\n- Fix ServiceSetup() errors.\n\nFinger Device - Added 'Switch' functionality and 'Switch Delay' setting.\n- Fixed 'Ignore Door State' and 'Show Interim State' settings.\n- Fixed errors during device reset.\n\nSpeakerHub Device - Suppress errors during device reset caused by the device being offline.\n\n",
+    "releaseNotes": "Water Meter Controller - Fix errors caused by 'StatusChange' and 'Alert' events.\n\n"YoLink Device Service - As of Hubitat platform 2.5.0 there are three Hubitat menus (Integrations, Automations, and Apps).\nThe 'YoLink Device Service' is being moving from 'Apps' to 'Integrations' to better reflect its functionality.\n- Fix ServiceSetup() errors.\n\nFinger Device - Added 'Switch' functionality and 'Switch Delay' setting.\n- Fixed 'Ignore Door State' and 'Show Interim State' settings.\n- Fixed errors during device reset.\n\nSpeakerHub Device - Suppress errors during device reset caused by the device being offline.\n\n,
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
@@ -249,7 +249,7 @@
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/WaterMeterController_Device.groovy",
 	    "required": false,
-	    "version": "0.1.0"
+	    "version": "0.1.1"
 	  }
   ]
 
