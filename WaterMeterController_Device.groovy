@@ -17,11 +17,12 @@
  *  0.0.1: ALPHA release - Added "Report" message processing
  *  0.1.0: BETA release - Cleaned up code
  *  0.1.1: Fixed errors caused by 'StatusChange' and 'Alert' events.
+ *  0.1.2: Fixed errors caused by 'getState' event.
  */
 
 import groovy.json.JsonSlurper
 
-def clientVersion() {return "0.1.1"}
+def clientVersion() {return "0.1.2"}
 def copyright() {return "<br>© 2025-" + new Date().format("yyyy") + " Steven Barcus. All rights reserved."}
 def bold(text) {return "<strong>$text</strong>"}
 
@@ -415,6 +416,7 @@ def void processStateData(payload) {
         logDebug("Received Message Type: ${event} for: $name")        
         
         switch(event) {
+        case "getState": 
         case "Report": 
             def valve = object.data.state.valve                                  //Valve state, ["close","open"]
             def meter = object.data.state.meter                                  //Meter reading, Integer
@@ -434,6 +436,9 @@ def void processStateData(payload) {
             def meterStepFactor = object.data.attributes.meterStepFactor         //Meter measurement accuracy, Integer
             def leakLimit = object.data.attributes.leakLimit                     //Leak limit in meter unit, Float
             def leakPlan = object.data.attributes.leakPlan                       //Leak plan mode, ["on","off","schedule"]
+            def autoCloseValve = object.data.attributes.autoCloseValve
+            def overrunAmountACV = object.data.attributes.overrunAmountACV       //Overrun amount auto close valve, Boolean
+            def overrunDurationACV = object.data.attributes.overrunDurationACV   //Overrun duration auto close valve, Boolean
             def overrunAmount = object.data.attributes.overrunAmount             //Overrun amount in meter unit, Float
             def overrunDuration = object.data.attributes.overrunDuration         //Overrun duration in minute, Integer
             def amount = object.data.recentUsage.amount                          //Recent usage in meter unit, Integer

@@ -249,7 +249,7 @@
 	    "namespace": "srbarcus",
 	    "location": "https://raw.githubusercontent.com/srbarcus/YoLink/master/WaterMeterController_Device.groovy",
 	    "required": false,
-	    "version": "0.1.1"
+	    "version": "0.1.2"
 	  }
   ]
 
