@@ -3,7 +3,7 @@
     "author": "Steven Barcus",
     "minimumHEVersion": "2.2.9",
     "dateReleased": "2022-07-17",
-    "releaseNotes": "YoLink Device Service - Add Device Model information to 'Device Info" Data section during device setup\n\nAdd new driver to support YoLink Smoke Alarm (YS7A12-UC)\n\n",
+    "releaseNotes": "YoLink Device Service - Add Device Model information to Device Info Data section during device setup\n\nAdd new driver to support YoLink Smoke Alarm YS7A12-UC\n\n",
     "documentationLink": "https://github.com/srbarcus/yolink/wiki",
     "communityLink": "https://community.hubitat.com/t/released-beta-yolink-device-service-app-and-drivers-to-connect-hubitat-to-yolink-devices/96432",
     "apps": [
