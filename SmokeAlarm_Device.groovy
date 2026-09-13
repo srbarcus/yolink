@@ -63,8 +63,6 @@ metadata {
         attribute "testingAlarm", "String"
         attribute "lastTest", "String"
         
-        attribute "deviceModel", "String"
-        
         /* Have no idea of their meaning
         attribute "unexpected", "String"  
         attribute "unexpectedChanged", "String"
@@ -97,11 +95,6 @@ void ServiceSetup(Hubitat_dni,homeID,devname,devtype,devtoken,devId) {
     //reset()  - Not necessary?     
  }
 
-void SetModel(devModel) {	
-    rememberState("deviceModel", devModel)   
-	log.info "Device model is ${state.devModel})"
- }
-
 public def getSetup() {
     def setup = [:]
         setup.put("my_dni", "${state.my_dni}")                   
@@ -110,7 +103,7 @@ public def getSetup() {
         setup.put("type", "${state.type}") 
         setup.put("token", "${state.token}") 
         setup.put("devId", "${state.devId}") 
-        setup.put("devModel", "${state.devModel}") 
+      
     return setup
 }
 
